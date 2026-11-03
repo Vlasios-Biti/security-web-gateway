@@ -1,8 +1,8 @@
 {
   "product": "Security Web Gateway",
-  "version": "3.4.1",
+  "version": "3.4.2",
   "schema_migration": "013",
-  "target_os": "Ubuntu 24.04 LTS",
+  "target_os": "Ubuntu 24.04 LTS / Ubuntu 26.04 LTS",
   "deployment_model": "single-vm-on-prem-appliance",
   "management_backend": "127.0.0.1:8200",
   "default_proxy_port": 3128,

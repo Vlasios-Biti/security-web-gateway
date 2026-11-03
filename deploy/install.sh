@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="$(cat "$(cd "$(dirname "$0")/.." && pwd)/VERSION")"
+SWG_VERSION="$(cat "$(cd "$(dirname "$0")/.." && pwd)/VERSION")"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 FQDN=""
 BIND_IP=""
@@ -67,8 +67,13 @@ if [[ $SELF_SIGNED -eq 0 ]]; then
   [[ -f "$TLS_CERT" && -f "$TLS_KEY" ]] || { echo "ERROR: provide --tls-cert and --tls-key, or explicitly use --self-signed." >&2; exit 2; }
 fi
 
-if [[ -f /etc/os-release ]]; then . /etc/os-release; fi
-if [[ "${ID:-}" != "ubuntu" ]]; then echo "WARNING: installer is validated for Ubuntu 24.04 LTS / 26.04 LTS; detected ${PRETTY_NAME:-unknown}."; fi
+OS_ID=""
+OS_PRETTY_NAME="unknown"
+if [[ -f /etc/os-release ]]; then
+  OS_ID="$(. /etc/os-release; printf '%s' "${ID:-}")"
+  OS_PRETTY_NAME="$(. /etc/os-release; printf '%s' "${PRETTY_NAME:-unknown}")"
+fi
+if [[ "$OS_ID" != "ubuntu" ]]; then echo "WARNING: installer is validated for Ubuntu 24.04 LTS / 26.04 LTS; detected $OS_PRETTY_NAME."; fi
 
 for port in 443 8081 "$PROXY_PORT"; do
   if ss -lnt 2>/dev/null | awk '{print $4}' | grep -Eq "(^|:)$port$"; then
@@ -98,11 +103,11 @@ install -d -o proxy-mgmt -g proxy-mgmt -m 0750 /var/lib/security-web-gateway/pro
 install -d -o root -g proxy -m 0750 /var/lib/security-web-gateway/backups /etc/squid/managed
 
 echo "===== 3. RELEASE + PYTHON RUNTIME ====="
-REL="/opt/security-web-gateway/releases/$VERSION"
+REL="/opt/security-web-gateway/releases/$SWG_VERSION"
 rm -rf "$REL"; install -d -o root -g proxy-mgmt -m 0750 "$REL"
 rsync -a --delete \
   --exclude '__pycache__' --exclude '*.pyc' \
-  "$ROOT/app" "$ROOT/bin" "$ROOT/migrations" "$ROOT/static" "$ROOT/templates" "$ROOT/tools" "$ROOT/requirements.txt" "$REL/"
+  "$ROOT/app" "$ROOT/bin" "$ROOT/migrations" "$ROOT/static" "$ROOT/templates" "$ROOT/tools" "$ROOT/requirements.txt" "$ROOT/VERSION" "$REL/"
 chown -R root:proxy-mgmt "$REL"
 find "$REL" -type d -exec chmod 0750 {} +
 find "$REL" -type f -exec chmod 0640 {} +
@@ -253,7 +258,7 @@ systemctl enable --now security-web-gateway-source-sync.timer security-web-gatew
 
 for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8200/healthz >/tmp/security-web-gateway-health.json 2>/dev/null && break; sleep 1; done
 cat /tmp/security-web-gateway-health.json
-grep -q "\"version\":\"$VERSION\"" /tmp/security-web-gateway-health.json
+grep -q "\"version\":\"$SWG_VERSION\"" /tmp/security-web-gateway-health.json
 runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH="$REL" /opt/security-web-gateway/venv/bin/python "$REL/bin/collect_performance.py" >/dev/null 2>&1 || true
 runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH="$REL" /opt/security-web-gateway/venv/bin/python "$REL/bin/collect_telemetry.py" --max-events 10000 >/dev/null 2>&1 || true
 
@@ -266,7 +271,7 @@ fi
 
 echo
 echo "============================================================"
-echo "Security Web Gateway v$VERSION installed"
+echo "Security Web Gateway v$SWG_VERSION installed"
 echo "GUI:      https://$FQDN"
 echo "PAC:      http://$BIND_IP:8081/proxy.pac"
 echo "Proxy:    $BIND_IP:$PROXY_PORT"

@@ -2,8 +2,20 @@ import os
 from pathlib import Path
 
 APP_NAME = "Security Web Gateway Manager"
-APP_VERSION = "3.4.0"
 APP_ROOT = Path(__file__).resolve().parents[1]
+
+def _load_app_version() -> str:
+    env_version = os.getenv("SWG_APP_VERSION", "").strip()
+    if env_version:
+        return env_version
+    version_file = APP_ROOT / "VERSION"
+    if version_file.is_file():
+        value = version_file.read_text(encoding="utf-8").strip()
+        if value:
+            return value
+    return "unknown"
+
+APP_VERSION = _load_app_version()
 MODE = os.getenv("SWG_MODE", "candidate").strip().lower()
 SERVICE_NAME = os.getenv("SWG_SERVICE_NAME", "security-web-gateway-candidate" if MODE == "candidate" else "security-web-gateway")
 PROXY_IP = os.getenv("SWG_PROXY_IP", "127.0.0.1")

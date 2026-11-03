@@ -1,8 +1,8 @@
 # Security Web Gateway
 
-**Version:** 3.4.1  
+**Version:** 3.4.2  
 **Target:** single-VM, on-prem enterprise appliance  
-**Target OS:** Ubuntu Server 24.04 LTS  
+**Target OS:** Ubuntu Server 24.04 LTS / 26.04 LTS  
 **Architecture:** Squid explicit proxy + FastAPI management plane + Nginx TLS + SQLite/WAL policy and telemetry store + isolated background workers + restricted privileged deployment helper.
 
 This repository is the source-of-truth for Security Web Gateway. Runtime databases, TLS private keys, production certificates, passwords, HAR captures, logs and backups are deliberately **not** part of Git.
@@ -25,7 +25,7 @@ The design priority is:
 Standard deployment for roughly 50–250 normal office users:
 
 ```text
-OS:        Ubuntu Server 24.04 LTS
+OS:        Ubuntu Server 24.04 LTS or 26.04 LTS
 vCPU:      4
 RAM:       8 GiB
 Disk:      100 GiB SSD/NVMe
@@ -121,7 +121,7 @@ docs/                architecture, deployment, performance and operations docs
 
 ## Fresh server installation
 
-Prepare a supported Ubuntu 24.04 LTS VM with static IP/routing/NTP and the intended certificate. Do **not** commit TLS keys to Git.
+Prepare a supported Ubuntu 24.04 LTS or 26.04 LTS VM with static IP/routing/NTP and the intended certificate. Do **not** commit TLS keys to Git.
 
 ```bash
 sudo ./deploy/install.sh \
@@ -212,11 +212,11 @@ Keep the repository private unless publication is intentional.
 git add -A
 git status
 git diff --cached
-git commit -m "Security Web Gateway v3.4.1"
+git commit -m "Security Web Gateway v3.4.2"
 git push
 
-git tag -a v3.4.1 -m "Security Web Gateway v3.4.1"
-git push origin v3.4.1
+git tag -a v3.4.2 -m "Security Web Gateway v3.4.2"
+git push origin v3.4.2
 ```
 
 Never stage `.db`, `.sqlite*`, `.env`, TLS/private-key material, HAR files, logs or backups.

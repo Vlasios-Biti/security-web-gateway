@@ -1,5 +1,22 @@
 # Changelog
 
+## 3.4.0
+
+- Re-focused the product as a **single-VM, on-prem Security Web Gateway appliance**.
+- Added data-plane resource priority for Squid and low-priority cgroup/I/O scheduling for telemetry, discovery, storage and performance workers.
+- Added optional/default fresh-install local DNS caching with Unbound, forwarding to enterprise DNS servers; Squid can use the loopback cache without changing the host resolver.
+- Disabled Squid content caching by policy; modern HTTPS CONNECT traffic is not cacheable without TLS inspection, so the design avoids unnecessary disk I/O.
+- Added SQLite runtime tuning (`WAL`, `synchronous=NORMAL`, memory temp store/cache, mmap) and session touch throttling to reduce write contention.
+- Removed live `systemctl`/DNS checks from the Overview request path; health is sampled in the background and read from cache.
+- Added background dashboard precomputation so Overview does not perform expensive telemetry aggregation on every page load.
+- Added VM/data-plane performance sampling: CPU, I/O wait, memory, disk, telemetry lag, proxy P50/P95/P99 and established proxy connections.
+- Added `System -> Performance` GUI.
+- Added response timing headers (`Server-Timing`, `X-Response-Time-Ms`) for management-plane diagnostics.
+- Added **Policy Simulator** and **Why Blocked?** explainability.
+- Added conservative **Application Dependency Candidates**: blocked destinations can be correlated with a recently active single application, classified/scored, and presented for approval/ignore. Candidates never auto-allow.
+- Added supporting schema migration 013, indexes and background caches.
+- Added new v3.4 smoke tests and CI migration checks.
+
 ## 3.3.1
 
 - Full product rebrand to **Security Web Gateway**.

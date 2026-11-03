@@ -6,6 +6,7 @@ import csv
 import hashlib
 import ipaddress
 import io
+import json
 import os
 import socket
 import shutil
@@ -379,14 +380,22 @@ def _ingest_locked(max_events=50000, cleanup=True):
         cleanup_result = None
         if cleanup:
             cleanup_result = _cleanup_telemetry_connection(c)
+        summary_state=c.execute("SELECT COUNT(*) c,MIN(event_time) first_event,MAX(event_time) last_event,MAX(epoch) last_epoch FROM telemetry_events").fetchone()
+        _set_state(c,"telemetry_event_count",summary_state["c"] or 0)
+        _set_state(c,"telemetry_first_event",summary_state["first_event"] or "")
+        _set_state(c,"telemetry_last_event",summary_state["last_event"] or "")
+        _set_state(c,"telemetry_last_event_epoch",summary_state["last_epoch"] or "")
         c.commit()
-        return {"inserted": inserted, "parsed": parsed, "offset": new_offset, "inode": st.st_ino, "cleanup": cleanup_result}
+        # Expensive intelligence/aggregation runs only in this collector path, never in GUI requests.
+        candidate_result = refresh_dependency_candidates()
+        cache_result = refresh_dashboard_cache((60,1440))
+        return {"inserted": inserted, "parsed": parsed, "offset": new_offset, "inode": st.st_ino, "cleanup": cleanup_result, "dependency_candidates": candidate_result, "dashboard_cache": cache_result}
     finally:
         c.close()
 
 
 def ensure_fresh():
-    # v3.3: never parse Squid logs inside a web request. The 30-second collector
+    # Never parse Squid logs inside a web request. The 30-second collector
     # timer owns ingestion so a large/locked access.log cannot stall the GUI or
     # trigger an Nginx 504. UI data can therefore be up to one collector interval old.
     return {"inserted": 0, "deferred": True}
@@ -527,12 +536,142 @@ def network_breakdown(minutes=1440):
     finally:c.close()
 
 
-def dashboard_payload(minutes=60):
+def _compute_dashboard_payload(minutes=60):
     ensure_fresh();f={"range":"1h" if minutes<=60 else "24h"};s=traffic_summary(f)
     return {"timeline":timeline(minutes,5),"allowed":s["allowed"],"denied":s["denied"],"clients":s["clients"],
             "bytes":s["bytes"],"top_blocked":top_items({**f,"decision":"DENY"},"destination_host",10),
             "top_allowed":top_items({**f,"decision":"ALLOW"},"destination_host",10),
             "top_clients":top_items(f,"client_ip",10),"networks":network_breakdown(minutes)}
+
+
+def _cache_ttl(c):
+    try:
+        return max(5, min(300, int(_setting(c, "dashboard_cache_ttl_seconds", "20"))))
+    except Exception:
+        return 20
+
+
+def refresh_dashboard_cache(minutes_list=(60, 1440)):
+    """Precompute overview/dashboard analytics outside the web request path."""
+    out={}
+    for minutes in minutes_list:
+        payload=_compute_dashboard_payload(int(minutes))
+        c=connect()
+        try:
+            ttl=_cache_ttl(c)
+            now=time.time()
+            key=f"traffic:{int(minutes)}"
+            c.execute(
+                "INSERT INTO dashboard_cache(key,payload_json,generated_at,expires_at) VALUES(?,?,CURRENT_TIMESTAMP,?) "
+                "ON CONFLICT(key) DO UPDATE SET payload_json=excluded.payload_json,generated_at=CURRENT_TIMESTAMP,expires_at=excluded.expires_at",
+                (key,json.dumps(payload,separators=(",",":")),now+ttl),
+            )
+            c.commit()
+            out[key]={"generated":True,"ttl":ttl}
+        finally:
+            c.close()
+    return out
+
+
+def dashboard_payload(minutes=60):
+    """Return precomputed dashboard data; never perform expensive aggregation in a page request."""
+    key=f"traffic:{int(minutes)}"
+    c=connect()
+    try:
+        r=c.execute("SELECT payload_json,generated_at,expires_at FROM dashboard_cache WHERE key=?",(key,)).fetchone()
+        if r:
+            try:
+                payload=json.loads(r["payload_json"])
+                payload["cache_generated_at"]=r["generated_at"]
+                payload["cache_stale"]=float(r["expires_at"]) < time.time()
+                return payload
+            except Exception:
+                pass
+    finally:
+        c.close()
+    return {
+        "timeline":[],"allowed":0,"denied":0,"clients":0,"bytes":0,
+        "top_blocked":[],"top_allowed":[],"top_clients":[],"networks":[],
+        "cache_generated_at":None,"cache_stale":True,"cache_warming":True,
+    }
+
+
+def _confidence_for_classification(classification,recommendation):
+    if classification in ("first_party","authentication","api","realtime"):
+        return 90,"high"
+    if classification in ("cdn","storage"):
+        return 72,"medium"
+    if recommendation=="ignore":
+        return 10,"low"
+    return 55,"medium"
+
+
+def refresh_dependency_candidates(max_denied=2000):
+    """Correlate new blocked hosts with the most recently active single application for a client.
+
+    This is intentionally conservative: candidates are evidence only and never change policy.
+    """
+    from app.services.discovery import _classify_endpoint
+    c=connect()
+    created=updated=0
+    try:
+        window=max(30,min(900,int(_setting(c,"dependency_candidate_window_seconds","120"))))
+        last=float(_get_state(c,"dependency_candidate_scan_epoch",str(max(0,time.time()-300))) or 0)
+        denied=[dict(r) for r in c.execute("""SELECT id,epoch,event_time,client_ip,destination_host,destination_port
+            FROM telemetry_events WHERE epoch>? AND decision='DENY' AND destination_host!=''
+            ORDER BY epoch ASC LIMIT ?""",(last,max(100,min(int(max_denied),10000))))]
+        max_epoch=last
+        for d in denied:
+            max_epoch=max(max_epoch,float(d['epoch']))
+            prev=c.execute("""SELECT application_ids,application_names FROM telemetry_events
+                WHERE client_ip=? AND decision='ALLOW' AND epoch<=? AND epoch>=?
+                  AND application_ids IS NOT NULL AND application_ids!=''
+                ORDER BY epoch DESC LIMIT 1""",(d['client_ip'],d['epoch'],d['epoch']-window)).fetchone()
+            if not prev: continue
+            app_ids=[int(x) for x in (prev['application_ids'] or '').strip(',').split(',') if x.strip().isdigit()]
+            app_ids=list(dict.fromkeys(app_ids))
+            if len(app_ids)!=1: continue
+            aid=app_ids[0]
+            app=c.execute("SELECT id,name,seed_domain FROM applications WHERE id=? AND status='active'",(aid,)).fetchone()
+            if not app: continue
+            host=(d['destination_host'] or '').lower().rstrip('.')
+            # If this host already belongs to the application, it is not a new dependency candidate.
+            already=False
+            for rr in c.execute("""SELECT r.destination FROM rules r JOIN application_rules ar ON ar.rule_id=r.id
+                WHERE ar.application_id=? AND ar.enabled=1 AND r.rule_type='domain' AND r.status='active'""",(aid,)):
+                if _domain_matches(rr['destination'],host): already=True; break
+            if already: continue
+            cls,rec=_classify_endpoint(host,seed_host=(app['seed_domain'] or '').lower().rstrip('.'))
+            if rec=='ignore': continue
+            score,confidence=_confidence_for_classification(cls,rec)
+            protocol='HTTPS' if int(d['destination_port'] or 443)==443 else 'HTTP'
+            row=c.execute("SELECT id,status FROM application_dependency_candidates WHERE application_id=? AND destination=? AND protocol=?",(aid,host,protocol)).fetchone()
+            evidence=json.dumps({"correlated_from_application":app['name'],"window_seconds":window,"event_id":d['id']},separators=(",",":"))
+            if row:
+                if row['status']=='pending':
+                    c.execute("""UPDATE application_dependency_candidates SET request_count=request_count+1,last_seen_at=?,
+                        classification=?,confidence_score=?,confidence=?,recommendation=?,evidence_json=? WHERE id=?""",
+                        (d['event_time'],cls,score,confidence,rec,evidence,row['id']))
+                    cid=row['id'];updated+=1
+                else:
+                    continue
+            else:
+                cur=c.execute("""INSERT INTO application_dependency_candidates(application_id,destination,protocol,classification,
+                    confidence_score,confidence,recommendation,request_count,client_count,first_seen_at,last_seen_at,
+                    first_client_ip,evidence_json,status) VALUES(?,?,?,?,?,?,?,?,1,?,?,?,?, 'pending')""",
+                    (aid,host,protocol,cls,score,confidence,rec,1,d['event_time'],d['event_time'],d['client_ip'],evidence))
+                cid=cur.lastrowid;created+=1
+            c.execute("""INSERT INTO application_dependency_candidate_clients(candidate_id,client_ip,first_seen_at,last_seen_at)
+                VALUES(?,?,?,?) ON CONFLICT(candidate_id,client_ip) DO UPDATE SET last_seen_at=excluded.last_seen_at""",
+                (cid,d['client_ip'],d['event_time'],d['event_time']))
+            cc=c.execute("SELECT COUNT(*) c FROM application_dependency_candidate_clients WHERE candidate_id=?",(cid,)).fetchone()['c']
+            c.execute("UPDATE application_dependency_candidates SET client_count=? WHERE id=?",(cc,cid))
+        if denied:
+            _set_state(c,"dependency_candidate_scan_epoch",max_epoch)
+        c.commit()
+        return {"created":created,"updated":updated,"scanned":len(denied),"window_seconds":window}
+    finally:
+        c.close()
 
 
 def _ptr(ip):
@@ -619,6 +758,11 @@ def _cleanup_telemetry_connection(c):
         pass
     _set_state(c, "last_cleanup_at", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     _set_state(c, "last_cleanup_deleted", deleted)
+    _set_state(c, "telemetry_event_count", after_count)
+    edge=c.execute("SELECT MIN(event_time) first_event,MAX(event_time) last_event,MAX(epoch) last_epoch FROM telemetry_events").fetchone()
+    _set_state(c,"telemetry_first_event",edge["first_event"] or "")
+    _set_state(c,"telemetry_last_event",edge["last_event"] or "")
+    _set_state(c,"telemetry_last_event_epoch",edge["last_epoch"] or "")
     _set_state(c, "last_cleanup_reason", "age+storage" if batches else "age")
     after_count = max(0, before_count - deleted)
     return {"deleted": deleted, "events_before": before_count, "events_after": after_count, **stats}
@@ -693,9 +837,9 @@ def update_storage_settings(retention_days, max_gb, target_gb, min_free_gb, raw_
 def telemetry_health():
     c=connect()
     try:
-        count=c.execute("SELECT COUNT(*) c FROM telemetry_events").fetchone()["c"]
-        first=c.execute("SELECT MIN(event_time) v FROM telemetry_events").fetchone()["v"]
-        last=c.execute("SELECT MAX(event_time) v FROM telemetry_events").fetchone()["v"]
+        count=int(_get_state(c,"telemetry_event_count","0") or 0)
+        first=_get_state(c,"telemetry_first_event","") or None
+        last=_get_state(c,"telemetry_last_event","") or None
         stats=_db_space_stats(c)
         return {
             "events":count,"first_event":first,"last_event":last,"last_ingest_at":_get_state(c,"last_ingest_at"),

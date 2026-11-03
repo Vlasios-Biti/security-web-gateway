@@ -3,15 +3,21 @@ from fastapi import APIRouter,Request,Form
 from fastapi.responses import HTMLResponse,RedirectResponse
 from app import auth
 from app.db import audit
-from app.services.system import service_status,disk_usage,memory_usage,port_open,dns_health
+from app.services.system import service_status,disk_usage,memory_usage,port_open,dns_health,cached_system_health
 from app.services.deployment import drift_status
 from app.services.traffic import telemetry_health,update_storage_settings,cleanup_telemetry,cleanup_rotated_squid_logs
 from app.services.operations import validate_squid,reload_squid,create_backup
 from app.config import MODE
+from app.services.performance import latest_performance,performance_history
 router=APIRouter(prefix="/system")
 @router.get("/health",response_class=HTMLResponse)
 def page(request:Request):
-    return request.app.state.templates.TemplateResponse(request=request,name="system/health.html",context={"request":request,"page_title":"System Health","squid":service_status("squid"),"nginx":service_status("nginx"),"app":service_status("security-web-gateway" if MODE=="production" else "security-web-gateway-candidate"),"disk":disk_usage(),"memory":memory_usage(),"port_ok":port_open(),"dns":dns_health(),"drift":drift_status(),"telemetry":telemetry_health(),"telemetry_service":service_status("security-web-gateway-telemetry.timer"),"mode":MODE})
+    h=cached_system_health()
+    return request.app.state.templates.TemplateResponse(request=request,name="system/health.html",context={"request":request,"page_title":"System Health","squid":h["squid_status"],"nginx":h["nginx_status"],"app":h["app_status"],"disk":h["disk"],"memory":h["memory"],"port_ok":h["port_ok"],"dns":h["dns"],"drift":drift_status(),"telemetry":telemetry_health(),"telemetry_service":service_status("security-web-gateway-telemetry.timer"),"performance_service":service_status("security-web-gateway-performance.timer"),"health_cache":h,"mode":MODE})
+
+@router.get("/performance",response_class=HTMLResponse)
+def performance_page(request:Request):
+    return request.app.state.templates.TemplateResponse(request=request,name="system/performance.html",context={"request":request,"page_title":"System Performance","perf":latest_performance(),"history":performance_history(6,360)})
 
 def _admin(request):return request.state.user and request.state.user["role"]=="admin"
 

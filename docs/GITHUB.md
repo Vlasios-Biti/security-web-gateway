@@ -7,7 +7,7 @@ Branch model for a small infrastructure team:
 - `main` — production-ready releases
 - short-lived `feature/*` and `fix/*` branches
 - pull request required into `main`
-- tagged releases: `v3.3.0`, `v3.3.1`, etc.
+- tagged releases: `v3.4.0`, `v3.4.1`, etc.
 
 Recommended protections:
 

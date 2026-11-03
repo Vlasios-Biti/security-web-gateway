@@ -1,13 +1,30 @@
 {
   "product": "Security Web Gateway",
-  "version": "3.3.1",
-  "schema_migration": "012",
+  "version": "3.4.0",
+  "schema_migration": "013",
   "target_os": "Ubuntu 24.04 LTS",
+  "deployment_model": "single-vm-on-prem-appliance",
   "management_backend": "127.0.0.1:8200",
   "default_proxy_port": 3128,
   "pac_port": 8081,
   "policy_model": "default-deny-explicit-allow",
   "runtime_state_in_git": false,
   "browser_discovery": "playwright-chromium",
-  "har_raw_storage": false
+  "har_raw_storage": false,
+  "dashboard_aggregation": "background-cache",
+  "local_dns_cache": "unbound-optional-default-on-fresh-install",
+  "dependency_candidates_auto_allow": false,
+  "recommended_vm": {
+    "vcpu": 4,
+    "ram_gib": 8,
+    "disk_gib": 100,
+    "nic": "VirtIO 1Gbps+",
+    "swap_gib": 2
+  },
+  "data_plane_priority": "squid-high-background-workers-low",
+  "proxy_content_cache": false,
+  "performance_sampling": true,
+  "policy_simulator": true,
+  "why_blocked": true,
+  "dependency_candidates": "review-only-no-auto-allow"
 }

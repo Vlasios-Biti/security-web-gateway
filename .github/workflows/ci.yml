@@ -21,7 +21,7 @@ jobs:
       - name: Python compile
         run: python -m compileall -q app bin tools privileged tests
       - name: Shell syntax
-        run: bash -n deploy/*.sh
+        run: bash -n deploy/*.sh scripts/*.sh
       - name: Fresh migration
         run: |
           rm -f /tmp/swg-ci.db
@@ -31,18 +31,28 @@ jobs:
           c=sqlite3.connect('/tmp/swg-ci.db')
           assert c.execute('pragma integrity_check').fetchone()[0]=='ok'
           assert not list(c.execute('pragma foreign_key_check'))
-          assert c.execute('select max(version) from schema_migrations').fetchone()[0]=='012'
+          assert c.execute('select max(version) from schema_migrations').fetchone()[0]=='013'
+          assert c.execute('pragma journal_mode').fetchone()[0].lower()=='wal'
           PY
-      - name: v3.2 to v3.3 migration
+      - name: v3.3.1 to v3.4 migration
         run: |
-          rm -rf /tmp/v32root /tmp/swg-v32.db
-          mkdir -p /tmp/v32root/migrations
-          cp migrations/0{01,02,03,04,05,06,07,08,09}_*.sql /tmp/v32root/migrations/
-          cp migrations/010_*.sql migrations/011_*.sql /tmp/v32root/migrations/
-          python tools/migrate.py --db /tmp/swg-v32.db --root /tmp/v32root
-          python tools/migrate.py --db /tmp/swg-v32.db --root .
-      - name: v3.3.1 smoke tests
+          rm -rf /tmp/v331root /tmp/swg-v331.db
+          mkdir -p /tmp/v331root/migrations
+          cp migrations/0{01,02,03,04,05,06,07,08,09}_*.sql /tmp/v331root/migrations/
+          cp migrations/010_*.sql migrations/011_*.sql migrations/012_*.sql /tmp/v331root/migrations/
+          python tools/migrate.py --db /tmp/swg-v331.db --root /tmp/v331root
+          python tools/migrate.py --db /tmp/swg-v331.db --root .
+          python - <<'PY'
+          import sqlite3
+          c=sqlite3.connect('/tmp/swg-v331.db')
+          assert c.execute('select max(version) from schema_migrations').fetchone()[0]=='013'
+          assert c.execute('pragma integrity_check').fetchone()[0]=='ok'
+          assert not list(c.execute('pragma foreign_key_check'))
+          PY
+      - name: v3.3 compatibility smoke tests
         run: python tests/smoke_v331.py
+      - name: v3.4 performance and intelligence smoke tests
+        run: python tests/smoke_v340.py
       - name: App import
         env:
           SWG_DB_PATH: /tmp/swg-ci.db
@@ -51,3 +61,8 @@ jobs:
           SWG_FQDN: proxy.test.local
           SWG_PROXY_IP: 127.0.0.1
         run: python -c 'from app.main import app; print(app.title, len(app.routes))'
+      - name: Forbidden product-name scan
+        run: |
+          forbidden="$(printf '\147\162\157\167\151\156')"
+          ! grep -RniI --exclude=CHECKSUMS.sha256 "$forbidden" .
+          ! find . -iname "*${forbidden}*" -print | grep .

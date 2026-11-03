@@ -1,8 +1,12 @@
+import json
 import os
 import shutil
 import socket
 import subprocess
-from app.config import PROXY_IP, PROXY_PORT, DEFAULT_DNS_SERVERS
+import time
+
+from app.config import PROXY_IP, PROXY_PORT, DEFAULT_DNS_SERVERS, LOCAL_DNS_CACHE, LOCAL_DNS_IP
+from app.db import connect
 
 
 def run(cmd, timeout=5):
@@ -14,7 +18,7 @@ def run(cmd, timeout=5):
 
 
 def service_status(name):
-    r = run(["systemctl", "is-active", name])
+    r = run(["systemctl", "is-active", name], timeout=3)
     return r["stdout"] or "unknown"
 
 
@@ -57,15 +61,64 @@ def load_average():
 
 def port_open(host=PROXY_IP, port=PROXY_PORT):
     try:
-        with socket.create_connection((host, port), timeout=2):
+        with socket.create_connection((host, port), timeout=1):
             return True
     except Exception:
         return False
 
 
+def _dig(server):
+    started=time.perf_counter()
+    r = run(["/usr/bin/dig", f"@{server}", "google.com", "A", "+time=1", "+tries=1", "+short"], 2)
+    return {"server":server,"ok":bool(r["ok"] and r["stdout"]),"latency_ms":round((time.perf_counter()-started)*1000,1)}
+
+
 def dns_health():
-    out = []
+    out=[]
+    if LOCAL_DNS_CACHE:
+        x=_dig(LOCAL_DNS_IP);x["role"]="local-cache";out.append(x)
     for s in DEFAULT_DNS_SERVERS:
-        r = run(["/usr/bin/dig", f"@{s}", "google.com", "A", "+time=2", "+tries=1", "+short"], 4)
-        out.append({"server": s, "ok": bool(r["ok"] and r["stdout"])})
+        x=_dig(s);x["role"]="upstream";out.append(x)
     return out
+
+
+def live_system_health():
+    from app.config import SERVICE_NAME
+    return {
+        "generated_at": time.time(),
+        "squid_status": service_status("squid"),
+        "nginx_status": service_status("nginx"),
+        "app_status": service_status(SERVICE_NAME),
+        "port_ok": port_open(),
+        "dns": dns_health(),
+        "disk": disk_usage(),
+        "memory": memory_usage(),
+        "load": load_average(),
+        "local_dns_cache": bool(LOCAL_DNS_CACHE),
+    }
+
+
+def cache_system_health(ttl=30):
+    payload=live_system_health();now=time.time();c=connect()
+    try:
+        c.execute(
+            "INSERT INTO dashboard_cache(key,payload_json,generated_at,expires_at) VALUES('system:health',?,CURRENT_TIMESTAMP,?) "
+            "ON CONFLICT(key) DO UPDATE SET payload_json=excluded.payload_json,generated_at=CURRENT_TIMESTAMP,expires_at=excluded.expires_at",
+            (json.dumps(payload,separators=(",",":")),now+max(5,min(int(ttl),300))),
+        );c.commit();return payload
+    finally:c.close()
+
+
+def cached_system_health():
+    c=connect()
+    try:r=c.execute("SELECT payload_json,generated_at,expires_at FROM dashboard_cache WHERE key='system:health'").fetchone()
+    finally:c.close()
+    if r:
+        try:
+            d=json.loads(r['payload_json']);d['cache_generated_at']=r['generated_at'];d['cache_stale']=float(r['expires_at'])<time.time();return d
+        except Exception:pass
+    return {
+        "generated_at":None,"cache_generated_at":None,"cache_stale":True,
+        "squid_status":"warming","nginx_status":"warming","app_status":"warming","port_ok":False,
+        "dns":[],"disk":disk_usage(),"memory":memory_usage(),"load":load_average(),"local_dns_cache":bool(LOCAL_DNS_CACHE),
+    }

@@ -22,6 +22,14 @@ jobs:
         run: pip install -r requirements.txt
       - name: Python compile
         run: python -m compileall -q app bin tools privileged tests
+      - name: Application version matches VERSION
+        run: |
+          python - <<'PY'
+          from app.config import APP_VERSION
+          expected=open('VERSION', encoding='utf-8').read().strip()
+          assert APP_VERSION == expected, (APP_VERSION, expected)
+          print(APP_VERSION)
+          PY
       - name: Shell syntax
         run: bash -n deploy/*.sh scripts/*.sh
       - name: Fresh migration

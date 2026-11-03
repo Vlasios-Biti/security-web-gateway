@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.4.1
+
+- Fixed release checksum generation for Windows PS1/CMD files managed as CRLF by .gitattributes, so a normal Git checkout passes `sha256sum -c CHECKSUMS.sha256`.
+- Changed fresh-install health version validation to use the release VERSION dynamically instead of hard-coding 3.4.0.
+- No data-plane, policy-model, schema, or application-intelligence behavior changes from v3.4.0.
+
 ## 3.4.0
 
 - Re-focused the product as a **single-VM, on-prem Security Web Gateway appliance**.

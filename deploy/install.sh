@@ -253,7 +253,7 @@ systemctl enable --now security-web-gateway-source-sync.timer security-web-gatew
 
 for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8200/healthz >/tmp/security-web-gateway-health.json 2>/dev/null && break; sleep 1; done
 cat /tmp/security-web-gateway-health.json
-grep -q '"version":"3.4.0"' /tmp/security-web-gateway-health.json
+grep -q "\"version\":\"$VERSION\"" /tmp/security-web-gateway-health.json
 runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH="$REL" /opt/security-web-gateway/venv/bin/python "$REL/bin/collect_performance.py" >/dev/null 2>&1 || true
 runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH="$REL" /opt/security-web-gateway/venv/bin/python "$REL/bin/collect_telemetry.py" --max-events 10000 >/dev/null 2>&1 || true
 

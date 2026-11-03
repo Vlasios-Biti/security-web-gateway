@@ -1,0 +1,93 @@
+name: Build Security Web Gateway v3.4.1 hotfix
+
+on:
+  push:
+    branches:
+      - release/v3.4.1
+
+permissions:
+  contents: write
+
+jobs:
+  build-hotfix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/v3.4.1
+          fetch-depth: 0
+
+      - name: Apply release-integrity hotfix
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          Path('VERSION').write_text('3.4.1\n', encoding='utf-8')
+
+          p = Path('release_manifest.json')
+          data = json.loads(p.read_text(encoding='utf-8'))
+          data['version'] = '3.4.1'
+          p.write_text(json.dumps(data, indent=2) + '\n', encoding='utf-8')
+
+          p = Path('README.md')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('**Version:** 3.4.0', '**Version:** 3.4.1', 1)
+          s = s.replace('git commit -m "Security Web Gateway v3.4.0"', 'git commit -m "Security Web Gateway v3.4.1"')
+          s = s.replace('git tag -a v3.4.0 -m "Security Web Gateway v3.4.0"', 'git tag -a v3.4.1 -m "Security Web Gateway v3.4.1"')
+          s = s.replace('git push origin v3.4.0', 'git push origin v3.4.1')
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('ACCEPTANCE_TEST.md')
+          s = p.read_text(encoding='utf-8').replace('v3.4.0', 'v3.4.1').replace('3.4.0', '3.4.1')
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('docs/DEPLOYMENT.md')
+          s = p.read_text(encoding='utf-8').replace('/healthz` reports version `3.4.0`', '/healthz` reports version `3.4.1`')
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('deploy/install.sh')
+          s = p.read_text(encoding='utf-8')
+          old = "grep -q '\"version\":\"3.4.0\"' /tmp/security-web-gateway-health.json"
+          new = "grep -q \"\\\"version\\\":\\\"$VERSION\\\"\" /tmp/security-web-gateway-health.json"
+          if old not in s:
+              raise SystemExit('Expected hard-coded health version check not found')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+
+          p = Path('CHANGELOG.md')
+          s = p.read_text(encoding='utf-8')
+          marker = '# Changelog\n\n'
+          entry = '''## 3.4.1
+
+- Fixed release checksum generation for Windows PS1/CMD files managed as CRLF by .gitattributes, so a normal Git checkout passes sha256sum -c CHECKSUMS.sha256.
+- Changed fresh-install health version validation to use the release VERSION dynamically instead of hard-coding 3.4.0.
+- No data-plane, policy-model, schema, or application-intelligence behavior changes from v3.4.0.
+
+'''
+          if '## 3.4.1' not in s:
+              s = s.replace(marker, marker + entry, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+
+          find . -type f \
+            ! -path './.git/*' \
+            ! -path './dist/*' \
+            ! -path '*/__pycache__/*' \
+            ! -name '*.pyc' \
+            ! -name 'CHECKSUMS.sha256' \
+            ! -path './.github/workflows/hotfix-v341.yml' \
+            -print0 | sort -z | xargs -0 sha256sum > CHECKSUMS.sha256
+
+          sha256sum -c CHECKSUMS.sha256
+          bash -n deploy/*.sh scripts/*.sh
+          python3 tests/smoke_v340.py
+          python3 -m compileall -q app bin tools privileged tests
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add VERSION release_manifest.json README.md ACCEPTANCE_TEST.md docs/DEPLOYMENT.md deploy/install.sh CHANGELOG.md CHECKSUMS.sha256
+          git commit -m 'Release integrity hotfix v3.4.1'
+          git push origin HEAD:release/v3.4.1

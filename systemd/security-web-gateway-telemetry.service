@@ -1,0 +1,28 @@
+[Unit]
+Description=Security Web Gateway Traffic Telemetry Collector
+After=network-online.target squid.service security-web-gateway.service
+Wants=network-online.target
+[Service]
+Type=oneshot
+User=proxy-mgmt
+Group=proxy-mgmt
+SupplementaryGroups=proxy
+WorkingDirectory=/opt/security-web-gateway/current
+EnvironmentFile=/etc/security-web-gateway/production.env
+ExecStart=/opt/security-web-gateway/venv/bin/python /opt/security-web-gateway/current/bin/collect_telemetry.py --max-events 100000
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/security-web-gateway/prod
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX

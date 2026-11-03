@@ -1,0 +1,10 @@
+[Unit]
+Description=Periodic Security Web Gateway Application Endpoint Source Check
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=1h
+RandomizedDelaySec=5min
+Persistent=true
+Unit=security-web-gateway-source-sync.service
+[Install]
+WantedBy=timers.target

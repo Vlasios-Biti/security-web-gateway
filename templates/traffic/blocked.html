@@ -1,0 +1,6 @@
+{% extends "base.html" %}{% block content %}
+<div class="traffic-summary"><div><b>{{ summary.clients }}</b><span>Clients</span></div><div><b class="good">{{ summary.allowed }}</b><span>Allowed</span></div><div><b class="bad">{{ summary.denied }}</b><span>Denied</span></div></div>
+<section class="panel"><div class="table-tools"><input class="search" data-filter-table="traffic-table" placeholder="Filter client IP, destination, method or result..."><button class="btn ghost" data-reload>Refresh</button></div>
+<div class="table-wrap"><table class="table" id="traffic-table"><thead><tr><th>TIME</th><th>CLIENT IP</th><th>DECISION</th><th>METHOD</th><th>DESTINATION</th><th>SQUID RESULT</th><th>UPSTREAM</th></tr></thead><tbody>
+{% for l in logs %}<tr><td class="muted">{{ l.time }}</td><td><code class="strong">{{ l.client }}</code></td><td><span class="badge {% if l.decision=='ALLOW' %}ok{% elif l.decision=='DENY' %}danger{% else %}system{% endif %}">{{ l.decision }}</span></td><td>{{ l.method }}</td><td><code>{{ l.destination }}</code></td><td><code>{{ l.result }}</code></td><td class="muted">{{ l.hierarchy }}</td></tr>{% endfor %}
+</tbody></table></div></section>{% endblock %}

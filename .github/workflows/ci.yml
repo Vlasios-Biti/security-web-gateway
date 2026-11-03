@@ -1,0 +1,53 @@
+name: swg-ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Python compile
+        run: python -m compileall -q app bin tools privileged tests
+      - name: Shell syntax
+        run: bash -n deploy/*.sh
+      - name: Fresh migration
+        run: |
+          rm -f /tmp/swg-ci.db
+          python tools/migrate.py --db /tmp/swg-ci.db --root .
+          python - <<'PY'
+          import sqlite3
+          c=sqlite3.connect('/tmp/swg-ci.db')
+          assert c.execute('pragma integrity_check').fetchone()[0]=='ok'
+          assert not list(c.execute('pragma foreign_key_check'))
+          assert c.execute('select max(version) from schema_migrations').fetchone()[0]=='012'
+          PY
+      - name: v3.2 to v3.3 migration
+        run: |
+          rm -rf /tmp/v32root /tmp/swg-v32.db
+          mkdir -p /tmp/v32root/migrations
+          cp migrations/0{01,02,03,04,05,06,07,08,09}_*.sql /tmp/v32root/migrations/
+          cp migrations/010_*.sql migrations/011_*.sql /tmp/v32root/migrations/
+          python tools/migrate.py --db /tmp/swg-v32.db --root /tmp/v32root
+          python tools/migrate.py --db /tmp/swg-v32.db --root .
+      - name: v3.3.1 smoke tests
+        run: python tests/smoke_v331.py
+      - name: App import
+        env:
+          SWG_DB_PATH: /tmp/swg-ci.db
+          SWG_DATA_ROOT: /tmp/swg-ci-data
+          SWG_MODE: production
+          SWG_FQDN: proxy.test.local
+          SWG_PROXY_IP: 127.0.0.1
+        run: python -c 'from app.main import app; print(app.title, len(app.routes))'

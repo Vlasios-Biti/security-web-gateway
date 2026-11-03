@@ -1,0 +1,43 @@
+# Runtime / secrets
+*.db
+*.db-wal
+*.db-shm
+*.sqlite*
+.env
+*.env
+!config/production.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+
+# Logs / telemetry / backups
+*.log
+backups/
+runtime/
+staging/
+telemetry/
+*.har
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Build / release output
+dist/
+build/
+*.zip
+*.tar.gz
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

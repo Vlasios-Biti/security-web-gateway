@@ -1,0 +1,10 @@
+[Unit]
+Description=Collect Security Web Gateway traffic telemetry every 30 seconds
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=30s
+AccuracySec=5s
+Persistent=true
+Unit=security-web-gateway-telemetry.service
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,57 @@
+{% extends "base.html" %}{% block content %}
+<div class="page-head"><div><h2>{{ page_title }}</h2><p>Searchable Squid telemetry with VLAN, client, destination and application attribution.</p></div><div class="head-actions"><a class="btn ghost" href="/traffic/export.csv?{{ export_query }}">Export CSV</a><a class="btn" href="/traffic/export.xlsx?{{ export_query }}">Export XLSX</a></div></div>
+<div class="telemetry-note"><b>Visibility source: Squid access.log.</b> Requests using PAC <code>DIRECT</code> bypass do not traverse Squid and are intentionally not present here. Router/IPFIX visibility belongs to the network-observability phase.</div>
+
+<div class="metrics traffic-kpis">
+  <div class="metric"><span>CLIENTS</span><strong>{{ summary.clients }}</strong><small>Unique source IPs</small></div>
+  <div class="metric"><span>REQUESTS</span><strong>{{ summary.total }}</strong><small>Current filtered window</small></div>
+  <div class="metric"><span>ALLOWED</span><strong class="good">{{ summary.allowed }}</strong><small>Proxy decisions</small></div>
+  <div class="metric"><span>DENIED</span><strong class="bad">{{ summary.denied }}</strong><small>Policy blocks</small></div>
+  <div class="metric"><span>TRANSFERRED</span><strong>{{ "%.1f"|format(summary.bytes/1048576) }} MB</strong><small>Logged Squid bytes</small></div>
+  <div class="metric"><span>AVG DURATION</span><strong>{{ summary.avg_elapsed_ms|round|int }} ms</strong><small>Request elapsed time</small></div>
+</div>
+
+<section class="panel traffic-filter-panel"><form method="get" class="traffic-filter-grid">
+  <label>Time range<select name="range"><option value="5m" {% if filters.range=='5m' %}selected{% endif %}>Last 5 min</option><option value="15m" {% if filters.range=='15m' %}selected{% endif %}>Last 15 min</option><option value="1h" {% if filters.range=='1h' %}selected{% endif %}>Last hour</option><option value="6h" {% if filters.range=='6h' %}selected{% endif %}>Last 6 hours</option><option value="24h" {% if filters.range=='24h' %}selected{% endif %}>Last 24 hours</option><option value="today" {% if filters.range=='today' %}selected{% endif %}>Today</option><option value="yesterday" {% if filters.range=='yesterday' %}selected{% endif %}>Yesterday</option><option value="7d" {% if filters.range=='7d' %}selected{% endif %}>Last 7 days</option><option value="30d" {% if filters.range=='30d' %}selected{% endif %}>Last 30 days</option><option value="all" {% if filters.range=='all' %}selected{% endif %}>All retained</option></select></label>
+  <label>From<input type="datetime-local" name="date_from" value="{{ filters.date_from }}"></label>
+  <label>To<input type="datetime-local" name="date_to" value="{{ filters.date_to }}"></label>
+  <label>Network / VLAN<select name="network_id"><option value="">All networks</option>{% for n in options.networks %}<option value="{{ n.id }}" {% if filters.network_id|string == n.id|string %}selected{% endif %}>{{ n.name }}{% if n.vlan_id %} · VLAN {{ n.vlan_id }}{% endif %} · {{ n.cidr }}</option>{% endfor %}</select></label>
+  <label>Client IP<input name="client_ip" value="{{ filters.client_ip }}" placeholder="10.0.0.10"></label>
+  <label>Destination host<input name="destination" value="{{ filters.destination }}" placeholder="google.com"></label>
+  <label>Destination IP<input name="destination_ip" value="{{ filters.destination_ip }}" placeholder="142.251.x.x"></label>
+  <label>Decision<select name="decision"><option value="">All</option><option value="ALLOW" {% if filters.decision=='ALLOW' %}selected{% endif %}>ALLOW</option><option value="DENY" {% if filters.decision=='DENY' %}selected{% endif %}>DENY</option><option value="INFO" {% if filters.decision=='INFO' %}selected{% endif %}>INFO</option></select></label>
+  <label>Application<select name="application_id"><option value="">All applications</option>{% for a in options.applications %}<option value="{{ a.id }}" {% if filters.application_id|string == a.id|string %}selected{% endif %}>{{ a.name }}{% if a.provider %} · {{ a.provider }}{% endif %}</option>{% endfor %}</select></label>
+  <label>Method<select name="method"><option value="">All methods</option>{% for m in ['CONNECT','GET','POST','PUT','HEAD','OPTIONS','DELETE','PATCH'] %}<option value="{{ m }}" {% if filters.method==m %}selected{% endif %}>{{ m }}</option>{% endfor %}</select></label>
+  <label>Port<input name="port" value="{{ filters.port }}" placeholder="443" inputmode="numeric"></label>
+  <label>Free search<input name="q" value="{{ filters.q }}" placeholder="IP, domain, app, result..."></label>
+  <input type="hidden" name="page_size" value="{{ result.page_size }}">
+  <div class="filter-actions"><button class="btn" type="submit">Apply filters</button><a class="btn ghost" href="{{ request.url.path }}">Clear</a></div>
+</form></section>
+
+<div class="traffic-insights">
+<section class="panel"><header><div><h2>Top Destinations</h2><p>Most requested hosts in the current filter.</p></div></header><div class="mini-rank">{% for r in top_destinations %}<div><code>{{ r.name or 'Unknown' }}</code><b>{{ r.count }}</b></div>{% else %}<p class="empty">No destination data.</p>{% endfor %}</div></section>
+<section class="panel"><header><div><h2>Top Applications</h2><p>Application Policy attribution from configured dependencies.</p></div></header><div class="mini-rank">{% for r in top_apps %}<div><span>{{ r.name or 'Unattributed' }}</span><b>{{ r.count }}</b></div>{% else %}<p class="empty">No application attribution in this window.</p>{% endfor %}</div></section>
+</div>
+
+<section class="panel"><div class="table-tools"><div><b>{{ result.total }}</b> matching events · page {{ result.page }} / {{ result.pages }}</div><div class="table-tools-right"><label>Rows<select data-page-size-select><option value="50" {% if result.page_size==50 %}selected{% endif %}>50</option><option value="100" {% if result.page_size==100 %}selected{% endif %}>100</option><option value="250" {% if result.page_size==250 %}selected{% endif %}>250</option><option value="500" {% if result.page_size==500 %}selected{% endif %}>500</option></select></label><button class="btn ghost" data-reload>Refresh</button></div></div>
+<div class="table-wrap traffic-table-wrap"><table class="table traffic-table"><thead><tr><th>TIME</th><th>CLIENT</th><th>NETWORK / VLAN</th><th>ACTION</th><th>APPLICATION / PROFILE</th><th>METHOD</th><th>DESTINATION</th><th>DEST IP</th><th>PORT</th><th>RESULT</th><th>BYTES</th><th>DURATION</th><th>UPSTREAM</th></tr></thead><tbody>
+{% for l in result.rows %}<tr>
+<td class="muted nowrap">{{ l.event_time }}</td>
+<td><a class="table-link" href="/traffic/clients/{{ l.client_ip }}"><code class="strong">{{ l.client_ip }}</code></a></td>
+<td><b>{{ l.network_name or 'Unmapped' }}</b><small class="cell-sub">{% if l.vlan_id %}VLAN {{ l.vlan_id }}{% else %}No VLAN metadata{% endif %}</small></td>
+<td><span class="badge {% if l.decision=='ALLOW' %}ok{% elif l.decision=='DENY' %}danger{% else %}system{% endif %}">{{ l.decision }}</span><small class="cell-sub">{{ l.traffic_path }}</small></td>
+<td>{% if l.application_names %}<b>{{ l.application_names }}</b>{% else %}<span class="muted">Unattributed</span>{% endif %}<small class="cell-sub">{{ l.access_profile_names or '—' }}</small></td>
+<td>{{ l.method }}</td>
+<td><code>{{ l.destination_host or l.destination }}</code><small class="cell-sub">{{ l.matched_rule_destination or 'No matched policy object' }}</small></td>
+<td><code>{{ l.destination_ip or '—' }}</code></td>
+<td>{{ l.destination_port or '—' }}</td>
+<td><code>{{ l.result_code }}{% if l.http_status %}/{{ l.http_status }}{% endif %}</code></td>
+<td>{{ "{:,}".format(l.bytes or 0) }}</td>
+<td>{{ l.elapsed_ms or 0 }} ms</td>
+<td><span class="muted">{{ l.hierarchy_code or '—' }}</span><small class="cell-sub">{{ l.upstream_ip or '—' }}</small></td>
+</tr>{% else %}<tr><td colspan="13" class="empty">No telemetry matches these filters.</td></tr>{% endfor %}
+</tbody></table></div>
+<div class="pagination"><a class="btn ghost small {% if result.page<=1 %}disabled{% endif %}" {% if result.page>1 %}href="?{{ nav_query }}&page={{ result.page-1 }}"{% endif %}>Previous</a><span>Page {{ result.page }} of {{ result.pages }}</span><a class="btn ghost small {% if result.page>=result.pages %}disabled{% endif %}" {% if result.page<result.pages %}href="?{{ nav_query }}&page={{ result.page+1 }}"{% endif %}>Next</a></div></section>
+
+<section class="panel telemetry-admin"><header><div><h2>Telemetry Retention</h2><p>Searchable events are normalized into the SWG database; raw Squid logs remain separate.</p></div><div><span class="badge ok">{{ health.events }} indexed</span></div></header><div class="telemetry-health-grid"><div><span>SOURCE</span><b>{{ health.source }}</b></div><div><span>FIRST EVENT</span><b>{{ health.first_event or '—' }}</b></div><div><span>LAST EVENT</span><b>{{ health.last_event or '—' }}</b></div><div><span>LAST INGEST</span><b>{{ health.last_ingest_at or '—' }}</b></div></div>{% if request.state.user.role=='admin' %}<form method="post" action="/traffic/settings/retention" class="inline-retention"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><label>Searchable retention <select name="days"><option value="7" {% if health.retention_days==7 %}selected{% endif %}>7 days</option><option value="14" {% if health.retention_days==14 %}selected{% endif %}>14 days</option><option value="30" {% if health.retention_days==30 %}selected{% endif %}>30 days</option><option value="60" {% if health.retention_days==60 %}selected{% endif %}>60 days</option><option value="90" {% if health.retention_days==90 %}selected{% endif %}>90 days</option><option value="180" {% if health.retention_days==180 %}selected{% endif %}>180 days</option><option value="365" {% if health.retention_days==365 %}selected{% endif %}>365 days</option></select></label><button class="btn ghost" type="submit">Save retention</button></form>{% endif %}</section>
+{% endblock %}

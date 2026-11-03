@@ -1,0 +1,13 @@
+{
+  "product": "Security Web Gateway",
+  "version": "3.3.1",
+  "schema_migration": "012",
+  "target_os": "Ubuntu 24.04 LTS",
+  "management_backend": "127.0.0.1:8200",
+  "default_proxy_port": 3128,
+  "pac_port": 8081,
+  "policy_model": "default-deny-explicit-allow",
+  "runtime_state_in_git": false,
+  "browser_discovery": "playwright-chromium",
+  "har_raw_storage": false
+}

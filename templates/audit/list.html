@@ -1,0 +1,4 @@
+{% extends "base.html" %}{% block content %}
+<section class="panel"><div class="table-tools"><input class="search" data-filter-table="audit-table" placeholder="Filter actor, action, object, source IP..."></div><div class="table-wrap"><table class="table" id="audit-table"><thead><tr><th>TIME</th><th>ACTOR</th><th>ACTION</th><th>OBJECT</th><th>SOURCE IP</th><th>RESULT</th></tr></thead><tbody>
+{% for a in rows %}<tr><td class="muted">{{ a.timestamp }}</td><td><b>{{ a.actor }}</b></td><td><code>{{ a.action }}</code></td><td>{{ a.object_type or '-' }} {{ a.object_id or '' }}</td><td><code>{{ a.source_ip or '-' }}</code></td><td><span class="badge {% if a.result=='SUCCESS' %}ok{% else %}danger{% endif %}">{{ a.result }}</span></td></tr>{% endfor %}
+</tbody></table></div></section>{% endblock %}

@@ -1,0 +1,11 @@
+[Unit]
+Description=Security Web Gateway Restricted Deployment Socket
+[Socket]
+ListenStream=/run/security-web-gateway-deploy.sock
+Accept=yes
+SocketUser=proxy-mgmt
+SocketGroup=proxy-mgmt
+SocketMode=0600
+RemoveOnStop=yes
+[Install]
+WantedBy=sockets.target

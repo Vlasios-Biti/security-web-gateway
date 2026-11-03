@@ -1,0 +1,11 @@
+[Unit]
+Description=Security Web Gateway Browser Discovery Queue Timer
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=10s
+Persistent=true
+AccuracySec=2s
+
+[Install]
+WantedBy=timers.target

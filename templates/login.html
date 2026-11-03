@@ -1,0 +1,7 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Secure Login | Security Web Gateway Manager</title><link rel="stylesheet" href="/static/css/app.css"></head>
+<body class="login-body"><div class="login-panel"><div class="login-mark">SWG</div><h1>Security Web Gateway</h1>
+<p>Restricted security management console</p>{% if error %}<div class="flash danger-box">{{ error }}</div>{% endif %}
+<form method="post" action="/login"><label>Username<input name="username" autocomplete="username" required autofocus></label>
+<label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+<button class="btn primary full">Sign in securely</button></form><small>proxy.example.internal · HTTPS only</small></div></body></html>

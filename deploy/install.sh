@@ -79,7 +79,7 @@ done
 
 echo "===== 1. PACKAGES ====="
 apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-venv python3-pip nginx squid sqlite3 curl ca-certificates openssl rsync sudo dnsutils sysstat
+DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-venv python3-pip nginx squid sqlite3 curl ca-certificates openssl rsync sudo bind9-dnsutils sysstat
 if [[ $LOCAL_DNS_CACHE -eq 1 ]]; then
   DEBIAN_FRONTEND=noninteractive apt-get install -y unbound
 fi

@@ -1,0 +1,38 @@
+name: Regenerate v3.4.2 checksum manifest
+
+on:
+  push:
+    branches:
+      - release/v3.4.2
+
+permissions:
+  contents: write
+
+jobs:
+  checksums:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/v3.4.2
+          fetch-depth: 0
+      - name: Regenerate and validate checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -type f \
+            ! -path './.git/*' \
+            ! -path './dist/*' \
+            ! -path '*/__pycache__/*' \
+            ! -name '*.pyc' \
+            ! -name 'CHECKSUMS.sha256' \
+            ! -path './.github/workflows/checksums-v342.yml' \
+            -print0 | sort -z | xargs -0 sha256sum > CHECKSUMS.sha256
+          sha256sum -c CHECKSUMS.sha256
+          bash -n deploy/*.sh scripts/*.sh
+          python3 tests/smoke_v340.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add CHECKSUMS.sha256
+          git commit -m 'Regenerate checksums for v3.4.2'
+          git push origin HEAD:release/v3.4.2

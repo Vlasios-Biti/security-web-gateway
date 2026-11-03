@@ -1,0 +1,29 @@
+name: Finalize Security Web Gateway v3.4.2
+
+on:
+  push:
+    branches:
+      - release/v3.4.2
+
+permissions:
+  contents: write
+
+jobs:
+  finalize-release:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_SHA: 29bb72d7ba38043f00c186811892cd7f687cef9a
+    steps:
+      - name: Create v3.4.2 tag and GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v3.4.2" >/dev/null 2>&1; then
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" -f ref='refs/tags/v3.4.2' -f sha="$RELEASE_SHA" >/dev/null
+          fi
+          if ! gh release view v3.4.2 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create v3.4.2 --repo "$GITHUB_REPOSITORY" --target "$RELEASE_SHA" --title 'Security Web Gateway v3.4.2' --notes 'Ubuntu 26.04 compatibility release. Uses bind9-dnsutils, Playwright 1.61.0, and adds Python 3.14 CI validation. No Squid policy, schema, telemetry model, or application-intelligence behavior changes from v3.4.1.'
+          fi
+          gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v3.4.2" --jq '.object.sha'
+          gh release view v3.4.2 --repo "$GITHUB_REPOSITORY" --json tagName,name,url,targetCommitish

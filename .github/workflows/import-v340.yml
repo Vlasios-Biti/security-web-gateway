@@ -24,7 +24,6 @@ jobs:
           echo "0e9e1830a3c2a169c86a5141a7ef7139d10b100a70c3bd046c622ccde2e5a7a1  /tmp/v340-patch.tar.xz" | sha256sum -c -
           tar -xJf /tmp/v340-patch.tar.xz -C .
           rm -rf .import
-          rm -f .github/workflows/import-v340.yml
 
           sha256sum -c CHECKSUMS.sha256
           bash -n deploy/*.sh scripts/*.sh

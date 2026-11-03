@@ -1,6 +1,6 @@
 {
   "product": "Security Web Gateway",
-  "version": "3.4.0",
+  "version": "3.4.1",
   "schema_migration": "013",
   "target_os": "Ubuntu 24.04 LTS",
   "deployment_model": "single-vm-on-prem-appliance",

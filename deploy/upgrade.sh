@@ -23,15 +23,25 @@ rollback(){
   if [[ $SUCCESS -eq 1 || $CUTOVER -eq 0 ]]; then exit "$rc"; fi
   echo "ERROR: upgrade failed; rolling back..." >&2
   systemctl stop security-web-gateway.service 2>/dev/null || true
-  systemctl stop security-web-gateway-telemetry.timer security-web-gateway-source-sync.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer 2>/dev/null || true
+  systemctl stop security-web-gateway-telemetry.timer security-web-gateway-source-sync.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer security-web-gateway-performance.timer 2>/dev/null || true
   if [[ -f "$BACKUP/swg.db" ]]; then
     rm -f "$PDB" "$PDB-wal" "$PDB-shm"; cp -a "$BACKUP/swg.db" "$PDB"; chown proxy-mgmt:proxy-mgmt "$PDB"; chmod 0640 "$PDB"
   fi
   if [[ -n "$OLD_REL" && -d "$OLD_REL" ]]; then ln -sfn "$OLD_REL" /opt/security-web-gateway/current; fi
   for f in "$BACKUP"/*.service "$BACKUP"/*.timer; do [[ -f "$f" ]] && cp -a "$f" /etc/systemd/system/; done
+  if [[ -f "$BACKUP/squid-priority.conf" ]]; then
+    install -d -o root -g root -m 0755 /etc/systemd/system/squid.service.d
+    cp -a "$BACKUP/squid-priority.conf" /etc/systemd/system/squid.service.d/10-security-web-gateway-priority.conf
+  else
+    rm -f /etc/systemd/system/squid.service.d/10-security-web-gateway-priority.conf
+  fi
   systemctl daemon-reload
   systemctl start security-web-gateway.service 2>/dev/null || true
-  systemctl start security-web-gateway-source-sync.timer security-web-gateway-telemetry.timer 2>/dev/null || true
+  systemctl start security-web-gateway-source-sync.timer \
+    security-web-gateway-telemetry.timer \
+    security-web-gateway-storage-maintenance.timer \
+    security-web-gateway-discovery.timer \
+    security-web-gateway-performance.timer 2>/dev/null || true
   echo "Rollback source: $BACKUP" >&2
   exit "$rc"
 }
@@ -56,6 +66,7 @@ cp -a /etc/security-web-gateway/production.env "$BACKUP/production.env"
 cp -a /etc/squid/managed/security-web-gateway.conf "$BACKUP/security-web-gateway.conf" 2>/dev/null || true
 for f in /etc/systemd/system/security-web-gateway*.service /etc/systemd/system/security-web-gateway*.timer; do [[ -f "$f" ]] && cp -a "$f" "$BACKUP/"; done
 echo "$OLD_REL" > "$BACKUP/previous-release"
+if [[ -f /etc/systemd/system/squid.service.d/10-security-web-gateway-priority.conf ]]; then cp -a /etc/systemd/system/squid.service.d/10-security-web-gateway-priority.conf "$BACKUP/squid-priority.conf"; fi
 
 echo "===== 3. STAGE RELEASE ====="
 rm -rf "$REL"; install -d -o root -g proxy-mgmt -m 0750 "$REL"
@@ -85,21 +96,24 @@ runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production
 
 echo "===== 5. TRANSACTIONAL CUTOVER ====="
 CUTOVER=1
-systemctl stop security-web-gateway-telemetry.timer security-web-gateway-source-sync.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer 2>/dev/null || true
+systemctl stop security-web-gateway-telemetry.timer security-web-gateway-source-sync.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer security-web-gateway-performance.timer 2>/dev/null || true
 systemctl stop security-web-gateway.service
 runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH="$REL" \
   "$VENV/bin/python" "$REL/tools/migrate.py" --db "$PDB" --root "$REL"
 ln -sfn "$REL" /opt/security-web-gateway/current
-for f in security-web-gateway.service security-web-gateway-source-sync.service security-web-gateway-source-sync.timer security-web-gateway-telemetry.service security-web-gateway-telemetry.timer security-web-gateway-storage-maintenance.service security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.service security-web-gateway-discovery.timer; do
+for f in security-web-gateway.service security-web-gateway-source-sync.service security-web-gateway-source-sync.timer security-web-gateway-telemetry.service security-web-gateway-telemetry.timer security-web-gateway-storage-maintenance.service security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.service security-web-gateway-discovery.timer security-web-gateway-performance.service security-web-gateway-performance.timer; do
   install -o root -g root -m 0644 "$ROOT/systemd/$f" "/etc/systemd/system/$f"
 done
+install -d -o root -g root -m 0755 /etc/systemd/system/squid.service.d
+install -o root -g root -m 0644 "$ROOT/systemd/squid-priority.conf" /etc/systemd/system/squid.service.d/10-security-web-gateway-priority.conf
 systemctl daemon-reload
+systemctl restart squid
 systemctl start security-web-gateway.service
-systemctl enable --now security-web-gateway-source-sync.timer security-web-gateway-telemetry.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer
+systemctl enable --now security-web-gateway-source-sync.timer security-web-gateway-telemetry.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer security-web-gateway-performance.timer
 
 for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8200/healthz >/tmp/security-web-gateway-upgrade-health.json 2>/dev/null && break; sleep 1; done
 cat /tmp/security-web-gateway-upgrade-health.json
-grep -q '"version":"3.3.1"' /tmp/security-web-gateway-upgrade-health.json
+grep -q '"version":"'$VERSION'"' /tmp/security-web-gateway-upgrade-health.json
 
 # Safe stale-pending reconciliation: clears flags only when effective Squid directives match live policy.
 runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH="$REL" "$VENV/bin/python" "$REL/bin/reconcile_pending.py" || true

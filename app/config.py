@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 APP_NAME = "Security Web Gateway Manager"
-APP_VERSION = "3.3.1"
+APP_VERSION = "3.4.0"
 APP_ROOT = Path(__file__).resolve().parents[1]
 MODE = os.getenv("SWG_MODE", "candidate").strip().lower()
 SERVICE_NAME = os.getenv("SWG_SERVICE_NAME", "security-web-gateway-candidate" if MODE == "candidate" else "security-web-gateway")
@@ -33,3 +33,9 @@ DISCOVERY_MAX_HAR_BYTES = int(os.getenv("SWG_DISCOVERY_MAX_HAR_BYTES", str(10 * 
 DISCOVERY_BROWSER_TIMEOUT_MS = int(os.getenv("SWG_DISCOVERY_BROWSER_TIMEOUT_MS", "20000"))
 DISCOVERY_BROWSER_MAX_PAGES = int(os.getenv("SWG_DISCOVERY_BROWSER_MAX_PAGES", "6"))
 SQUID_LOG_DIR = Path(os.getenv("SWG_SQUID_LOG_DIR", "/var/log/squid"))
+
+SESSION_TOUCH_INTERVAL_SECONDS = int(os.getenv("SWG_SESSION_TOUCH_INTERVAL_SECONDS", "60"))
+DASHBOARD_CACHE_TTL_SECONDS = int(os.getenv("SWG_DASHBOARD_CACHE_TTL_SECONDS", "20"))
+TELEMETRY_BATCH_MAX = int(os.getenv("SWG_TELEMETRY_BATCH_MAX", "10000"))
+LOCAL_DNS_CACHE = os.getenv("SWG_LOCAL_DNS_CACHE", "0").strip().lower() in ("1","true","yes","on")
+LOCAL_DNS_IP = os.getenv("SWG_LOCAL_DNS_IP", "127.0.0.1")

@@ -1,23 +1,59 @@
-# Deployment Runbook
+# Deployment Runbook — Security Web Gateway 3.4
+
+## Recommended VM baseline
+
+For a normal 50–250 user office deployment:
+
+- Ubuntu Server 24.04 LTS
+- 4 vCPU
+- 8 GiB RAM
+- 100 GiB SSD/NVMe-backed virtual disk
+- VirtIO NIC, 1 Gbps+
+- VirtIO SCSI + I/O thread + discard/TRIM
+- 2 GiB swap as emergency safety net, not steady-state working memory
+- 20–25% normal resource headroom
+
+Do not size only by user count. Monitor requests/sec, concurrent CONNECT sessions, WAN throughput, telemetry events/day and Chromium discovery bursts.
 
 ## Fresh server
 
-PRE-CHECK: supported Ubuntu, static IP/routing/DNS/NTP, trusted TLS certificate, backup/VM snapshot capability, required ports available.
+### PRE-CHECK
 
-BACKUP: not applicable to a new host; snapshot immediately after OS baseline if desired.
+- supported Ubuntu release
+- static management/proxy address
+- correct routing, DNS and NTP
+- TLS certificate/key available outside Git
+- intended DNS forwarders known
+- TCP 3128/443/8081 path understood
+- VM snapshot/backup capability
+- enough SSD/NVMe IOPS and free disk
 
-IMPLEMENTATION:
+### IMPLEMENTATION
 
 ```bash
-sudo ./deploy/install.sh --fqdn <fqdn> --bind-ip <ip> --dns-servers <dns1,dns2> --tls-cert <crt> --tls-key <key>
+sudo ./deploy/install.sh \
+  --fqdn <fqdn> \
+  --bind-ip <ip> \
+  --dns-servers <dns1,dns2> \
+  --tls-cert <crt> \
+  --tls-key <key> \
+  --admin-user admin
 ```
 
-VALIDATION:
+The installer attempts a loopback Unbound cache by default. Use `--no-local-dns-cache` only when the host already has a deliberate DNS service/conflict or another resolver design is required.
+
+### VALIDATION
 
 ```bash
 systemctl --failed
 systemctl is-active security-web-gateway squid nginx security-web-gateway-deploy-helper.socket
-systemctl is-active security-web-gateway-telemetry.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer
+systemctl is-active \
+  security-web-gateway-telemetry.timer \
+  security-web-gateway-storage-maintenance.timer \
+  security-web-gateway-discovery.timer \
+  security-web-gateway-source-sync.timer \
+  security-web-gateway-performance.timer
+
 curl -fsS http://127.0.0.1:8200/healthz
 curl -kfsS --resolve '<fqdn>:443:<ip>' https://<fqdn>/healthz
 curl -fsS http://<ip>:8081/proxy.pac
@@ -25,24 +61,54 @@ squid -k parse
 nginx -t
 ```
 
-ROLLBACK: revert VM snapshot or remove the newly provisioned VM. Do not use a partially configured host as production.
+If local DNS cache is enabled:
 
-## Existing v3.2 upgrade
+```bash
+dig @127.0.0.1 example.com
+systemctl is-active unbound
+```
 
-PRE-CHECK: no unresolved disk/database incident, current GUI healthy, Squid/Nginx active.
+### MONITORING
 
-BACKUP: take VM snapshot and use the automatic release-upgrade backup.
+Validate `System → Performance` after several collection intervals. Establish a site baseline for proxy P95/P99, CPU I/O wait, telemetry lag, disk free space and concurrent proxy connections.
 
-IMPLEMENTATION:
+### ROLLBACK
+
+For a new deployment, revert/delete the VM from the pre-cutover snapshot. Do not promote a partially configured host to production.
+
+## Generic in-place upgrade
+
+Applies only to installations already using the generic `security-web-gateway` layout.
+
+### PRE-CHECK
+
+- no unresolved disk/database incident
+- `/healthz` healthy
+- Squid/Nginx active
+- enough free disk for DB/release backup
+- VM snapshot taken
+
+### IMPLEMENTATION
 
 ```bash
 sudo ./deploy/upgrade.sh --confirm
 ```
 
-VALIDATION: healthz version 3.3.1, schema migration 012, timers active, current Squid traffic unaffected.
+### VALIDATION
 
-ROLLBACK: upgrade script restores DB/release/unit state automatically on a cutover failure; VM snapshot is the outer recovery boundary.
+- `/healthz` reports version `3.4.0`
+- schema migration is `013`
+- `PRAGMA integrity_check` returns `ok`
+- all expected timers including `security-web-gateway-performance.timer` are active
+- `squid -k parse` and current client traffic remain healthy
+- no pending policy was auto-deployed
 
-## State migration to a new host
+### ROLLBACK
 
-Install target first, then restore only the policy/database state using the dedicated export/restore scripts. Do not copy target-specific `production.env`, TLS keys or bind configuration from the old host unless intentionally reusing the same identity/IP.
+The upgrade script restores DB, previous release, systemd units and worker timers on a failed cutover. The VM snapshot remains the outer recovery boundary.
+
+## State migration to another VM
+
+Install the target first. Then use `deploy/export_policy_state.sh` and `deploy/restore_policy_state.sh` over a protected transfer channel.
+
+Do not copy target-specific `production.env`, TLS keys or bind configuration from the source unless the target intentionally assumes the same identity/IP.

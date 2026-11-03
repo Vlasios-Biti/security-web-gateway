@@ -13,7 +13,11 @@ acl CONNECT method CONNECT
 http_access deny !Safe_ports
 http_access deny CONNECT !port_https
 
-dns_nameservers __DNS_SERVERS_SPACE__
+dns_nameservers __SQUID_DNS_SERVERS_SPACE__
+
+client_persistent_connections on
+server_persistent_connections on
+cache deny all
 
 access_log stdio:/var/log/squid/access.log squid
 cache_log /var/log/squid/cache.log

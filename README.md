@@ -1,63 +1,127 @@
 # Security Web Gateway
 
-**Version:** 3.3.1  
-**Target OS:** Ubuntu 24.04 LTS  
-**Architecture:** Squid explicit proxy + FastAPI management plane + Nginx TLS + SQLite policy/telemetry store + restricted privileged deployment helper.
+**Version:** 3.4.0  
+**Target:** single-VM, on-prem enterprise appliance  
+**Target OS:** Ubuntu Server 24.04 LTS  
+**Architecture:** Squid explicit proxy + FastAPI management plane + Nginx TLS + SQLite/WAL policy and telemetry store + isolated background workers + restricted privileged deployment helper.
 
-This repository is the source-of-truth for the Security Web Gateway. Runtime databases, TLS private keys, production certificates, passwords, logs and backups are deliberately **not** part of Git.
+This repository is the source-of-truth for Security Web Gateway. Runtime databases, TLS private keys, production certificates, passwords, HAR captures, logs and backups are deliberately **not** part of Git.
 
-## Core security model
+## Product objective
 
-- Default deny at Squid.
-- Explicit ALLOW policies only.
+Deploy one local VM, connect managed endpoints/VLANs/VPN clients through PAC/Proxy Control, and manage web access centrally without making Internet access dependent on a public SaaS control plane.
+
+The design priority is:
+
+1. Data-plane security and performance
+2. Stability and fail-open continuity
+3. Maintainability and recoverability
+4. Observability
+5. Management-plane responsiveness
+6. Application intelligence
+
+## Recommended VM profile
+
+Standard deployment for roughly 50–250 normal office users:
+
+```text
+OS:        Ubuntu Server 24.04 LTS
+vCPU:      4
+RAM:       8 GiB
+Disk:      100 GiB SSD/NVMe
+NIC:       VirtIO, 1 Gbps+
+Disk bus:  VirtIO SCSI
+CPU type:  host where live-migration compatibility permits
+I/O thread: enabled
+TRIM:      enabled
+Swap:      2 GiB safety net
+Headroom:  keep 20–25% CPU/RAM/disk capacity available
+```
+
+Sizing should ultimately follow concurrent CONNECT sessions, requests/sec, WAN throughput, telemetry events/day and discovery workload rather than user count alone.
+
+## Security and trust model
+
+- Squid is **default deny** with explicit ALLOW policy.
+- Squid is the data plane and remains operational independently from GUI, telemetry and discovery workers.
 - Access Profiles and Network Policies provide scoped source authorization.
-- Management GUI binds to loopback backend and is published by Nginx over HTTPS.
+- Management GUI binds to loopback and is published by Nginx over HTTPS.
 - GUI runs unprivileged as `proxy-mgmt`.
-- Squid deployment is performed through a narrow Unix-socket privileged helper; there is no web shell or unrestricted sudo path.
-- Application discovery cannot directly deploy policy. Discovery → Review → Pending → Diff → Deploy remains mandatory.
-- Public discovery protects against private/reserved destinations and DNS-rebinding/SSRF-style pivots.
+- Squid deployment uses a narrow Unix-socket privileged helper; there is no web shell or unrestricted sudo path.
+- Discovery can only create evidence/candidates. `Discovery → Review → Pending → Diff → Deploy` remains mandatory.
+- Browser discovery rejects private/reserved targets and DNS-rebinding/SSRF-style pivots.
 - PAC supports explicit DIRECT bypasses plus fail-open `PROXY ...; DIRECT` behavior.
 
-## v3.3.1 update
+## v3.4.0 — performance and application intelligence
 
-v3.3.1 includes the v3.3 application-discovery and operational updates, plus a complete vendor-neutral rebrand:
+### Fast single-VM data plane
 
-- **Server Browser Discovery** using isolated Chromium/Playwright for JavaScript/XHR/API/CDN/WebSocket dependencies.
-- **HAR workflow discovery** for authenticated/click-driven workflows without learning all workstation traffic. Raw HAR is processed in memory and is not persisted.
-- `Observed Squid traffic` retained only as an Advanced/Troubleshooting discovery mode.
-- Browser discovery is processed by a systemd worker so Chromium activity cannot block GUI requests and cause Nginx `504` timeouts.
-- Web requests no longer parse Squid `access.log`; telemetry ingestion belongs to the collector timer.
-- Dual telemetry guardrails: age retention + logical DB storage cap + cleanup target + minimum free disk.
-- Raw rotated Squid log age/size guardrails.
-- Metadata-only Access Profile/Application edits no longer create false policy-pending state.
-- Safe stale-pending reconciliation when effective Squid directives are identical to production.
-- Portable fresh-server installation and controlled v3.2→v3.3 upgrade scripts.
-- Latest Windows **Proxy Control** source/builder included under `tools/windows/`.
+- Squid receives high CPU/I/O cgroup weight and a higher file-descriptor ceiling.
+- Telemetry, discovery, storage maintenance and performance sampling run at deliberately lower CPU/I/O priority.
+- Squid content cache is disabled by design. Modern HTTPS `CONNECT` traffic cannot be content-cached without TLS inspection, so unnecessary proxy disk I/O is avoided.
+- Fresh installations can use local **Unbound DNS cache** on loopback, forwarding to enterprise DNS servers. Internal DNS authority remains with the configured enterprise resolvers.
+- Persistent proxy connections remain enabled.
+
+### Management-plane responsiveness
+
+- SQLite uses WAL and runtime tuning for concurrent read/write workloads.
+- Session `last_seen` writes are throttled instead of writing on every authenticated page request.
+- Overview no longer performs synchronous `systemctl` or DNS probes.
+- Health is sampled in the background and read from cache.
+- Expensive Traffic Overview aggregation is precomputed by the telemetry worker.
+- Static assets receive short browser cache headers.
+- Management responses expose `Server-Timing` and `X-Response-Time-Ms` for diagnostics.
+
+### Performance telemetry
+
+`System → Performance` exposes VM/data-plane health including:
+
+- CPU and I/O wait
+- load average
+- memory and swap pressure
+- disk utilization/free space
+- telemetry lag
+- proxy request P50/P95/P99
+- established proxy connections
+
+### Application-aware troubleshooting
+
+- **Policy Simulator** explains what would happen for a client IP + destination + protocol/port without changing policy.
+- **Why Blocked?** explains a denied telemetry event using effective Network/Profile/Application/Rule scope.
+- **Application Dependency Candidates** correlate new blocked destinations with a recently active single application, classify them and score confidence.
+- Candidates are **never auto-allowed**. Approving a candidate creates a normal pending Application dependency that still requires Diff/Deploy.
+
+### Application discovery
+
+Primary discovery is application-scoped rather than workstation-scoped:
+
+1. Server Browser Discovery — isolated Chromium/Playwright for JavaScript/XHR/fetch/API/CDN/WebSocket dependencies.
+2. HAR workflow discovery — for authenticated/click-driven application workflows; raw HAR is processed in memory and not persisted.
+3. Official source/catalog evidence where available.
+4. Observed Squid traffic — retained only under Advanced/Troubleshooting because it can contain unrelated workstation traffic.
 
 ## Repository layout
 
 ```text
-app/                 FastAPI application
-bin/                 operational workers / CLI tools
+app/                 FastAPI management application
+bin/                 telemetry/performance/discovery workers and CLI tools
 migrations/          ordered SQLite schema migrations
-static/               CSS / JavaScript
-templates/            Jinja GUI templates
-privileged/           restricted root deployment helper
-systemd/              application and worker units
-deploy/               fresh install, upgrade, state export/restore
-deploy/templates/     Nginx and Squid portable templates
-pac/                  PAC template
-config/               environment examples
-tools/windows/         Proxy Control Windows endpoint package source
-docs/                 architecture, deployment and operations documentation
-.github/workflows/     GitHub CI
+static/              CSS / JavaScript
+templates/           Jinja GUI templates
+privileged/          restricted root deployment helper
+systemd/             app and low-priority worker units + Squid priority drop-in
+deploy/              fresh install, upgrade, state export/restore
+deploy/templates/    Nginx, Squid and Unbound templates
+pac/                 PAC template
+config/              production environment example
+tools/windows/       Proxy Control Windows endpoint package source
+docs/                architecture, deployment, performance and operations docs
+.github/workflows/   CI
 ```
 
 ## Fresh server installation
 
-Prepare an Ubuntu 24.04 LTS VM with the intended management/proxy IP already configured. Do **not** commit TLS keys to the repository.
-
-With an internal/public trusted certificate:
+Prepare a supported Ubuntu 24.04 LTS VM with static IP/routing/NTP and the intended certificate. Do **not** commit TLS keys to Git.
 
 ```bash
 sudo ./deploy/install.sh \
@@ -69,6 +133,12 @@ sudo ./deploy/install.sh \
   --admin-user admin
 ```
 
+Local DNS cache is enabled by default for fresh installs when TCP/UDP 53 on loopback is available. To deliberately skip it:
+
+```bash
+sudo ./deploy/install.sh ... --no-local-dns-cache
+```
+
 For a temporary lab bootstrap only:
 
 ```bash
@@ -78,49 +148,47 @@ sudo ./deploy/install.sh \
   --self-signed
 ```
 
-The installer deliberately does **not** change UFW/firewall policy because management-source ACLs and upstream network enforcement must be decided for the target environment.
+The installer deliberately does **not** create firewall/UFW policy because management-source ACLs and upstream bypass enforcement depend on the target network design.
 
-## Future in-place upgrades
+## Upgrade
 
-After a server is installed with the generic `security-web-gateway` filesystem/service layout, future releases can use:
+Servers already using the generic `security-web-gateway` filesystem/service layout can use:
 
 ```bash
 sudo ./deploy/upgrade.sh --confirm
 ```
 
-The upgrade performs a shadow database migration/validation first, creates a rollback backup, then changes the application release. It **does not automatically deploy pending Squid policy**. Existing traffic policy remains untouched until an administrator reviews Pending/Diff and deploys normally.
+The upgrade creates a database/release/unit backup, performs shadow migration and validation, then cuts over transactionally. A failed cutover restores the prior DB/release/units/timers. Pending Squid policy is **not** auto-deployed.
 
-A pre-existing installation that used a different product/service/path namespace requires a controlled one-time migration or a fresh install plus policy-state restore; do not run this generic upgrade script blindly against a differently named legacy installation.
+A legacy installation using a different product/service/path namespace needs a controlled one-time migration or a fresh install plus policy-state restore.
 
-## Move current policy state to another server
+## Move policy state to another VM
 
-Runtime state is sensitive and must stay outside Git.
-
-On the source server:
+On the source VM:
 
 ```bash
 sudo ./deploy/export_policy_state.sh
 ```
 
-Copy the resulting root-only archive over a protected channel to the target server. After installing Security Web Gateway on the target:
+Transfer the root-only archive over a protected channel. On the already-installed target VM:
 
 ```bash
 sudo ./deploy/restore_policy_state.sh /secure/path/security-web-gateway-policy-state-....tar.gz
 ```
 
-The restore migrates the DB to the target schema and revokes existing web sessions. Target IP/FQDN/TLS/PAC remain local to the new server.
+Runtime sessions are revoked after restore. Target IP/FQDN/TLS/PAC remain local to the target host.
 
-## PAC behavior
+## PAC / fail-open
 
-Default template:
+Default behavior:
 
 ```text
-DIRECT: internal/simple names, RFC1918 destinations, configured business bypass IPs
+DIRECT: internal/simple names, RFC1918 destinations and configured business bypass IPs
 PROXY:  <server-ip>:3128
 FAIL:   DIRECT fallback
 ```
 
-Current explicit DIRECT business IPs in `pac/proxy.pac.tpl`:
+Explicit DIRECT business destinations retained in `pac/proxy.pac.tpl`:
 
 ```text
 49.12.132.214
@@ -128,42 +196,38 @@ Current explicit DIRECT business IPs in `pac/proxy.pac.tpl`:
 178.63.88.53
 ```
 
-The return path is:
+Proxy return path:
 
 ```text
 PROXY <SWG-IP>:3128; DIRECT
 ```
 
-PAC itself cannot force a sub-second TCP failure timeout. Fast fail-open enforcement belongs to the network layer (for example MikroTik health-check/reject logic) when that phase is enabled.
+PAC cannot force a browser TCP timeout. Sub-second fail-open belongs to the network layer (for example router health-check + fast reject) if strict fast failover is required.
 
-## GitHub
+## GitHub workflow
 
-Use a **Private** repository unless you intentionally want the source public.
-
-```bash
-git init
-git add .
-git commit -m "Security Web Gateway v3.3.1"
-git branch -M main
-git remote add origin git@github.com:<ORG>/<REPO>.git
-git push -u origin main
-```
-
-Before every push:
+Keep the repository private unless publication is intentional.
 
 ```bash
+git add -A
 git status
 git diff --cached
+git commit -m "Security Web Gateway v3.4.0"
+git push
+
+git tag -a v3.4.0 -m "Security Web Gateway v3.4.0"
+git push origin v3.4.0
 ```
 
-Verify that no `.db`, `.env`, certificate/private-key, log, backup or HAR file is staged.
+Never stage `.db`, `.sqlite*`, `.env`, TLS/private-key material, HAR files, logs or backups.
 
 ## Validation
 
 ```bash
-python3 -m compileall -q app bin tools privileged
-bash -n deploy/*.sh
+python3 -m compileall -q app bin tools privileged tests
+bash -n deploy/*.sh scripts/*.sh
 python3 tools/migrate.py --db /tmp/swg-test.db --root .
+python3 tests/smoke_v340.py
 ```
 
-See `docs/DEPLOYMENT.md`, `docs/ARCHITECTURE.md`, and `docs/OPERATIONS.md` for production procedures.
+See `docs/ARCHITECTURE.md`, `docs/DEPLOYMENT.md`, `docs/PERFORMANCE.md`, `docs/OPERATIONS.md`, and `SECURITY_MODEL.md`.

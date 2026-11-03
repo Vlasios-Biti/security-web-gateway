@@ -13,6 +13,7 @@ SELF_SIGNED=0
 SKIP_BROWSER=0
 ADMIN_USER="admin"
 INTERNAL_DOMAIN_SUFFIX=""
+LOCAL_DNS_CACHE=1
 
 usage(){ cat <<USAGE
 Usage: sudo ./deploy/install.sh --fqdn FQDN --bind-ip IP [options]
@@ -31,6 +32,7 @@ Options:
   --admin-user NAME        Initial admin username; default: admin
   --internal-domain-suffix SUFFIX  Optional direct-bypass DNS suffix, e.g. .corp.internal
   --skip-browser-runtime   Skip Playwright/Chromium installation
+  --no-local-dns-cache     Do not configure loopback Unbound cache for Squid
 USAGE
 }
 
@@ -46,6 +48,7 @@ while [[ $# -gt 0 ]]; do
     --skip-browser-runtime) SKIP_BROWSER=1; shift;;
     --admin-user) ADMIN_USER="$2"; shift 2;;
     --internal-domain-suffix) INTERNAL_DOMAIN_SUFFIX="$2"; shift 2;;
+    --no-local-dns-cache) LOCAL_DNS_CACHE=0; shift;;
     -h|--help) usage; exit 0;;
     *) echo "Unknown option: $1" >&2; usage; exit 2;;
   esac
@@ -76,7 +79,10 @@ done
 
 echo "===== 1. PACKAGES ====="
 apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-venv python3-pip nginx squid sqlite3 curl ca-certificates openssl rsync sudo
+DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-venv python3-pip nginx squid sqlite3 curl ca-certificates openssl rsync sudo dnsutils sysstat
+if [[ $LOCAL_DNS_CACHE -eq 1 ]]; then
+  DEBIAN_FRONTEND=noninteractive apt-get install -y unbound
+fi
 
 echo "===== 2. SERVICE ACCOUNT / DIRECTORIES ====="
 getent group proxy >/dev/null || groupadd --system proxy
@@ -133,7 +139,37 @@ if [[ -z "$DNS_SERVERS" ]]; then
   if [[ -z "$DNS_SERVERS" ]]; then
     DNS_SERVERS="$(awk '/^nameserver[[:space:]]+/ {print $2}' /etc/resolv.conf 2>/dev/null | grep -Ev '^(127\.|::1$)' | awk '!seen[$0]++' | paste -sd, -)"
   fi
-  [[ -n "$DNS_SERVERS" ]] || DNS_SERVERS="1.1.1.1,8.8.8.8"
+  [[ -n "$DNS_SERVERS" ]] || { echo "ERROR: no non-loopback DNS resolvers detected. Supply --dns-servers explicitly." >&2; exit 1; }
+fi
+
+SQUID_DNS_SERVERS="$DNS_SERVERS"
+if [[ $LOCAL_DNS_CACHE -eq 1 ]]; then
+  echo "===== 6A. LOCAL DNS CACHE ====="
+  # Package installation may auto-start Unbound. Stop our intended service first,
+  # then detect only a genuine third-party conflict on 127.0.0.1:53.
+  systemctl stop unbound 2>/dev/null || true
+  if ss -lntup 2>/dev/null | grep -Eq '127\.0\.0\.1:53[[:space:]]'; then
+    echo "WARNING: 127.0.0.1:53 is already in use by another service; local DNS cache disabled."
+    LOCAL_DNS_CACHE=0
+    systemctl disable unbound 2>/dev/null || true
+  else
+    python3 - "$DNS_SERVERS" "$ROOT/deploy/templates/unbound.conf.tpl" /etc/unbound/unbound.conf.d/security-web-gateway.conf <<'PYDNS'
+import sys
+servers=[x.strip() for x in sys.argv[1].split(',') if x.strip()]
+template=open(sys.argv[2],encoding='utf-8').read()
+forward='\n'.join(f'    forward-addr: {x}' for x in servers)
+open(sys.argv[3],'w',encoding='utf-8').write(template.replace('__UNBOUND_FORWARD_ADDRS__',forward))
+PYDNS
+    unbound-checkconf
+    systemctl enable --now unbound
+    if dig @127.0.0.1 google.com A +time=2 +tries=1 +short | grep -q .; then
+      SQUID_DNS_SERVERS="127.0.0.1"
+    else
+      echo "WARNING: local DNS cache health check failed; falling back to enterprise DNS servers."
+      LOCAL_DNS_CACHE=0
+      systemctl disable --now unbound 2>/dev/null || true
+    fi
+  fi
 fi
 cat > /etc/security-web-gateway/production.env <<ENV
 SWG_MODE=production
@@ -150,6 +186,11 @@ SWG_PROXY_IP=$BIND_IP
 SWG_PROXY_PORT=$PROXY_PORT
 SWG_FQDN=$FQDN
 SWG_DNS_SERVERS=$DNS_SERVERS
+SWG_LOCAL_DNS_CACHE=$LOCAL_DNS_CACHE
+SWG_LOCAL_DNS_IP=127.0.0.1
+SWG_SESSION_TOUCH_INTERVAL_SECONDS=60
+SWG_DASHBOARD_CACHE_TTL_SECONDS=20
+SWG_TELEMETRY_BATCH_MAX=10000
 SWG_SESSION_COOKIE=swg_session
 PLAYWRIGHT_BROWSERS_PATH=/var/lib/security-web-gateway/playwright
 SWG_DISCOVERY_MAX_HAR_BYTES=10485760
@@ -172,8 +213,8 @@ install -o root -g proxy -m 0640 "$TMP_CONF" /etc/squid/managed/security-web-gat
 rm -f "$TMP_CONF"
 
 echo "===== 9. SQUID + PAC + NGINX ====="
-DNS_SPACE="${DNS_SERVERS//,/ }"
-sed -e "s|__FQDN__|$FQDN|g" -e "s|__BIND_IP__|$BIND_IP|g" -e "s|__PROXY_PORT__|$PROXY_PORT|g" -e "s|__DNS_SERVERS_SPACE__|$DNS_SPACE|g" \
+SQUID_DNS_SPACE="${SQUID_DNS_SERVERS//,/ }"
+sed -e "s|__FQDN__|$FQDN|g" -e "s|__BIND_IP__|$BIND_IP|g" -e "s|__PROXY_PORT__|$PROXY_PORT|g" -e "s|__SQUID_DNS_SERVERS_SPACE__|$SQUID_DNS_SPACE|g" \
   "$ROOT/deploy/templates/squid.conf.tpl" > /etc/squid/squid.conf
 chown root:proxy /etc/squid/squid.conf; chmod 0640 /etc/squid/squid.conf
 
@@ -199,17 +240,22 @@ echo "===== 10. PRIVILEGED HELPER + SYSTEMD ====="
 install -o root -g root -m 0750 "$ROOT/privileged/security-web-gateway-deploy-helper.py" /usr/local/sbin/security-web-gateway-deploy-helper
 install -o root -g root -m 0644 "$ROOT/privileged/security-web-gateway-deploy-helper.socket" /etc/systemd/system/security-web-gateway-deploy-helper.socket
 install -o root -g root -m 0644 "$ROOT/privileged/security-web-gateway-deploy-helper@.service" /etc/systemd/system/security-web-gateway-deploy-helper@.service
-for f in security-web-gateway.service security-web-gateway-source-sync.service security-web-gateway-source-sync.timer security-web-gateway-telemetry.service security-web-gateway-telemetry.timer security-web-gateway-storage-maintenance.service security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.service security-web-gateway-discovery.timer; do
+for f in security-web-gateway.service security-web-gateway-source-sync.service security-web-gateway-source-sync.timer security-web-gateway-telemetry.service security-web-gateway-telemetry.timer security-web-gateway-storage-maintenance.service security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.service security-web-gateway-discovery.timer security-web-gateway-performance.service security-web-gateway-performance.timer; do
   install -o root -g root -m 0644 "$ROOT/systemd/$f" "/etc/systemd/system/$f"
 done
+install -d -o root -g root -m 0755 /etc/systemd/system/squid.service.d
+install -o root -g root -m 0644 "$ROOT/systemd/squid-priority.conf" /etc/systemd/system/squid.service.d/10-security-web-gateway-priority.conf
 systemctl daemon-reload
+systemctl restart squid
 systemctl enable --now security-web-gateway-deploy-helper.socket
 systemctl enable --now security-web-gateway.service
-systemctl enable --now security-web-gateway-source-sync.timer security-web-gateway-telemetry.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer
+systemctl enable --now security-web-gateway-source-sync.timer security-web-gateway-telemetry.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer security-web-gateway-performance.timer
 
 for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8200/healthz >/tmp/security-web-gateway-health.json 2>/dev/null && break; sleep 1; done
 cat /tmp/security-web-gateway-health.json
-grep -q '"version":"3.3.1"' /tmp/security-web-gateway-health.json
+grep -q '"version":"3.4.0"' /tmp/security-web-gateway-health.json
+runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH="$REL" /opt/security-web-gateway/venv/bin/python "$REL/bin/collect_performance.py" >/dev/null 2>&1 || true
+runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH="$REL" /opt/security-web-gateway/venv/bin/python "$REL/bin/collect_telemetry.py" --max-events 10000 >/dev/null 2>&1 || true
 
 echo "===== 11. INITIAL ADMIN ====="
 if ! sqlite3 /var/lib/security-web-gateway/prod/swg.db "SELECT 1 FROM users LIMIT 1" | grep -q 1; then

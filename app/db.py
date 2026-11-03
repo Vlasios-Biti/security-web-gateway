@@ -3,7 +3,7 @@ import sqlite3
 from pathlib import Path
 from app.config import DB_PATH
 
-EXPECTED_MIGRATION = "012"
+EXPECTED_MIGRATION = "013"
 
 
 def connect(path=None):
@@ -13,6 +13,13 @@ def connect(path=None):
     c.row_factory = sqlite3.Row
     c.execute("PRAGMA foreign_keys=ON")
     c.execute("PRAGMA busy_timeout=10000")
+    c.execute("PRAGMA synchronous=NORMAL")
+    c.execute("PRAGMA temp_store=MEMORY")
+    c.execute("PRAGMA cache_size=-32768")
+    try:
+        c.execute("PRAGMA mmap_size=268435456")
+    except sqlite3.DatabaseError:
+        pass
     return c
 
 

@@ -2,8 +2,8 @@
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION="$(cat "$ROOT/VERSION")"
-REL="/opt/security-web-gateway/releases/$VERSION"
+SWG_VERSION="$(cat "$ROOT/VERSION")"
+REL="/opt/security-web-gateway/releases/$SWG_VERSION"
 VENV="/opt/security-web-gateway/venv"
 PDB="/var/lib/security-web-gateway/prod/swg.db"
 STAMP="$(date +%Y%m%d-%H%M%S)"
@@ -70,7 +70,7 @@ if [[ -f /etc/systemd/system/squid.service.d/10-security-web-gateway-priority.co
 
 echo "===== 3. STAGE RELEASE ====="
 rm -rf "$REL"; install -d -o root -g proxy-mgmt -m 0750 "$REL"
-rsync -a --delete --exclude '__pycache__' --exclude '*.pyc' "$ROOT/app" "$ROOT/bin" "$ROOT/migrations" "$ROOT/static" "$ROOT/templates" "$ROOT/tools" "$ROOT/requirements.txt" "$REL/"
+rsync -a --delete --exclude '__pycache__' --exclude '*.pyc' "$ROOT/app" "$ROOT/bin" "$ROOT/migrations" "$ROOT/static" "$ROOT/templates" "$ROOT/tools" "$ROOT/requirements.txt" "$ROOT/VERSION" "$REL/"
 chown -R root:proxy-mgmt "$REL"; find "$REL" -type d -exec chmod 0750 {} +; find "$REL" -type f -exec chmod 0640 {} +; find "$REL/bin" "$REL/tools" -type f -name '*.py' -exec chmod 0750 {} +
 "$VENV/bin/pip" install -r "$REL/requirements.txt"
 if [[ $SKIP_BROWSER -eq 0 ]]; then
@@ -80,7 +80,7 @@ if [[ $SKIP_BROWSER -eq 0 ]]; then
 fi
 
 echo "===== 4. SHADOW MIGRATION / VALIDATION ====="
-SHADOW="/var/lib/security-web-gateway/staging/v${VERSION}-${STAMP}.db"
+SHADOW="/var/lib/security-web-gateway/staging/v${SWG_VERSION}-${STAMP}.db"
 install -d -o proxy-mgmt -g proxy-mgmt -m 0750 /var/lib/security-web-gateway/staging
 python3 - "$PDB" "$SHADOW" <<'PY'
 import sqlite3,sys
@@ -113,7 +113,7 @@ systemctl enable --now security-web-gateway-source-sync.timer security-web-gatew
 
 for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8200/healthz >/tmp/security-web-gateway-upgrade-health.json 2>/dev/null && break; sleep 1; done
 cat /tmp/security-web-gateway-upgrade-health.json
-grep -q '"version":"'$VERSION'"' /tmp/security-web-gateway-upgrade-health.json
+grep -q '"version":"'$SWG_VERSION'"' /tmp/security-web-gateway-upgrade-health.json
 
 # Safe stale-pending reconciliation: clears flags only when effective Squid directives match live policy.
 runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH="$REL" "$VENV/bin/python" "$REL/bin/reconcile_pending.py" || true
@@ -121,7 +121,7 @@ runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production
 SUCCESS=1; CUTOVER=0; trap - ERR EXIT
 rm -f "$SHADOW"
 echo "============================================================"
-echo "Security Web Gateway v$VERSION upgrade successful"
+echo "Security Web Gateway v$SWG_VERSION upgrade successful"
 echo "Policy was NOT auto-deployed; existing Squid policy remains unchanged until GUI Pending/Diff/Deploy."
 echo "Rollback backup: $BACKUP"
 echo "============================================================"

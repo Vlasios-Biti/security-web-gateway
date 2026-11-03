@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.4.3
+
+- Fixed a fresh-install version collision where sourcing `/etc/os-release` overwrote the Security Web Gateway release `VERSION` variable on Ubuntu 26.04.
+- Application version is now loaded from the deployed release `VERSION` file instead of a hard-coded constant.
+- Fresh install and upgrade now copy the `VERSION` file into each immutable release directory.
+- Upgrade/install health checks validate against the release version without relying on OS metadata.
+- Added CI validation that application-reported version matches the repository `VERSION`.
+- No Squid policy, schema, telemetry model, or application-intelligence behavior changes from v3.4.2.
+
 ## 3.4.2
 
 - Added Ubuntu Server 26.04 LTS compatibility for fresh deployments.

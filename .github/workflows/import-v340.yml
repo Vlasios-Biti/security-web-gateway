@@ -12,13 +12,11 @@ jobs:
   import-release:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout release branch
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: release/v3.4.0
           fetch-depth: 0
-
-      - name: Verify and import v3.4.0 patch
+      - name: Import and validate package
         shell: bash
         run: |
           set -euo pipefail

@@ -33,6 +33,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --cached --check
           git commit -m "Release Security Web Gateway v3.4.0"
           git push origin HEAD:release/v3.4.0

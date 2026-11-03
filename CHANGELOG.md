@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.4.2
+
+- Added Ubuntu Server 26.04 LTS compatibility for fresh deployments.
+- Replaced the legacy/virtual `dnsutils` package dependency with the real `bind9-dnsutils` provider.
+- Upgraded Playwright from 1.55.0 to 1.61.0, the first release with Ubuntu 26.04 support and Python 3.14 compatibility.
+- Added Python 3.14 dependency/import validation to CI.
+- No Squid policy, schema, telemetry model, or application-intelligence behavior changes from v3.4.1.
+
 ## 3.4.1
 
 - Fixed release checksum generation for Windows PS1/CMD files managed as CRLF by .gitattributes, so a normal Git checkout passes `sha256sum -c CHECKSUMS.sha256`.

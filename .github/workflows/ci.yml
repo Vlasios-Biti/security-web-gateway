@@ -68,3 +68,29 @@ jobs:
           forbidden="$(printf '\147\162\157\167\151\156')"
           ! grep -RniI --exclude=CHECKSUMS.sha256 "$forbidden" .
           ! find . -iname "*${forbidden}*" -print | grep .
+
+
+  python-314-compat:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: 'pip'
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Python 3.14 compile
+        run: python -m compileall -q app bin tools privileged tests
+      - name: Python 3.14 app import
+        env:
+          SWG_DB_PATH: /tmp/swg-py314.db
+          SWG_DATA_ROOT: /tmp/swg-py314-data
+          SWG_MODE: production
+          SWG_FQDN: proxy.test.local
+          SWG_PROXY_IP: 127.0.0.1
+        run: |
+          python tools/migrate.py --db /tmp/swg-py314.db --root .
+          python -c 'from app.main import app; print(app.title, len(app.routes))'
+      - name: Python 3.14 v3.4 smoke
+        run: python tests/smoke_v340.py

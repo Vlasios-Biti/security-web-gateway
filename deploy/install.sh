@@ -68,7 +68,7 @@ if [[ $SELF_SIGNED -eq 0 ]]; then
 fi
 
 if [[ -f /etc/os-release ]]; then . /etc/os-release; fi
-if [[ "${ID:-}" != "ubuntu" ]]; then echo "WARNING: installer is validated for Ubuntu 24.04 LTS; detected ${PRETTY_NAME:-unknown}."; fi
+if [[ "${ID:-}" != "ubuntu" ]]; then echo "WARNING: installer is validated for Ubuntu 24.04 LTS / 26.04 LTS; detected ${PRETTY_NAME:-unknown}."; fi
 
 for port in 443 8081 "$PROXY_PORT"; do
   if ss -lnt 2>/dev/null | awk '{print $4}' | grep -Eq "(^|:)$port$"; then
@@ -79,7 +79,7 @@ done
 
 echo "===== 1. PACKAGES ====="
 apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-venv python3-pip nginx squid sqlite3 curl ca-certificates openssl rsync sudo dnsutils sysstat
+DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-venv python3-pip nginx squid sqlite3 curl ca-certificates openssl rsync sudo bind9-dnsutils sysstat
 if [[ $LOCAL_DNS_CACHE -eq 1 ]]; then
   DEBIAN_FRONTEND=noninteractive apt-get install -y unbound
 fi

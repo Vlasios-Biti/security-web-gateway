@@ -4,7 +4,7 @@
 
 For a normal 50–250 user office deployment:
 
-- Ubuntu Server 24.04 LTS
+- Ubuntu Server 24.04 LTS or 26.04 LTS
 - 4 vCPU
 - 8 GiB RAM
 - 100 GiB SSD/NVMe-backed virtual disk
@@ -96,7 +96,7 @@ sudo ./deploy/upgrade.sh --confirm
 
 ### VALIDATION
 
-- `/healthz` reports version `3.4.1`
+- `/healthz` reports version `3.4.2`
 - schema migration is `013`
 - `PRAGMA integrity_check` returns `ok`
 - all expected timers including `security-web-gateway-performance.timer` are active

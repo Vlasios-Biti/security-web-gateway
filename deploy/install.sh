@@ -68,7 +68,7 @@ if [[ $SELF_SIGNED -eq 0 ]]; then
 fi
 
 if [[ -f /etc/os-release ]]; then . /etc/os-release; fi
-if [[ "${ID:-}" != "ubuntu" ]]; then echo "WARNING: installer is validated for Ubuntu 24.04 LTS; detected ${PRETTY_NAME:-unknown}."; fi
+if [[ "${ID:-}" != "ubuntu" ]]; then echo "WARNING: installer is validated for Ubuntu 24.04 LTS / 26.04 LTS; detected ${PRETTY_NAME:-unknown}."; fi
 
 for port in 443 8081 "$PROXY_PORT"; do
   if ss -lnt 2>/dev/null | awk '{print $4}' | grep -Eq "(^|:)$port$"; then

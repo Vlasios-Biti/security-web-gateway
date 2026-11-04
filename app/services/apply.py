@@ -56,7 +56,12 @@ def apply_saved_change(actor,source_ip=None,description="Saved policy change",pr
             audit(actor,"SAVE_APPLY","NO_EFFECTIVE_CHANGE","policy",None,source_ip)
             return {"ok":True,"applied":False,"no_effective_change":True}
 
-        result=deploy(actor,source_ip,description)
+        try:
+            result=deploy(actor,source_ip,description)
+        except Exception as exc:
+            audit(actor,"SAVE_APPLY","FAILED","policy",None,source_ip)
+            return {"ok":False,"applied":False,"error":str(exc) or "Apply failed"}
+
         if result.get("ok"):
             audit(actor,"SAVE_APPLY","SUCCESS","policy",None,source_ip)
             return {"ok":True,"applied":True,"result":result}

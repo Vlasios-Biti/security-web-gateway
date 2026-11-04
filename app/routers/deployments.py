@@ -23,7 +23,7 @@ def review(request:Request):
     finally:
         c.close()
     return request.app.state.templates.TemplateResponse(request=request,name="deployments/review.html",
-        context={"request":request,"page_title":"Changes","pending_count":pending_count(),"diff":preview_diff(),"rows":rows,"drift":drift_status()})
+        context={"request":request,"page_title":"Activity","pending_count":pending_count(),"diff":preview_diff(),"rows":rows,"drift":drift_status()})
 
 @router.get("/drift",response_class=HTMLResponse)
 def drift(request:Request):

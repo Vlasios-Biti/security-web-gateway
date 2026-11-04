@@ -106,6 +106,25 @@ function drawSystemPerformance(){
  ctx.fillStyle="#7b8798";ctx.font="10px system-ui";ctx.fillText("6h ago",pad.l,h-7);ctx.fillText("now",w-pad.r-20,h-7);
 }
 
+function setupCardFilters(){
+ document.querySelectorAll("[data-filter-cards]").forEach(input=>{
+   const root=document.getElementById(input.dataset.filterCards);if(!root)return;
+   input.addEventListener("input",()=>{const q=input.value.trim().toLowerCase();root.querySelectorAll("[data-card-search]").forEach(card=>{card.style.display=!q||card.dataset.cardSearch.toLowerCase().includes(q)?"":"none"})});
+ });
+}
+
+function setupLiveTrafficRefresh(){
+ const marker=document.querySelector("[data-live-traffic-refresh]");if(!marker)return;
+ const seconds=Math.max(5,Math.min(60,Number(marker.dataset.liveTrafficRefresh)||10));
+ const tick=()=>{
+   if(document.hidden){window.setTimeout(tick,seconds*1000);return}
+   const tag=(document.activeElement&&document.activeElement.tagName||"").toLowerCase();
+   if(["input","select","textarea"].includes(tag)){window.setTimeout(tick,5000);return}
+   window.location.reload();
+ };
+ window.setTimeout(tick,seconds*1000);
+}
+
 function setupApplicationActivityPoll(){
  const el=document.querySelector("[data-application-activity]");
  if(!el)return;
@@ -144,6 +163,6 @@ document.addEventListener("DOMContentLoaded",()=>{
    master.addEventListener("change",()=>{boxes.forEach(x=>x.checked=master.checked);sync()});
    boxes.forEach(x=>x.addEventListener("change",sync));sync();
  });
- setupNavigation();setupCommandPalette();setupApplicationActivityPoll();refreshCharts();drawSystemPerformance();if(document.getElementById("traffic-chart"))setInterval(refreshCharts,15000);
+ setupNavigation();setupCommandPalette();setupCardFilters();setupLiveTrafficRefresh();setupApplicationActivityPoll();refreshCharts();drawSystemPerformance();if(document.getElementById("traffic-chart"))setInterval(refreshCharts,15000);
 });
 window.addEventListener("resize",()=>{clearTimeout(window.__pmResize);window.__pmResize=setTimeout(()=>{refreshCharts();drawSystemPerformance()},160)});

@@ -32,6 +32,26 @@ jobs:
           PY
       - name: Shell syntax
         run: bash -n deploy/*.sh scripts/*.sh
+      - name: Background worker direct imports
+        env:
+          SWG_DB_PATH: /tmp/swg-ci.db
+          SWG_DATA_ROOT: /tmp/swg-ci-data
+          SWG_MODE: production
+          SWG_FQDN: proxy.test.local
+          SWG_PROXY_IP: 127.0.0.1
+        run: |
+          python - <<'PY'
+          import runpy
+          for path in (
+              'bin/collect_performance.py',
+              'bin/collect_telemetry.py',
+              'bin/process_discovery_queue.py',
+              'bin/sync_sources.py',
+              'bin/maintain_storage.py',
+          ):
+              runpy.run_path(path, run_name='swg_ci_import')
+              print('IMPORT OK', path)
+          PY
       - name: Fresh migration
         run: |
           rm -f /tmp/swg-ci.db

@@ -3,9 +3,14 @@ import os
 import shutil
 import subprocess
 import time
+import ssl
+from datetime import datetime,timezone
+from pathlib import Path
 
 from app.config import PROXY_IP, PROXY_PORT, DEFAULT_DNS_SERVERS, LOCAL_DNS_CACHE, LOCAL_DNS_IP
 from app.db import connect
+
+MANAGEMENT_CERT=Path('/etc/security-web-gateway/tls/management.crt')
 
 
 def run(cmd, timeout=5):
@@ -48,6 +53,56 @@ def memory_usage():
         }
     except Exception:
         return {"total_mb": 0, "used_mb": 0, "percent": 0}
+
+
+
+def swap_usage():
+    vals={}
+    try:
+        with open("/proc/meminfo",encoding="utf-8") as f:
+            for line in f:
+                k,v=line.split(":",1);vals[k]=int(v.strip().split()[0])
+        total=vals.get("SwapTotal",0);free=vals.get("SwapFree",0);used=max(0,total-free)
+        return {"total_mb":round(total/1024),"used_mb":round(used/1024),"percent":round(used/total*100,1) if total else 0}
+    except Exception:
+        return {"total_mb":0,"used_mb":0,"percent":0}
+
+
+def uptime_seconds():
+    try:
+        return int(float(Path("/proc/uptime").read_text(encoding="utf-8").split()[0]))
+    except Exception:
+        return 0
+
+
+def ntp_health():
+    r=run(["/usr/bin/timedatectl","show","-p","NTPSynchronized","--value"],timeout=3)
+    raw=(r["stdout"] or "").strip().lower()
+    return {"ok":bool(r["ok"] and raw=="yes"),"state":"synchronized" if raw=="yes" else ("not synchronized" if raw=="no" else "unknown")}
+
+
+def certificate_health(path=MANAGEMENT_CERT):
+    try:
+        data=ssl._ssl._test_decode_cert(str(path))
+        raw=data.get("notAfter")
+        if not raw:return {"ok":False,"days_remaining":None,"expires_at":None,"state":"unknown"}
+        expires=datetime.strptime(raw,"%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc)
+        days=(expires-datetime.now(timezone.utc)).total_seconds()/86400
+        return {"ok":days>14,"days_remaining":round(days,1),"expires_at":expires.isoformat(),"state":"healthy" if days>30 else ("warning" if days>14 else "critical")}
+    except Exception:
+        return {"ok":False,"days_remaining":None,"expires_at":None,"state":"unknown"}
+
+
+def worker_health():
+    names={
+      "telemetry":"security-web-gateway-telemetry.timer",
+      "performance":"security-web-gateway-performance.timer",
+      "discovery":"security-web-gateway-discovery.timer",
+      "source_sync":"security-web-gateway-source-sync.timer",
+      "storage":"security-web-gateway-storage-maintenance.timer",
+      "deploy_helper":"security-web-gateway-deploy-helper.socket",
+    }
+    return {k:service_status(v) for k,v in names.items()}
 
 
 def load_average():
@@ -112,7 +167,12 @@ def live_system_health():
         "dns": dns_health(),
         "disk": disk_usage(),
         "memory": memory_usage(),
+        "swap": swap_usage(),
         "load": load_average(),
+        "uptime_seconds": uptime_seconds(),
+        "ntp": ntp_health(),
+        "certificate": certificate_health(),
+        "workers": worker_health(),
         "local_dns_cache": bool(LOCAL_DNS_CACHE),
     }
 
@@ -139,5 +199,7 @@ def cached_system_health():
     return {
         "generated_at":None,"cache_generated_at":None,"cache_stale":True,
         "squid_status":"warming","nginx_status":"warming","app_status":"warming","port_ok":False,
-        "dns":[],"disk":disk_usage(),"memory":memory_usage(),"load":load_average(),"local_dns_cache":bool(LOCAL_DNS_CACHE),
+        "dns":[],"disk":disk_usage(),"memory":memory_usage(),"swap":swap_usage(),"load":load_average(),
+        "uptime_seconds":uptime_seconds(),"ntp":{"ok":False,"state":"warming"},"certificate":{"ok":False,"days_remaining":None,"expires_at":None,"state":"warming"},
+        "workers":{},"local_dns_cache":bool(LOCAL_DNS_CACHE),
     }

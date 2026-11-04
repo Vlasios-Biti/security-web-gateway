@@ -463,11 +463,11 @@ def _execute_run(c,run_id,application_id,query,method,source_ref,client_ip,windo
     c.commit()
 
 
-def create_run(application_id,query,method,actor,source_ref=None,client_ip=None,window_minutes=None,catalog_key=None,auto_approve=False):
+def create_run(application_id,query,method,actor,source_ref=None,client_ip=None,window_minutes=None,catalog_key=None,auto_approve=False,auto_apply=False,baseline_dirty=False):
     c=connect();run_id=None
     try:
-        cur=c.execute("""INSERT INTO discovery_runs(application_id,query,method,status,source_ref,client_ip,window_minutes,started_by,auto_approve)
-          VALUES(?,?,?,'running',?,?,?,?,?)""",(application_id,query or None,method,source_ref or None,client_ip or None,window_minutes,actor,1 if auto_approve else 0));run_id=cur.lastrowid;c.commit()
+        cur=c.execute("""INSERT INTO discovery_runs(application_id,query,method,status,source_ref,client_ip,window_minutes,started_by,auto_approve,auto_apply,baseline_dirty)
+          VALUES(?,?,?,'running',?,?,?,?,?,?,?)""",(application_id,query or None,method,source_ref or None,client_ip or None,window_minutes,actor,1 if auto_approve else 0,1 if auto_apply else 0,1 if baseline_dirty else 0));run_id=cur.lastrowid;c.commit()
         # Browser execution is deliberately deferred to the systemd worker so a
         # Chromium session can never hold an Nginx/GUI request open long enough
         # to produce a 504. The review page can be refreshed while status=running.
@@ -507,8 +507,18 @@ def process_browser_queue(max_runs=1):
                 ready=get_run(run['id'])
                 ids=[x['id'] for x in ready.get('candidates',[])] if ready else []
                 if ids:
-                    approve_run(run['id'],ids,run.get('started_by') or 'system')
-                    processed.append({'id':run['id'],'status':'approved','auto_approved':len(ids)})
+                    actor=run.get('started_by') or 'system'
+                    approve_run(run['id'],ids,actor)
+                    apply_result=None
+                    if bool(run.get('auto_apply')):
+                        from app.services.apply import apply_saved_change
+                        apply_result=apply_saved_change(
+                            actor,
+                            None,
+                            f"Automatic application dependency update for application {run.get('application_id')}",
+                            preexisting_dirty=bool(run.get('baseline_dirty')),
+                        )
+                    processed.append({'id':run['id'],'status':'approved','auto_approved':len(ids),'apply':apply_result})
                 else:
                     processed.append({'id':run['id'],'status':'ready','auto_approved':0})
             else:

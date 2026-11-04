@@ -494,13 +494,16 @@ def process_browser_queue(max_runs=1):
             if not run:break
             run=dict(run)
         finally:
-            if c:c.close()
-        c=connect()
+            c.close()
+
         try:
-            _execute_run(c,run['id'],run.get('application_id'),run.get('query'),run['method'],run.get('source_ref'),run.get('client_ip'),run.get('window_minutes'))
-            auto_approve=bool(run.get('auto_approve'))
-            if auto_approve:
-                c.close();c=None
+            c=connect()
+            try:
+                _execute_run(c,run['id'],run.get('application_id'),run.get('query'),run['method'],run.get('source_ref'),run.get('client_ip'),run.get('window_minutes'))
+            finally:
+                c.close()
+
+            if bool(run.get('auto_approve')):
                 ready=get_run(run['id'])
                 ids=[x['id'] for x in ready.get('candidates',[])] if ready else []
                 if ids:
@@ -511,11 +514,13 @@ def process_browser_queue(max_runs=1):
             else:
                 processed.append({'id':run['id'],'status':'ready'})
         except Exception as exc:
+            c=connect()
             try:
-                c.rollback();c.execute("UPDATE discovery_runs SET status='failed',error_text=?,completed_at=CURRENT_TIMESTAMP WHERE id=?",(str(exc),run['id']));c.commit()
-            except Exception:pass
+                c.execute("UPDATE discovery_runs SET status='failed',error_text=?,completed_at=CURRENT_TIMESTAMP WHERE id=?",(str(exc),run['id']))
+                c.commit()
+            finally:
+                c.close()
             processed.append({'id':run['id'],'status':'failed','error':str(exc)})
-        finally:c.close()
     return processed
 
 

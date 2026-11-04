@@ -1,40 +1,47 @@
 {% extends "base.html" %}{% block content %}
-<div class="page-head simple-page-head">
-  <div><span class="section-kicker">Access</span><h2>Applications</h2><p>Allow a service once. SWG discovers and maintains the web dependencies behind it.</p></div>
+<div class="ops-page-head">
+  <div><span class="ops-kicker">Access management</span><h2>Managed applications</h2><p>Allow a service once. Discovery maintains its public dependency graph automatically.</p></div>
   {% if request.state.user.role in ['admin','operator'] %}<a class="btn primary" href="/applications/discover">+ Add application</a>{% endif %}
 </div>
 
-<div class="application-grid app-grid-v37">
+<section class="apps-summary">
+  <div><span>Applications</span><strong>{{ stats.applications }}</strong><small>{{ stats.active }} active</small></div>
+  <div><span>Dependencies</span><strong class="accent-blue-text">{{ stats.dependencies }}</strong><small>Managed endpoints</small></div>
+  <div><span>Auto-discovery</span><strong class="{{ 'good' if stats.discovery=='active' else 'warn' }}">{{ stats.discovery|capitalize }}</strong><small>Discovery worker</small></div>
+  <div><span>Needs attention</span><strong class="{{ 'warn' if stats.attention else 'good' }}">{{ stats.attention }}</strong><small>Candidates / failed runs</small></div>
+  <div><span>Access profiles</span><strong class="accent-violet-text">{{ stats.profiles }}</strong><small>Reusable scopes</small></div>
+  <div><span>Last apply</span><strong>{{ stats.last_apply.status|capitalize if stats.last_apply else 'None' }}</strong><small>{{ stats.last_apply.deployed_at if stats.last_apply else 'Not initialized' }}</small></div>
+</section>
+
+<section class="ops-card application-search-card">
+  <div class="app-search-row"><input class="search" data-filter-cards="application-card-grid" placeholder="Search applications, provider, profile or dependency count…"><span class="status-pill healthy">{{ stats.active }} active</span><span class="status-pill {{ 'warning' if stats.attention else 'healthy' }}">{{ stats.attention }} attention</span></div>
+</section>
+
+<div class="app-grid-v39" id="application-card-grid">
 {% for a in applications %}
-  <section class="application-card app-card-v37">
-    <div class="app-icon">{{ a.name[:2]|upper }}</div>
-    <div class="app-main">
-      <div class="app-title"><h3>{{ a.name }}</h3>{% if a.pending %}<span class="badge warn-bg">APPROVAL REQUIRED</span>{% endif %}</div>
-      <p>{{ a.description or 'Managed web application' }}</p>
-      <div class="app-meta-v37">
-        <span><b>{{ a.dependency_count }}</b> dependencies</span>
-        <span>{% if a.groups %}{{ a.groups|map(attribute='name')|join(', ') }}{% elif a.direct_network_count %}Direct network scope{% else %}No access scope{% endif %}</span>
-        <span>{{ 'Last checked ' ~ (a.last_discovery_at or 'never') }}</span>
-      </div>
+  {% set run = latest_runs.get(a.id) %}
+  <article class="app-card-v39" data-card-search="{{ a.name }} {{ a.provider }} {{ a.description }} {% for g in a.groups %}{{ g.name }} {% endfor %}">
+    <header><div class="app-icon">{{ a.name[:2]|upper }}</div><span class="status-pill {{ 'healthy' if a.status=='active' else 'warning' }}">{{ a.status|capitalize }}</span></header>
+    <h3>{{ a.name }}</h3><p>{{ a.description or 'Managed web application' }}</p>
+    <div class="app-meta-v39">
+      <span><b>{{ a.dependency_count }}</b> dependencies</span>
+      <span>{% if a.groups %}{{ a.groups|map(attribute='name')|join(', ') }}{% elif a.direct_network_count %}Direct network scope{% else %}No access scope{% endif %}</span>
+      <span>Last checked {{ a.last_discovery_at or 'never' }}</span>
+      {% if run and run.status=='failed' %}<span class="bad">Latest discovery failed</span>{% elif run and run.status=='running' %}<span class="accent-blue-text">Discovery running…</span>{% endif %}
     </div>
-    <div class="app-actions">
-      <span class="badge {{ 'ok' if a.status=='active' else 'off' }}">{{ a.status|upper }}</span>
-      <a class="btn ghost small" href="/applications/{{ a.id }}">Open</a>
-    </div>
-  </section>
+    <footer><span class="status-pill {{ 'warning' if a.pending else 'healthy' }}">{{ 'Approval required' if a.pending else 'Synchronized' }}</span><a class="btn ghost small" href="/applications/{{ a.id }}">Open</a></footer>
+  </article>
 {% else %}
   <section class="empty-state-card"><div class="empty-orb">＋</div><h3>No applications yet</h3><p>Add the first website or service you want users to access.</p><a class="btn primary" href="/applications/discover">Add application</a></section>
 {% endfor %}
 </div>
 
-{% if runs %}
-<details class="advanced-card space-top">
-  <summary>Discovery activity</summary>
-  <div class="advanced-body">
-    <table class="table"><thead><tr><th>Time</th><th>Application</th><th>Status</th><th>Result</th></tr></thead><tbody>
-    {% for r in runs %}<tr><td>{{ r.started_at }}</td><td>{{ r.application_name or r.query or '-' }}</td><td><span class="badge {{ 'ok' if r.status in ('ready','approved') else ('danger' if r.status=='failed' else 'off') }}">{{ r.status|upper }}</span></td><td><a class="text-link" href="/applications/discovery/{{ r.id }}">{{ r.candidate_count }} endpoints</a></td></tr>{% endfor %}
-    </tbody></table>
+<section class="ops-card dependency-health">
+  <header><div><h3>Dependency health</h3><p>Recent discovery outcomes. Healthy applications stay quiet; failures and reviews stand out.</p></div><a class="text-link" href="/intelligence/dependency-candidates">Dependency review →</a></header>
+  <div class="ops-status-list">
+  {% for r in runs[:8] %}
+    <div><span><b>{{ r.application_name or r.query or 'Application' }}</b> · {{ r.method|replace('_',' ')|title }} · {{ r.started_at }}</span><b class="status-pill {{ 'healthy' if r.status in ('ready','approved') else ('danger' if r.status=='failed' else 'warning') }}">{{ r.status|capitalize }}</b></div>
+  {% else %}<div><span>No discovery activity yet.</span><b class="status-pill healthy">Ready</b></div>{% endfor %}
   </div>
-</details>
-{% endif %}
+</section>
 {% endblock %}

@@ -79,6 +79,33 @@ function setupCommandPalette(){
  document.addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();palette.hidden?open():close()}else if(e.key==="Escape"){close();document.body.classList.remove("nav-open")}});
 }
 
+function drawSystemPerformance(){
+ const canvas=document.getElementById("system-performance-chart");
+ const source=document.getElementById("system-performance-data");
+ if(!canvas||!source)return;
+ let rows=[];try{rows=JSON.parse(source.textContent||"[]")}catch(e){return}
+ const empty=document.getElementById("system-performance-empty");
+ if(!rows.length){if(empty)empty.style.display="flex";return}
+ if(empty)empty.style.display="none";
+ const {ctx,w,h}=fitCanvas(canvas),pad={l:36,r:16,t:14,b:26};
+ ctx.clearRect(0,0,w,h);
+ ctx.strokeStyle="#e9edf3";ctx.lineWidth=1;
+ for(let i=0;i<4;i++){const y=pad.t+(h-pad.t-pad.b)*i/3;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(w-pad.r,y);ctx.stroke()}
+ const xs=rows.slice(-120),pw=w-pad.l-pad.r,ph=h-pad.t-pad.b;
+ const latencyMax=Math.max(50,...xs.map(r=>Number(r.proxy_p95_ms||0)));
+ const series=[
+  {key:"cpu_percent",stroke:"#2563eb",max:100},
+  {key:"memory_percent",stroke:"#159a67",max:100},
+  {key:"proxy_p95_ms",stroke:"#7c3aed",max:latencyMax}
+ ];
+ series.forEach(ser=>{
+   ctx.strokeStyle=ser.stroke;ctx.lineWidth=2;ctx.beginPath();let started=false;
+   xs.forEach((r,i)=>{const raw=r[ser.key];if(raw===null||raw===undefined)return;const x=pad.l+(xs.length<=1?0:i*pw/(xs.length-1));const y=pad.t+ph-(Math.max(0,Math.min(ser.max,Number(raw)))/ser.max)*ph;if(!started){ctx.moveTo(x,y);started=true}else ctx.lineTo(x,y)});
+   if(started)ctx.stroke();
+ });
+ ctx.fillStyle="#7b8798";ctx.font="10px system-ui";ctx.fillText("6h ago",pad.l,h-7);ctx.fillText("now",w-pad.r-20,h-7);
+}
+
 function setupApplicationActivityPoll(){
  const el=document.querySelector("[data-application-activity]");
  if(!el)return;
@@ -117,6 +144,6 @@ document.addEventListener("DOMContentLoaded",()=>{
    master.addEventListener("change",()=>{boxes.forEach(x=>x.checked=master.checked);sync()});
    boxes.forEach(x=>x.addEventListener("change",sync));sync();
  });
- setupNavigation();setupCommandPalette();setupApplicationActivityPoll();refreshCharts();if(document.getElementById("traffic-chart"))setInterval(refreshCharts,15000);
+ setupNavigation();setupCommandPalette();setupApplicationActivityPoll();refreshCharts();drawSystemPerformance();if(document.getElementById("traffic-chart"))setInterval(refreshCharts,15000);
 });
-window.addEventListener("resize",()=>{clearTimeout(window.__pmResize);window.__pmResize=setTimeout(refreshCharts,160)});
+window.addEventListener("resize",()=>{clearTimeout(window.__pmResize);window.__pmResize=setTimeout(()=>{refreshCharts();drawSystemPerformance()},160)});

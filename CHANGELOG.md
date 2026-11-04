@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.5.0
+
+- Redesigned the management console navigation around five human-readable task groups instead of exposing every route at once.
+- Simplified the Dashboard to prioritize gateway health, traffic, quick actions, policy coverage and change status.
+- Replaced hard-coded proxy endpoint text with the configured proxy IP and port.
+- Added a flat, restrained visual system with less decorative gradient/uppercase noise and clearer hierarchy.
+- Added a functional mobile navigation drawer instead of hiding the sidebar entirely on smaller screens.
+- Added template syntax validation to CI.
+- No Squid policy, schema, telemetry model, or enforcement behavior changes from v3.4.5.
+
 ## 3.4.5
 
 - Fixed telemetry cleanup on an empty/fresh telemetry database where `after_count` was referenced before assignment.

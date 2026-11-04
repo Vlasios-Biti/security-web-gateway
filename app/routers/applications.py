@@ -57,6 +57,7 @@ def discover_catalog(request:Request,catalog_key:str=Form(...),policy_group_ids:
     item=next((x for x in catalog_search("") if x["key"]==catalog_key),None)
     if not item:return RedirectResponse("/applications/discover?error=Unknown+catalog+application",303)
     try:
+        baseline_dirty=save_apply_state()["dirty"]
         c=connect();existing=c.execute("SELECT id FROM applications WHERE name=? AND status!='deleted'",(item["name"],)).fetchone();c.close()
         aid=existing["id"] if existing else create_application(item["name"],item["provider"],item["description"],item["seed_domain"],item.get("source_kind",item["method"]),item.get("source_ref",catalog_key),bool(item.get("auto_monitor")),u["username"],system_managed=False)
         if policy_group_ids:
@@ -66,7 +67,7 @@ def discover_catalog(request:Request,catalog_key:str=Form(...),policy_group_ids:
                 c.commit()
             finally:c.close()
         method=item["method"]
-        rid=create_run(aid,item.get("seed_domain") or item["name"],method,u["username"],source_ref=item.get("source_ref"),catalog_key=catalog_key);audit(u["username"],"DISCOVERY_START","SUCCESS","discovery_run",rid,auth.client_ip(request),json.dumps({"catalog":catalog_key,"method":method}));return RedirectResponse(f"/applications/discovery/{rid}",303)
+        rid=create_run(aid,item.get("seed_domain") or item["name"],method,u["username"],source_ref=item.get("source_ref"),catalog_key=catalog_key,auto_apply=bool(u["role"]=="admin"),baseline_dirty=baseline_dirty);audit(u["username"],"DISCOVERY_START","SUCCESS","discovery_run",rid,auth.client_ip(request),json.dumps({"catalog":catalog_key,"method":method}));return RedirectResponse(f"/applications/discovery/{rid}",303)
     except Exception as exc:return RedirectResponse("/applications/discover?error="+str(exc).replace(" ","+"),303)
 
 @router.post("/discover/custom")
@@ -100,6 +101,7 @@ async def discover_har_upload(request:Request,name:str=Form(...),seed_domain:str
     if not can_manage(request):return HTMLResponse("Forbidden",403)
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
     try:
+        baseline_dirty=save_apply_state()["dirty"]
         raw=await har_file.read()
         c=connect();existing=c.execute("SELECT id FROM applications WHERE name=? AND status!='deleted'",(name.strip(),)).fetchone();c.close()
         aid=existing["id"] if existing else create_application(name,"Custom",f"Discovered application: {name}",seed_domain,"observed","HAR workflow",False,u["username"])
@@ -110,7 +112,7 @@ async def discover_har_upload(request:Request,name:str=Form(...),seed_domain:str
                     c.execute("INSERT OR IGNORE INTO policy_group_applications VALUES(?,?)",(gid,aid));c.execute("UPDATE policy_groups SET pending=1 WHERE id=?",(gid,))
                 c.commit()
             finally:c.close()
-        rid=create_har_run(aid,seed_domain,raw,u["username"])
+        rid=create_har_run(aid,seed_domain,raw,u["username"],auto_apply=bool(u["role"]=="admin"),baseline_dirty=baseline_dirty)
         audit(u["username"],"DISCOVERY_HAR","SUCCESS","discovery_run",rid,auth.client_ip(request),json.dumps({"filename":har_file.filename,"bytes":len(raw)}))
         return RedirectResponse(f"/applications/discovery/{rid}",303)
     except Exception as exc:
@@ -134,7 +136,13 @@ def discovery_approve(run_id:int,request:Request,candidate_ids:list[int]=Form(de
     app=get_application(run["application_id"]) if run.get("application_id") else None
     if app and not can_modify_application(request,app):return HTMLResponse("Forbidden",403)
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
-    try:r=approve_run(run_id,candidate_ids,u["username"]);audit(u["username"],"DISCOVERY_APPROVE","SUCCESS","discovery_run",run_id,auth.client_ip(request),json.dumps(r));run=get_run(run_id);return RedirectResponse(f"/applications/{run['application_id']}?msg=Discovery+approved+as+pending+change",303)
+    try:
+        r=approve_run(run_id,candidate_ids,u["username"])
+        audit(u["username"],"DISCOVERY_APPROVE","SUCCESS","discovery_run",run_id,auth.client_ip(request),json.dumps(r))
+        run=get_run(run_id)
+        result,msg=_apply_after_save(request,u,f"Approve discovered dependencies for application {run['application_id']}",bool(run.get("baseline_dirty")))
+        key="msg" if result.get("ok") else "error"
+        return RedirectResponse(f"/applications/{run['application_id']}?{key}="+quote_plus(msg),303)
     except Exception as exc:return RedirectResponse(f"/applications/discovery/{run_id}?error="+str(exc).replace(" ","+"),303)
 
 @router.get("/{application_id}/activity")

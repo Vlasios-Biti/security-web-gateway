@@ -527,7 +527,16 @@ def process_browser_queue(max_runs=1):
                                 c.close()
                     processed.append({'id':run['id'],'status':'approved','auto_approved':len(ids),'apply':apply_result})
                 else:
-                    processed.append({'id':run['id'],'status':'ready','auto_approved':0})
+                    apply_result=None
+                    if bool(run.get('auto_apply')):
+                        from app.services.apply import apply_saved_change
+                        apply_result=apply_saved_change(
+                            run.get('started_by') or 'system',
+                            None,
+                            f"Save application {run.get('application_id')} after empty discovery",
+                            preexisting_dirty=bool(run.get('baseline_dirty')),
+                        )
+                    processed.append({'id':run['id'],'status':'ready','auto_approved':0,'apply':apply_result})
             else:
                 processed.append({'id':run['id'],'status':'ready'})
         except Exception as exc:
@@ -541,11 +550,11 @@ def process_browser_queue(max_runs=1):
     return processed
 
 
-def create_har_run(application_id,seed_domain,raw_bytes,actor):
+def create_har_run(application_id,seed_domain,raw_bytes,actor,auto_apply=False,baseline_dirty=False):
     c=connect();run_id=None
     try:
-        cur=c.execute("""INSERT INTO discovery_runs(application_id,query,method,status,source_ref,started_by)
-          VALUES(?,?,'har_import','running','har-upload',?)""",(application_id,seed_domain or None,actor));run_id=cur.lastrowid;c.commit()
+        cur=c.execute("""INSERT INTO discovery_runs(application_id,query,method,status,source_ref,started_by,auto_apply,baseline_dirty)
+          VALUES(?,?,'har_import','running','har-upload',?,?,?)""",(application_id,seed_domain or None,actor,1 if auto_apply else 0,1 if baseline_dirty else 0));run_id=cur.lastrowid;c.commit()
         items,version,actual=discover_har(raw_bytes,seed_domain)
         c.execute("BEGIN IMMEDIATE");_persist_candidates(c,run_id,items)
         c.execute("UPDATE discovery_runs SET status='ready',source_ref=?,source_version=?,completed_at=CURRENT_TIMESTAMP WHERE id=?",(actual,version,run_id))

@@ -756,6 +756,7 @@ def _cleanup_telemetry_connection(c):
         c.execute("PRAGMA incremental_vacuum(2000)")
     except Exception:
         pass
+    after_count = int(c.execute("SELECT COUNT(*) c FROM telemetry_events").fetchone()["c"] or 0)
     _set_state(c, "last_cleanup_at", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     _set_state(c, "last_cleanup_deleted", deleted)
     _set_state(c, "telemetry_event_count", after_count)
@@ -764,7 +765,6 @@ def _cleanup_telemetry_connection(c):
     _set_state(c,"telemetry_last_event",edge["last_event"] or "")
     _set_state(c,"telemetry_last_event_epoch",edge["last_epoch"] or "")
     _set_state(c, "last_cleanup_reason", "age+storage" if batches else "age")
-    after_count = max(0, before_count - deleted)
     return {"deleted": deleted, "events_before": before_count, "events_after": after_count, **stats}
 
 

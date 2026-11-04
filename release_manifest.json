@@ -1,6 +1,6 @@
 {
   "product": "Security Web Gateway",
-  "version": "3.8.0",
+  "version": "3.9.0",
   "schema_migration": "015",
   "target_os": "Ubuntu 24.04 LTS / Ubuntu 26.04 LTS",
   "deployment_model": "single-vm-on-prem-appliance",
@@ -28,8 +28,10 @@
   "why_blocked": true,
   "dependency_candidates": "review-only-no-auto-allow",
   "application_discovery_auto_stage": true,
-  "primary_navigation": "overview-applications-traffic-activity-system",
-  "ui_theme": "light-workspace-dark-sidebar",
+  "primary_navigation": "overview-applications-traffic-activity-system-policy-tools",
+  "ui_theme": "enterprise-operations-light-workspace-graphite-sidebar",
   "save_behavior": "admin-save-validate-apply-rollback",
-  "operator_save_behavior": "pending-admin-approval"
+  "operator_save_behavior": "pending-admin-approval",
+  "system_console": "unified-health-performance-dns-tls-storage-recovery-alerts",
+  "live_traffic_auto_refresh_seconds": 10
 }

@@ -13,7 +13,7 @@ def index(request:Request):
     try:rows=[dict(x) for x in c.execute("SELECT * FROM deployments ORDER BY id DESC LIMIT 50")]
     finally:c.close()
     return request.app.state.templates.TemplateResponse(request=request,name="deployments/list.html",
-        context={"request":request,"page_title":"Deployments","rows":rows,"pending_count":pending_count()})
+        context={"request":request,"page_title":"Apply History","rows":rows,"pending_count":pending_count()})
 @router.get("/review",response_class=HTMLResponse)
 def review(request:Request):
     if request.state.user["role"] not in("admin","operator"):return HTMLResponse("Forbidden",403)

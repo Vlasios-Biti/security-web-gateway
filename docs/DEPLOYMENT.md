@@ -1,4 +1,4 @@
-# Deployment Runbook — Security Web Gateway 3.4
+# Deployment Runbook — Security Web Gateway 3.8
 
 ## Recommended VM baseline
 
@@ -96,12 +96,12 @@ sudo ./deploy/upgrade.sh --confirm
 
 ### VALIDATION
 
-- `/healthz` reports version `3.7.1`
-- schema migration is `014`
+- `/healthz` reports version `3.8.0`
+- schema migration is `015`
 - `PRAGMA integrity_check` returns `ok`
 - all expected timers including `security-web-gateway-performance.timer` are active
 - `squid -k parse` and current client traffic remain healthy
-- no pending policy was auto-deployed
+- the upgrade itself did not auto-publish pre-existing pending policy; subsequent Admin Saves use transactional Save & Apply
 
 ### ROLLBACK
 

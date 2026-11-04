@@ -541,7 +541,16 @@ def list_runs(limit=50):
 
 
 def _category_for_app(c,app):
-    slug="app-"+app["slug"];c.execute("INSERT OR IGNORE INTO categories(name,slug,system_managed) VALUES(?,?,?)",(app["name"],slug,app["system_managed"]));return c.execute("SELECT id FROM categories WHERE slug=?",(slug,)).fetchone()["id"]
+    slug="app-"+app["slug"]
+    row=c.execute("SELECT id FROM categories WHERE slug=?",(slug,)).fetchone()
+    if row:return row["id"]
+    # Legacy bootstrap categories such as "Google Maps" may already occupy
+    # the unique category name. Use an application-specific display name.
+    name=f"Application: {app['name']} [{app['id']}]"
+    c.execute("INSERT INTO categories(name,slug,system_managed) VALUES(?,?,?)",(name,slug,app["system_managed"]))
+    row=c.execute("SELECT id FROM categories WHERE slug=?",(slug,)).fetchone()
+    if not row:raise RuntimeError(f"Failed to create discovery category for {app['name']}.")
+    return row["id"]
 
 
 def _merge_protocol(a,b):

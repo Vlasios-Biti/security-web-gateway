@@ -122,6 +122,6 @@ SUCCESS=1; CUTOVER=0; trap - ERR EXIT
 rm -f "$SHADOW"
 echo "============================================================"
 echo "Security Web Gateway v$SWG_VERSION upgrade successful"
-echo "Policy was NOT auto-deployed; existing Squid policy remains unchanged until GUI Pending/Diff/Deploy."
+echo "Upgrade did not publish pre-existing pending policy. Existing Squid policy remains unchanged; future Admin Saves use validated Save & Apply."
 echo "Rollback backup: $BACKUP"
 echo "============================================================"

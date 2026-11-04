@@ -79,6 +79,33 @@ function setupCommandPalette(){
  document.addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();palette.hidden?open():close()}else if(e.key==="Escape"){close();document.body.classList.remove("nav-open")}});
 }
 
+function setupApplicationActivityPoll(){
+ const el=document.querySelector("[data-application-activity]");
+ if(!el)return;
+ const url=el.dataset.activityUrl;
+ if(!url)return;
+ let stopped=false,failures=0;
+ const poll=async()=>{
+   if(stopped)return;
+   try{
+     const r=await fetch(url,{credentials:"same-origin",headers:{"Accept":"application/json"}});
+     if(!r.ok)throw new Error("HTTP "+r.status);
+     const data=await r.json();
+     failures=0;
+     if(data.status==="running"){
+       window.setTimeout(poll,1800);
+       return;
+     }
+     stopped=true;
+     window.location.reload();
+   }catch(e){
+     failures+=1;
+     if(failures<20)window.setTimeout(poll,Math.min(5000,1800+failures*250));
+   }
+ };
+ window.setTimeout(poll,1200);
+}
+
 document.addEventListener("DOMContentLoaded",()=>{
  document.querySelectorAll("[data-confirm]").forEach(el=>el.addEventListener("submit",e=>{if(!confirm(el.dataset.confirm))e.preventDefault()}));
  document.querySelectorAll("[data-filter-table]").forEach(i=>{const t=document.getElementById(i.dataset.filterTable);if(!t)return;i.addEventListener("input",()=>{const q=i.value.toLowerCase().trim();t.querySelectorAll("tbody tr").forEach(r=>r.style.display=r.textContent.toLowerCase().includes(q)?"":"none")})});
@@ -90,6 +117,6 @@ document.addEventListener("DOMContentLoaded",()=>{
    master.addEventListener("change",()=>{boxes.forEach(x=>x.checked=master.checked);sync()});
    boxes.forEach(x=>x.addEventListener("change",sync));sync();
  });
- setupNavigation();setupCommandPalette();refreshCharts();if(document.getElementById("traffic-chart"))setInterval(refreshCharts,15000);
+ setupNavigation();setupCommandPalette();setupApplicationActivityPoll();refreshCharts();if(document.getElementById("traffic-chart"))setInterval(refreshCharts,15000);
 });
 window.addEventListener("resize",()=>{clearTimeout(window.__pmResize);window.__pmResize=setTimeout(refreshCharts,160)});

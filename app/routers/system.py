@@ -38,6 +38,10 @@ def page(request:Request):
     if not (h.get("ntp") or {}).get("ok"):alerts.append({"severity":"warning","title":"NTP synchronization needs attention","detail":(h.get("ntp") or {}).get("state","unknown")})
     for d in h.get("dns",[]):
         if not d.get("ok"):alerts.append({"severity":"warning","title":"DNS resolver unavailable","detail":str(d.get("server","unknown"))})
+    for worker,state in (h.get("workers") or {}).items():
+        if state!="active":alerts.append({"severity":"warning","title":"Background service needs attention","detail":f"{worker.replace('_',' ').title()}: {state}"})
+    if perf and perf.get("telemetry_lag_seconds") is not None and perf["telemetry_lag_seconds"]>60:
+        alerts.append({"severity":"warning","title":"Telemetry ingestion is delayed","detail":f"{round(perf['telemetry_lag_seconds'],1)} seconds behind."})
     if drift.get("state")=="drift":alerts.append({"severity":"critical","title":"Managed Squid configuration drift detected","detail":drift.get("message","Expected and live policy differ.")})
     return request.app.state.templates.TemplateResponse(
       request=request,name="system/health.html",

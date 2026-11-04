@@ -3,9 +3,10 @@ from fastapi.responses import HTMLResponse
 
 from app.services.system import cached_system_health
 from app.services.traffic import dashboard_payload, telemetry_health
-from app.services.rules import pending_count, list_networks
+from app.services.rules import pending_count
 from app.services.deployment import drift_status
 from app.db import connect
+from app.config import PROXY_IP, PROXY_PORT
 
 router = APIRouter()
 
@@ -24,19 +25,36 @@ def page(request: Request):
         last_dep = dict(last_dep) if last_dep else None
     finally:
         c.close()
+
     traffic = dashboard_payload(60)
     health = cached_system_health()
     return request.app.state.templates.TemplateResponse(
         request=request,
         name="overview.html",
         context={
-            "request": request, "page_title": "Security Operations Overview", "traffic": traffic,
+            "request": request,
+            "page_title": "Dashboard",
+            "traffic": traffic,
             "telemetry_health": telemetry_health(),
-            "squid_status": health["squid_status"], "nginx_status": health["nginx_status"],
-            "app_status": health["app_status"], "port_ok": health["port_ok"], "dns": health["dns"],
-            "disk": health["disk"], "memory": health["memory"], "load": health["load"], "domain_count": domains,
-            "system_domain_count": system_domains, "custom_domain_count": custom_domains, "ip_count": ips,
-            "network_count": network_count, "pending_count": pending_count(), "drift": drift_status(),
-            "audit_rows": audits, "last_deployment": last_dep, "health_cache": health,
+            "squid_status": health["squid_status"],
+            "nginx_status": health["nginx_status"],
+            "app_status": health["app_status"],
+            "port_ok": health["port_ok"],
+            "dns": health["dns"],
+            "disk": health["disk"],
+            "memory": health["memory"],
+            "load": health["load"],
+            "domain_count": domains,
+            "system_domain_count": system_domains,
+            "custom_domain_count": custom_domains,
+            "ip_count": ips,
+            "network_count": network_count,
+            "pending_count": pending_count(),
+            "drift": drift_status(),
+            "audit_rows": audits,
+            "last_deployment": last_dep,
+            "health_cache": health,
+            "proxy_ip": PROXY_IP,
+            "proxy_port": PROXY_PORT,
         },
     )

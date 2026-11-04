@@ -20,3 +20,12 @@ window.addEventListener("resize",()=>{clearTimeout(window.__pmResize);window.__p
 document.addEventListener("DOMContentLoaded",()=>{
  document.querySelectorAll("[data-page-size-select]").forEach(s=>s.addEventListener("change",()=>{const u=new URL(location.href);u.searchParams.set("page_size",s.value);u.searchParams.set("page","1");location.href=u.toString()}));
 });
+
+
+document.addEventListener("DOMContentLoaded",()=>{
+  const toggles=[...document.querySelectorAll("[data-nav-toggle]")];
+  const closeNav=()=>document.body.classList.remove("nav-open");
+  toggles.forEach(el=>el.addEventListener("click",()=>document.body.classList.toggle("nav-open")));
+  document.querySelectorAll(".sidebar a").forEach(a=>a.addEventListener("click",closeNav));
+  document.addEventListener("keydown",e=>{if(e.key==="Escape")closeNav()});
+});

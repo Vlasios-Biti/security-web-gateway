@@ -39,7 +39,7 @@
       </details>
 
       <a href="/changes/review" class="nav-primary {% if '/changes/' in request.url.path and request.url.path!='/changes/audit' %}active{% endif %}">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg><span>Changes</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg><span>Activity</span>
         {% if request.state.user.role in ('admin','operator') %}<span class="nav-count" data-pending-count></span>{% endif %}
       </a>
 

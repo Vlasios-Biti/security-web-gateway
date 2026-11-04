@@ -40,6 +40,9 @@ jobs:
           grep -q 'Add application' templates/applications/discover.html
           grep -q 'Delete application' templates/applications/detail.html
           grep -q 'data-select-candidates-all' templates/applications/discovery_result.html
+          grep -q 'data-application-activity' templates/applications/detail.html
+          grep -q 'setupApplicationActivityPoll' static/js/app.js
+          grep -q 'scope-picker .check' static/css/ui-v37.css
           test -s static/css/ui-v37.css
           test -s static/favicon.svg
       - name: Application version matches VERSION

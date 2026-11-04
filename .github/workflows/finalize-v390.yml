@@ -1,0 +1,27 @@
+name: Finalize Security Web Gateway v3.9.0
+
+on:
+  push:
+    branches:
+      - release/v3.9.0
+
+permissions:
+  contents: write
+
+jobs:
+  finalize-release:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_SHA: 1e75fce6c8e577c2cea780db56930542850858ef
+    steps:
+      - name: Create v3.9.0 tag and GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v3.9.0" >/dev/null 2>&1; then
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" -f ref='refs/tags/v3.9.0' -f sha="$RELEASE_SHA" >/dev/null
+          fi
+          if ! gh release view v3.9.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create v3.9.0 --repo "$GITHUB_REPOSITORY" --target "$RELEASE_SHA" --title 'Security Web Gateway v3.9.0' --notes 'Enterprise operations console release. Figma-led UI/UX redesign, unified System health/performance console, corrected System vs Policy & Tools navigation, professional Overview/Applications/Activity workspaces, Live Traffic auto-refresh, operational alerts, TLS/NTP/worker/recovery signals, and complete removal of legacy dark workspace controls. Schema remains 015; v3.8 Save & Apply semantics are unchanged.'
+          fi

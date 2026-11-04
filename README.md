@@ -1,6 +1,6 @@
 # Security Web Gateway
 
-**Version:** 3.7.1  
+**Version:** 3.8.0  
 **Target:** single-VM, on-prem enterprise appliance  
 **Target OS:** Ubuntu Server 24.04 LTS / 26.04 LTS  
 **Architecture:** Squid explicit proxy + FastAPI management plane + Nginx TLS + SQLite/WAL policy and telemetry store + isolated background workers + restricted privileged deployment helper.
@@ -48,9 +48,9 @@ Sizing should ultimately follow concurrent CONNECT sessions, requests/sec, WAN t
 - Management GUI binds to loopback and is published by Nginx over HTTPS.
 - GUI runs unprivileged as `proxy-mgmt`.
 - Squid deployment uses a narrow Unix-socket privileged helper; there is no web shell or unrestricted sudo path.
-- Normal application onboarding is automatic: isolated browser discovery stages observed public dependencies as pending changes.
-- Production remains protected by explicit change control: only an Administrator can deploy an effective Squid policy diff.
-- Advanced manual/HAR discovery remains available for authenticated or unusual workflows.
+- Normal application onboarding is automatic: isolated browser discovery discovers public dependencies and Admin-initiated runs use transactional Save & Apply.
+- Production remains protected by explicit change control: only an Administrator can publish policy. Admin Save performs validation, atomic apply, health verification, audit and automatic rollback on failure.
+- Operator changes remain pending for Admin approval. Advanced manual/HAR discovery remains available for authenticated or unusual workflows.
 - Browser discovery rejects private/reserved targets and DNS-rebinding/SSRF-style pivots.
 - PAC supports explicit DIRECT bypasses plus fail-open `PROXY ...; DIRECT` behavior.
 
@@ -91,7 +91,7 @@ Sizing should ultimately follow concurrent CONNECT sessions, requests/sec, WAN t
 - **Policy Simulator** explains what would happen for a client IP + destination + protocol/port without changing policy.
 - **Why Blocked?** explains a denied telemetry event using effective Network/Profile/Application/Rule scope.
 - **Application Dependency Candidates** correlate new blocked destinations with a recently active single application, classify them and score confidence.
-- Blocked-traffic dependency candidates remain review-only. Initial isolated-browser onboarding can automatically stage observed dependencies, but nothing is enforced until normal Diff/Deploy.
+- Blocked-traffic dependency candidates remain review-only until approved. Admin approval and Admin-initiated onboarding use the same validated Save & Apply pipeline.
 
 ### Application discovery
 
@@ -160,7 +160,7 @@ Servers already using the generic `security-web-gateway` filesystem/service layo
 sudo ./deploy/upgrade.sh --confirm
 ```
 
-The upgrade creates a database/release/unit backup, performs shadow migration and validation, then cuts over transactionally. A failed cutover restores the prior DB/release/units/timers. Pending Squid policy is **not** auto-deployed.
+The upgrade creates a database/release/unit backup, performs shadow migration and validation, then cuts over transactionally. A failed cutover restores the prior DB/release/units/timers. The upgrade itself never publishes pre-existing pending policy; subsequent Admin Saves use transactional Save & Apply.
 
 A legacy installation using a different product/service/path namespace needs a controlled one-time migration or a fresh install plus policy-state restore.
 
@@ -214,11 +214,11 @@ Keep the repository private unless publication is intentional.
 git add -A
 git status
 git diff --cached
-git commit -m "Security Web Gateway v3.7.1"
+git commit -m "Security Web Gateway v3.8.0"
 git push
 
-git tag -a v3.7.1 -m "Security Web Gateway v3.7.1"
-git push origin v3.7.1
+git tag -a v3.8.0 -m "Security Web Gateway v3.8.0"
+git push origin v3.8.0
 ```
 
 Never stage `.db`, `.sqlite*`, `.env`, TLS/private-key material, HAR files, logs or backups.
@@ -231,6 +231,7 @@ bash -n deploy/*.sh scripts/*.sh
 python3 tools/migrate.py --db /tmp/swg-test.db --root .
 python3 tests/smoke_v340.py
 python3 tests/smoke_v370.py
+python3 tests/smoke_v380.py
 ```
 
 See `docs/ARCHITECTURE.md`, `docs/DEPLOYMENT.md`, `docs/PERFORMANCE.md`, `docs/OPERATIONS.md`, and `SECURITY_MODEL.md`.

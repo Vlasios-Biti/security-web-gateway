@@ -45,11 +45,16 @@ def main():
             for e in events:
                 c.execute("""INSERT INTO telemetry_events(epoch,event_time,client_ip,decision,result_code,http_status,bytes,method,destination,destination_host,destination_port,network_id,network_name,application_ids,application_names,matched_rule_id,matched_rule_destination,event_hash)
                     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",e)
-            c.execute("INSERT INTO telemetry_state(key,value) VALUES('dependency_candidate_scan_epoch',?)",(str(now-30),))
-            c.execute("INSERT INTO telemetry_state(key,value) VALUES('telemetry_event_count','2')")
-            c.execute("INSERT INTO telemetry_state(key,value) VALUES('telemetry_first_event','2026-11-03 20:00:00')")
-            c.execute("INSERT INTO telemetry_state(key,value) VALUES('telemetry_last_event','2026-11-03 20:00:10')")
-            c.execute("INSERT INTO telemetry_state(key,value) VALUES('telemetry_last_event_epoch',?)",(str(now),))
+            states={
+                'dependency_candidate_scan_epoch':str(now-30),
+                'telemetry_event_count':'2',
+                'telemetry_first_event':'2026-11-03 20:00:00',
+                'telemetry_last_event':'2026-11-03 20:00:10',
+                'telemetry_last_event_epoch':str(now),
+            }
+            for key,value in states.items():
+                c.execute("""INSERT INTO telemetry_state(key,value,updated_at) VALUES(?,?,CURRENT_TIMESTAMP)
+                             ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=CURRENT_TIMESTAMP""",(key,value))
             c.commit()
         finally:c.close()
 

@@ -23,7 +23,7 @@ def main():
 
         from app.db import connect
         from app.services.policy_explain import explain_policy
-        from app.services.traffic import cleanup_telemetry,refresh_dependency_candidates,refresh_dashboard_cache,dashboard_payload
+        from app.services.traffic import cleanup_telemetry,refresh_dependency_candidates,refresh_dashboard_cache,dashboard_payload,traffic_summary,list_events,is_system_client
 
         empty_cleanup=cleanup_telemetry()
         assert empty_cleanup['events_before']==0 and empty_cleanup['events_after']==0,empty_cleanup
@@ -41,6 +41,7 @@ def main():
             events=[
                 (now-10,'2026-11-03 20:00:00','10.10.10.25','ALLOW','TCP_TUNNEL',200,1000,'CONNECT','app.example.com:443','app.example.com',443,1,'Pilot',',1,','Portal',1,'app.example.com','h1'),
                 (now,'2026-11-03 20:00:10','10.10.10.25','DENY','TCP_DENIED',403,0,'CONNECT','api-new.example.net:443','api-new.example.net',443,1,'Pilot','','',None,'','h2'),
+                (now+1,'2026-11-03 20:00:11','127.0.0.1','INFO','NONE_NONE',None,0,'-','error:transaction-end-before-headers','error:transaction-end-before-headers',None,None,'System appliance','','',None,'','h-system'),
             ]
             for e in events:
                 c.execute("""INSERT INTO telemetry_events(epoch,event_time,client_ip,decision,result_code,http_status,bytes,method,destination,destination_host,destination_port,network_id,network_name,application_ids,application_names,matched_rule_id,matched_rule_destination,event_hash)
@@ -57,6 +58,14 @@ def main():
                              ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=CURRENT_TIMESTAMP""",(key,value))
             c.commit()
         finally:c.close()
+
+        assert is_system_client('127.0.0.1')
+        business=traffic_summary({"range":"all"})
+        assert business["clients"]==1 and business["total"]==2,business
+        default_rows=list_events({"range":"all"},1,100)
+        assert all(not row["is_system"] for row in default_rows["rows"]),default_rows
+        all_rows=list_events({"range":"all","include_system":"1"},1,100)
+        assert all_rows["total"]==3 and any(row["is_system"] for row in all_rows["rows"]),all_rows
 
         decision=explain_policy('10.10.10.25','app.example.com',443,'CONNECT')
         assert decision['decision']=='ALLOW',decision

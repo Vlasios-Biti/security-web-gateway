@@ -28,6 +28,7 @@ def _filters(request, forced_decision=None, default_range="1h"):
         "application_id": q.get("application_id", "").strip(),
         "port": q.get("port", "").strip(),
         "traffic_path": q.get("traffic_path", "").strip().upper(),
+        "include_system": "1" if q.get("include_system", "").strip().lower() in ("1","true","yes","on") else "",
         "q": q.get("q", "").strip(),
     }
     if data["decision"] not in ("", "ALLOW", "DENY", "INFO"): data["decision"] = ""

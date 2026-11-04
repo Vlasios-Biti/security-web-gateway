@@ -9,6 +9,7 @@ User=proxy-mgmt
 Group=proxy-mgmt
 WorkingDirectory=/opt/security-web-gateway/current
 EnvironmentFile=/etc/security-web-gateway/production.env
+Environment=PYTHONPATH=/opt/security-web-gateway/current
 ExecStart=/opt/security-web-gateway/venv/bin/python /opt/security-web-gateway/current/bin/process_discovery_queue.py --max-runs 1
 Nice=15
 CPUWeight=10

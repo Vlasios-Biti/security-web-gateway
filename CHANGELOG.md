@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.4.4
+
+- Fixed background worker imports when systemd launches scripts by absolute path.
+- Added explicit `PYTHONPATH=/opt/security-web-gateway/current` to performance, telemetry, discovery, source-sync and storage-maintenance units.
+- Made performance and telemetry collectors self-bootstrap the release root in `sys.path` for direct execution resilience.
+- Added CI coverage for direct execution/importability of background workers from the release layout.
+- No Squid policy, schema, telemetry model, or application-intelligence behavior changes from v3.4.3.
+
 ## 3.4.3
 
 - Fixed a fresh-install version collision where sourcing `/etc/os-release` overwrote the Security Web Gateway release `VERSION` variable on Ubuntu 26.04.

@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-import argparse
+import argparse,sys
+from pathlib import Path
+ROOT=Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT))
 from app.config import TELEMETRY_BATCH_MAX
 from app.services.traffic import ingest_access_log, telemetry_health
 

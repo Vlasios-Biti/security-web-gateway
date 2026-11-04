@@ -8,6 +8,7 @@ from app.services.access_model import list_applications,get_application,create_a
 from app.services.discovery import catalog_search,create_run,create_har_run,get_run,list_runs,approve_run
 from app.services.rules import list_networks
 from app.services.apply import save_apply_state,apply_saved_change,apply_message
+from app.services.system import cached_system_health
 router=APIRouter(prefix="/applications")
 
 def can_manage(r):return r.state.user and r.state.user["role"] in("admin","operator")
@@ -24,7 +25,26 @@ def _apply_after_save(request,user,description,baseline_dirty):
 
 @router.get("",response_class=HTMLResponse)
 def index(request:Request):
-    return request.app.state.templates.TemplateResponse(request=request,name="applications/list.html",context={"request":request,"page_title":"Application Policies","applications":list_applications(),"runs":list_runs(10)})
+    apps=list_applications();runs=list_runs(12);h=cached_system_health();c=connect()
+    try:
+        pending_candidates=c.execute("SELECT COUNT(*) c FROM application_dependency_candidates WHERE status='pending'").fetchone()["c"]
+        profile_count=c.execute("SELECT COUNT(*) c FROM policy_groups WHERE status='active'").fetchone()["c"]
+        last_apply=c.execute("SELECT deployed_at,status FROM deployments ORDER BY id DESC LIMIT 1").fetchone()
+    finally:c.close()
+    stats={
+      "applications":len(apps),
+      "active":sum(1 for a in apps if a.get("status")=="active"),
+      "dependencies":sum(int(a.get("dependency_count") or 0) for a in apps),
+      "attention":pending_candidates+sum(1 for r in runs if r.get("status")=="failed"),
+      "profiles":profile_count,
+      "discovery":(h.get("workers") or {}).get("discovery","unknown"),
+      "last_apply":dict(last_apply) if last_apply else None,
+    }
+    latest={}
+    for r in runs:
+        aid=r.get("application_id")
+        if aid and aid not in latest:latest[aid]=r
+    return request.app.state.templates.TemplateResponse(request=request,name="applications/list.html",context={"request":request,"page_title":"Applications","applications":apps,"runs":runs,"stats":stats,"latest_runs":latest})
 
 @router.get("/add",response_class=HTMLResponse)
 def add_page(request:Request):

@@ -1,4 +1,4 @@
-# Security Web Gateway — Security Model 3.4
+# Security Web Gateway — Security Model 3.8
 
 ## Operating model
 
@@ -14,7 +14,7 @@ Security Web Gateway is primarily a **single-VM on-prem appliance**. Squid is th
 
 **Privileged deploy helper** is root-owned/socket-activated and accepts only typed deployment operations. The management application has no arbitrary shell primitive.
 
-**Discovery Engine** processes untrusted external evidence. Provider data, HTML, browser requests, HAR data, DNS-derived endpoints and observed traffic are untrusted. Normal onboarding may automatically stage isolated-browser evidence as desired-state policy, but production enforcement still requires an explicit Administrator deployment.
+**Discovery Engine** processes untrusted external evidence. Provider data, HTML, browser requests, HAR data, DNS-derived endpoints and observed traffic are untrusted. Normal Admin-initiated onboarding may automatically stage isolated-browser evidence and, after the run completes, submit the resulting desired state through the same validated Save & Apply pipeline used by the GUI.
 
 **Local DNS cache** is a performance layer only. Enterprise DNS servers remain the configured upstream authority.
 
@@ -40,8 +40,9 @@ Protocol is an atomic destination property. Discovery/manual attachment cannot s
 - Ongoing dependency candidates are created only from conservative same-client correlation with a recently active **single** Application.
 - Obvious analytics/OS/background noise is filtered before candidate creation.
 - Ongoing blocked-traffic candidates carry evidence/confidence and remain review-only.
-- Initial isolated-browser onboarding may auto-stage observed public dependencies as pending desired state.
-- No discovery path can invoke production enforcement directly; effective policy still requires Diff/Deploy.
+- Initial isolated-browser onboarding may auto-stage observed public dependencies as desired state.
+- An Admin-initiated automatic discovery may request production apply only through the normal transactional Save & Apply service; it cannot bypass validation, the restricted privileged helper, health verification, audit, or rollback.
+- Operator-initiated discovery remains pending until Admin approval.
 
 ## Discovery network controls
 
@@ -50,18 +51,20 @@ Protocol is an atomic destination property. Discovery/manual attachment cannot s
 - Destination DNS must resolve exclusively to public/global addresses; private/reserved targets are rejected.
 - Outbound connections are pinned to validated public IPs while TLS validates the original hostname to reduce DNS-rebinding risk.
 - Redirects are revalidated, response sizes and execution times are bounded.
-- Discovery never invokes the privileged deploy helper.
+- Discovery never invokes arbitrary privileged operations. Admin-authorized automatic apply uses only the typed Save & Apply path and the restricted deploy helper.
 
 ## Change control
 
-`GUI edit / automatic discovery staging → desired state → Pending → generated Diff → Admin Deploy → checksum → privileged helper → squid -k parse → atomic managed-config replacement → reload/health verification → rollback on failure`
+`Admin Save / approved automatic discovery → desired state → effective-diff check → candidate checksum → privileged helper → squid -k parse → atomic managed-config replacement → reload/health verification → audit → rollback on failure`
+
+`Operator Save → desired state → pending Admin approval → the same validated apply path`
 
 ## RBAC
 
 - **Viewer** — operational read-only.
 - **Auditor** — traffic/audit/security read-only.
-- **Operator** — prepares custom Application/rule/profile changes; cannot mutate protected system objects or deploy production policy.
-- **Admin** — networks, protected bundles, users, deployment, rollback and controlled maintenance.
+- **Operator** — prepares custom Application/rule/profile changes; cannot publish production policy.
+- **Admin** — Save applies effective policy changes transactionally; Admin also controls networks, protected bundles, users, rollback and controlled maintenance.
 
 ## Authentication and session controls
 

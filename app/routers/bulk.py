@@ -1,4 +1,5 @@
 import csv, io, json
+from urllib.parse import quote_plus
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Request, Form, UploadFile, File
 from fastapi.responses import HTMLResponse, Response, RedirectResponse
@@ -8,6 +9,7 @@ from app.db import audit, connect
 from app.services.rules import create_rule, list_networks, list_rules
 from app.services.access_model import list_policy_groups
 from app.security import normalize_domain, normalize_ip
+from app.services.apply import save_apply_state,apply_saved_change,apply_message
 router=APIRouter(prefix="/bulk")
 def can_manage(u):return u and u["role"] in("admin","operator")
 def _parse(content):
@@ -86,6 +88,7 @@ def apply(batch_id:int,request:Request,csrf_token:str=Form(...)):
     if not r:return RedirectResponse("/bulk/import?error=Import+batch+not+found+or+already+used",303)
     exp=datetime.fromisoformat(r["expires_at"]);exp=exp if exp.tzinfo else exp.replace(tzinfo=timezone.utc)
     if datetime.now(timezone.utc)>=exp:return RedirectResponse("/bulk/import?error=Import+preview+expired",303)
+    baseline_dirty=save_apply_state()["dirty"]
     payload=json.loads(r["rows_json"]);ok=0;errs=[]
     for row in payload.get("accepted",[]):
         try:create_rule(r["kind"],row["destination"],row["protocol"],row["network_ids"],u["username"],row["reason"],row.get("change_reference","") or "",row.get("expires_at","") or "",management_type=r["management_type"],category_slug=r["category_slug"],scope_mode=row.get("scope_mode","selected"),policy_group_ids=row.get("policy_group_ids") or []);ok+=1
@@ -94,7 +97,11 @@ def apply(batch_id:int,request:Request,csrf_token:str=Form(...)):
     try:c.execute("UPDATE import_batches SET status='applied' WHERE id=?",(batch_id,));c.commit()
     finally:c.close()
     audit(u["username"],"BULK_APPLY","SUCCESS" if not errs else "PARTIAL","batch",batch_id,auth.client_ip(request),json.dumps({"created":ok,"errors":errs[:20]}))
-    return RedirectResponse("/bulk/import?msg="+f"{ok}+rules+created+as+pending+changes"+("&error=Some+rows+failed+during+apply" if errs else ""),303)
+    if errs:
+        return RedirectResponse("/bulk/import?error="+quote_plus(f"{ok} rules saved, but some rows failed. Production was not auto-applied; fix the batch before approval."),303)
+    applied=apply_saved_change(u["username"],auth.client_ip(request),f"Apply bulk import {batch_id}",preexisting_dirty=baseline_dirty,role=u["role"])
+    msg=apply_message(applied);key="msg" if applied.get("ok") else "error"
+    return RedirectResponse("/bulk/import?"+key+"="+quote_plus(msg),303)
 def _export(kind):
     output=io.StringIO();writer=csv.writer(output)
     writer.writerow(["action","destination","protocol","scope_mode","access_profiles","networks","status","reason","change_reference","expires_at"])

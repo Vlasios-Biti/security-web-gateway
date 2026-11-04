@@ -1,4 +1,5 @@
 import json
+from urllib.parse import quote_plus
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 
@@ -6,6 +7,7 @@ from app import auth
 from app.db import connect, audit
 from app.services.policy_explain import explain_policy, explain_event
 from app.services.access_model import create_application_dependency, get_application
+from app.services.apply import save_apply_state,apply_saved_change,apply_message
 
 router=APIRouter(prefix='/intelligence')
 
@@ -52,6 +54,7 @@ def review_candidate(candidate_id:int,request:Request,action:str=Form(...),csrf_
         row=dict(row)
     finally:c.close()
     try:
+        baseline_dirty=save_apply_state()["dirty"]
         if action=='approve':
             rid=create_application_dependency(row['application_id'],'domain',row['destination'],row['protocol'],u['username'],'Approved dependency candidate')
             status='approved';details={'rule_id':rid}
@@ -63,6 +66,10 @@ def review_candidate(candidate_id:int,request:Request,action:str=Form(...),csrf_
             c.execute("UPDATE application_dependency_candidates SET status=?,reviewed_by=?,reviewed_at=CURRENT_TIMESTAMP WHERE id=?",(status,u['username'],candidate_id));c.commit()
         finally:c.close()
         audit(u['username'],'DEPENDENCY_CANDIDATE_'+status.upper(),'SUCCESS','dependency_candidate',candidate_id,auth.client_ip(request),json.dumps(details))
-        return RedirectResponse('/intelligence/dependency-candidates?msg=Candidate+reviewed',303)
+        if action=='approve':
+            applied=apply_saved_change(u['username'],auth.client_ip(request),'Approve dependency candidate',preexisting_dirty=baseline_dirty,role=u['role'])
+            msg=apply_message(applied);key='msg' if applied.get('ok') else 'error'
+            return RedirectResponse('/intelligence/dependency-candidates?'+key+'='+quote_plus(msg),303)
+        return RedirectResponse('/intelligence/dependency-candidates?msg=Candidate+ignored',303)
     except Exception as exc:
         return RedirectResponse('/intelligence/dependency-candidates?error='+str(exc).replace(' ','+'),303)

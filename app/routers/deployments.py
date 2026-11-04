@@ -3,7 +3,8 @@ from fastapi.responses import HTMLResponse,RedirectResponse
 from app import auth
 from app.db import connect
 from app.services.rules import pending_count
-from app.services.deployment import preview_diff,deploy,rollback_to,drift_status,current_live,reconcile_pending_if_no_diff
+from app.services.deployment import preview_diff,rollback_to,drift_status,current_live,reconcile_pending_if_no_diff
+from app.services.apply import apply_saved_change,apply_message
 from app.config import MODE
 router=APIRouter(prefix="/changes")
 @router.get("/deployments",response_class=HTMLResponse)
@@ -12,7 +13,7 @@ def index(request:Request):
     try:rows=[dict(x) for x in c.execute("SELECT * FROM deployments ORDER BY id DESC LIMIT 50")]
     finally:c.close()
     return request.app.state.templates.TemplateResponse(request=request,name="deployments/list.html",
-        context={"request":request,"page_title":"Deployments","rows":rows,"pending_count":pending_count()})
+        context={"request":request,"page_title":"Apply History","rows":rows,"pending_count":pending_count()})
 @router.get("/review",response_class=HTMLResponse)
 def review(request:Request):
     if request.state.user["role"] not in("admin","operator"):return HTMLResponse("Forbidden",403)
@@ -23,7 +24,7 @@ def review(request:Request):
     finally:
         c.close()
     return request.app.state.templates.TemplateResponse(request=request,name="deployments/review.html",
-        context={"request":request,"page_title":"Changes","pending_count":pending_count(),"diff":preview_diff(),"rows":rows,"drift":drift_status()})
+        context={"request":request,"page_title":"Activity","pending_count":pending_count(),"diff":preview_diff(),"rows":rows,"drift":drift_status()})
 
 @router.get("/drift",response_class=HTMLResponse)
 def drift(request:Request):
@@ -41,8 +42,9 @@ def deploy_now(request:Request,description:str=Form(""),csrf_token:str=Form(...)
     u=request.state.user
     if u["role"]!="admin":return HTMLResponse("Forbidden",403)
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
-    result=deploy(u["username"],auth.client_ip(request),description)
-    return RedirectResponse("/changes/review?msg=Deployment+successful" if result.get("ok") else "/changes/review?error=Deployment+failed",303)
+    result=apply_saved_change(u["username"],auth.client_ip(request),description or "Approve existing pending policy",preexisting_dirty=False,role=u["role"])
+    msg=apply_message(result)
+    return RedirectResponse("/changes/review?msg="+msg.replace(" ","+") if result.get("ok") else "/changes/review?error="+msg.replace(" ","+"),303)
 @router.post("/rollback/{deployment_id}")
 def rollback(deployment_id:int,request:Request,csrf_token:str=Form(...)):
     if MODE != "production": return RedirectResponse("/changes/deployments?error=Rollback+is+disabled+in+candidate+preview",303)

@@ -14,13 +14,17 @@
 
 {% if runs and runs[0].status=='running' %}
 <div class="flash info-box space-top" data-application-activity data-activity-url="/applications/{{ application.id }}/activity"><b>Discovering dependencies…</b> SWG is checking the application in the background. Results will appear automatically when discovery finishes.</div>
-{% elif runs and runs[0].status=='failed' %}
-<div class="flash danger-box space-top"><b>Automatic discovery needs attention.</b> {{ runs[0].error_text or 'Discovery failed.' }}</div>
+{% elif runs and runs[0].error_text %}
+<div class="flash danger-box space-top"><b>Save could not be fully applied.</b> {{ runs[0].error_text }} The previous production policy remains active.</div>
+{% elif runs and runs[0].status=='approved' and not application.pending %}
+<div class="flash success-box space-top"><b>Saved and applied.</b> The application and its discovered dependencies are synchronized with production.</div>
+{% elif application.pending %}
+<div class="flash warning-box space-top"><b>Approval required.</b> This change is saved but is not yet active in production.</div>
 {% endif %}
 
 {% if can_change %}
 <section class="primary-action-card space-top">
-  <div><span class="section-kicker">Automatic dependency management</span><h3>Refresh application access</h3><p>SWG will revisit the website, discover its current public dependencies and stage any new endpoints automatically.</p></div>
+  <div><span class="section-kicker">Automatic dependency management</span><h3>Refresh application access</h3><p>SWG will revisit the website, discover current public dependencies, validate the resulting policy and apply it automatically.</p></div>
   {% if application.source_ref and application.source_ref.startswith('https://') or application.seed_domain %}
   <form method="post" action="/applications/{{ application.id }}/discover">
     <input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}">
@@ -40,7 +44,7 @@
 <details class="advanced-card space-top" open>
   <summary>Dependencies <span>{{ application.dependencies|length }}</span></summary>
   <div class="advanced-body">
-    <div class="table-tools"><input class="search" data-filter-table="app-deps" placeholder="Search dependencies..."><span>Automatically discovered endpoints are staged and remain subject to normal deployment review.</span></div>
+    <div class="table-tools"><input class="search" data-filter-table="app-deps" placeholder="Search dependencies..."><span>Admin-initiated discovery is validated and applied automatically. Operator changes remain pending for Admin approval.</span></div>
     <div class="table-wrap"><table class="table" id="app-deps"><thead><tr><th>Destination</th><th>Protocol</th><th>Source</th><th>Status</th>{% if can_change %}<th></th>{% endif %}</tr></thead><tbody>
     {% for r in application.dependencies %}<tr class="{{ 'muted-row' if not r.dependency_enabled else '' }}"><td><code class="strong">{{ r.destination }}</code></td><td>{{ r.protocol }}</td><td>{{ r.source }}</td><td><span class="badge {{ 'ok' if r.dependency_enabled and r.status=='active' else 'off' }}">{{ 'Enabled' if r.dependency_enabled and r.status=='active' else 'Disabled' }}</span></td>{% if can_change %}<td><form method="post" action="/applications/{{ application.id }}/dependency/{{ r.id }}/status" data-confirm="Remove this dependency from {{ application.name }}?"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><input type="hidden" name="status" value="deleted"><button class="btn ghost small danger-text">Remove</button></form></td>{% endif %}</tr>{% else %}<tr><td colspan="5" class="empty">Dependency discovery is still running or no endpoints were found.</td></tr>{% endfor %}
     </tbody></table></div>
@@ -64,7 +68,7 @@
 
 <section class="danger-zone space-top">
   <div><h3>Delete application</h3><p>Removes this application from active policy management. Audit and discovery history are retained.</p></div>
-  <form method="post" action="/applications/{{ application.id }}/delete" data-confirm="Delete {{ application.name }}? This will stage removal from the active policy."><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><button class="btn danger">Delete application</button></form>
+  <form method="post" action="/applications/{{ application.id }}/delete" data-confirm="Delete {{ application.name }}? The change will be validated and applied immediately if you are an Administrator."><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><button class="btn danger">Delete application</button></form>
 </section>
 {% endif %}
 {% endblock %}

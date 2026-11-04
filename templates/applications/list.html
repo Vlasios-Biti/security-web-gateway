@@ -9,7 +9,7 @@
   <section class="application-card app-card-v37">
     <div class="app-icon">{{ a.name[:2]|upper }}</div>
     <div class="app-main">
-      <div class="app-title"><h3>{{ a.name }}</h3>{% if a.pending %}<span class="badge warn-bg">PENDING</span>{% endif %}</div>
+      <div class="app-title"><h3>{{ a.name }}</h3>{% if a.pending %}<span class="badge warn-bg">APPROVAL REQUIRED</span>{% endif %}</div>
       <p>{{ a.description or 'Managed web application' }}</p>
       <div class="app-meta-v37">
         <span><b>{{ a.dependency_count }}</b> dependencies</span>

@@ -1,4 +1,4 @@
-# Operations — Security Web Gateway 3.4
+# Operations — Security Web Gateway 3.8
 
 ## Services
 
@@ -61,14 +61,25 @@ Inspect `Server-Timing` / `X-Response-Time-Ms`, background timer status, databas
 
 A blocked destination may appear as a candidate only when the collector can conservatively correlate it with a recently active single application and the endpoint is not classified as obvious noise.
 
-Candidate states are review workflow only:
+Candidate states remain review workflow:
 
-- review/approve → creates pending dependency
+- review/approve → saves the dependency
 - ignore → leaves production policy unchanged
-- no automatic allow path exists
-
-After approval, use normal `Pending → Diff → Deploy`.
+- Admin approval validates and applies immediately through Save & Apply
+- Operator approval remains pending for Admin approval
 
 ## Browser discovery
 
-Primary onboarding uses isolated server-side Chromium and automatically stages discovered public dependencies. Authenticated/click-driven workflows use HAR evidence under Advanced. Observed Squid mode remains troubleshooting-only because it can collect unrelated workstation traffic.
+Primary onboarding uses isolated server-side Chromium. For an Admin-initiated run, discovered public dependencies are saved and transactionally applied when discovery completes. Authenticated/click-driven workflows use HAR evidence under Advanced. Observed Squid mode remains troubleshooting-only because it can collect unrelated workstation traffic.
+
+
+## Save & Apply operations
+
+Normal Admin changes do not require a second Deploy screen. The control plane executes:
+
+`Save → effective-diff check → candidate render → privileged Squid validation → atomic apply → reload/health verification → audit`.
+
+If validation or reload fails, the privileged helper restores the previous managed policy. The desired state remains visible for troubleshooting while the previous production policy continues to run.
+
+If effective unapplied policy already existed before a new Save, automatic apply is blocked so the new Save cannot silently publish unrelated older work. The exceptional queue is visible under **Activity** and requires one-time Admin approval.
+

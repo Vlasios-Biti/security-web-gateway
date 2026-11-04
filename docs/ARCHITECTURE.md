@@ -1,4 +1,4 @@
-# Architecture — Security Web Gateway 3.4
+# Architecture — Security Web Gateway 3.8
 
 ## Deployment model
 
@@ -73,17 +73,23 @@ Security Web Gateway intentionally separates three different concepts:
 
 ## Policy path
 
-`GUI/DB → candidate policy → Diff → privileged validation → atomic Squid include → reload → health check`
+`Admin Save → desired-state DB → effective-diff check → candidate policy → privileged validation → atomic Squid include → reload → health check → audit/rollback`
+
+`Operator Save → desired-state DB → Admin approval → same apply path`
 
 ## Application intelligence path
 
-`Browser evidence → classify → automatic pending dependencies → Diff → Admin Deploy`\n\nAdvanced/authenticated workflows remain:\n\n`HAR/vendor/manual evidence → review as needed → Pending → Diff → Admin Deploy`
+`Admin browser discovery → classify → automatic dependencies → transactional Save & Apply`
+
+Advanced/authenticated workflows remain:
+
+`HAR/vendor/manual evidence → review as needed → Admin approval/Save → transactional Save & Apply`
 
 For ongoing application use:
 
 `DENY event → same-client recent single-application correlation → noise filtering → confidence → Dependency Candidate`
 
-An ongoing blocked-traffic candidate never changes production policy automatically. Automatic onboarding can stage desired state, but cannot deploy it.
+An ongoing blocked-traffic candidate never changes production policy until it is approved. Admin approval then uses the same validated Save & Apply pipeline. Automatic onboarding may apply only when the discovery run was explicitly initiated by an Admin.
 
 ## Visibility boundary
 

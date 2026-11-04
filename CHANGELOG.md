@@ -1,5 +1,19 @@
 # Changelog
 
+## 3.8.0
+
+- Replaced the normal two-step Pending/Deploy operator workflow with transactional **Save & Apply** for Administrators.
+- Admin Save now renders the effective Squid candidate, validates it through the restricted privileged helper, applies atomically, reloads/verifies Squid, audits the action and automatically rolls back on validation/reload failure.
+- Applications, automatic discovery, standalone Domain/IP rules, Access Profiles, Network Scopes, protected System Rules, approved dependency candidates and successful Bulk Imports use the same Save & Apply service.
+- Automatic application discovery started by an Admin applies only after discovery completes; Operator-initiated changes remain pending for Admin approval.
+- Added a global apply lock so concurrent apply operations are serialized.
+- Added a pre-existing-diff guard: a new Save cannot silently publish unrelated older pending changes.
+- Metadata-only saves reconcile without creating meaningless deployment history.
+- Renamed the primary Changes workflow to **Activity**. Activity is now primarily history, drift, audit and rollback; manual approval appears only for Operator or legacy pending changes.
+- Kept full deployment/audit history and rollback capability while removing routine deployment friction from the GUI.
+- Added migration 015 and v3.8 regression coverage for Admin auto-apply, Operator approval, legacy-pending guard, no-op saves and apply failure behavior.
+- Default-deny policy semantics and the restricted privileged deployment boundary remain unchanged.
+
 ## 3.7.1
 
 - Application detail now polls lightweight discovery activity only while a browser discovery run is active.

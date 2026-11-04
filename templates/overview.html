@@ -31,9 +31,9 @@
   <a href="/traffic/explorer"><span class="action-icon monitor">↗</span><div><strong>Investigate traffic</strong><small>Search clients, domains and decisions</small></div></a>
   {% if request.state.user.role in ('admin','operator') %}
   <a href="/applications/discover"><span class="action-icon configure">＋</span><div><strong>Add application</strong><small>Discover and review dependencies</small></div></a>
-  <a href="/changes/review"><span class="action-icon changes">✓</span><div><strong>Review changes</strong><small>{{ pending_count }} pending item{{ '' if pending_count==1 else 's' }}</small></div></a>
+  <a href="/changes/review"><span class="action-icon changes">✓</span><div><strong>Activity</strong><small>{{ pending_count }} approval item{{ '' if pending_count==1 else 's' }}</small></div></a>
   {% endif %}
-  <a href="/intelligence/simulator"><span class="action-icon investigate">⌕</span><div><strong>Simulate policy</strong><small>Explain an access decision before deploy</small></div></a>
+  <a href="/intelligence/simulator"><span class="action-icon investigate">⌕</span><div><strong>Simulate policy</strong><small>Explain an access decision before Save</small></div></a>
 </section>
 
 <section class="kpi-grid">
@@ -73,10 +73,10 @@
   </article>
 
   <aside class="panel posture-panel">
-    <header class="panel-header"><div><span class="panel-kicker">At a glance</span><h3>Gateway posture</h3><p>Health, changes and resource pressure.</p></div></header>
+    <header class="panel-header"><div><span class="panel-kicker">At a glance</span><h3>Gateway posture</h3><p>Health, approvals and resource pressure.</p></div></header>
     <div class="posture-list">
       <a href="/system/health"><span>Core services</span><strong class="good">Operational</strong><small>Proxy, manager and HTTPS</small></a>
-      <a href="/changes/review"><span>Pending changes</span><strong class="{{ 'warn' if pending_count else 'good' }}">{{ pending_count }}</strong><small>{{ 'Review before deploy' if pending_count else 'Configuration synchronized' }}</small></a>
+      <a href="/changes/review"><span>Approval queue</span><strong class="{{ 'warn' if pending_count else 'good' }}">{{ pending_count }}</strong><small>{{ 'Administrator approval required' if pending_count else 'Configuration synchronized' }}</small></a>
       <a href="/changes/drift"><span>Config drift</span><strong class="{{ 'good' if drift.state=='clean' else 'bad' if drift.state=='drift' else 'warn' }}">{{ drift.state|capitalize }}</strong><small>Expected vs live Squid policy</small></a>
       <a href="/system/performance"><span>Host pressure</span><strong>{{ memory.percent }}% RAM</strong><small>{{ disk.percent }}% disk · load {{ load.one }}</small></a>
       {% if request.state.user.role=='admin' %}

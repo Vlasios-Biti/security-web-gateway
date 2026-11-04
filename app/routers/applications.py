@@ -202,5 +202,8 @@ def discover_existing(application_id:int,request:Request,method:str=Form(...),so
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
     try:
         catalog_key=app["source_ref"] if method in("catalog","official_api") else None;query=app["seed_domain"] if method=="seed_probe" else (catalog_key or app["name"])
-        rid=create_run(application_id,query,method,u["username"],source_ref=source_ref or app.get("source_ref"),client_ip=client_ip,window_minutes=window_minutes,catalog_key=catalog_key,auto_approve=bool(auto_approve));return RedirectResponse(f"/applications/discovery/{rid}",303)
+        rid=create_run(application_id,query,method,u["username"],source_ref=source_ref or app.get("source_ref"),client_ip=client_ip,window_minutes=window_minutes,catalog_key=catalog_key,auto_approve=bool(auto_approve))
+        if auto_approve:
+            return RedirectResponse(f"/applications/{application_id}?msg=Dependency+refresh+started",303)
+        return RedirectResponse(f"/applications/discovery/{rid}",303)
     except Exception as exc:return RedirectResponse(f"/applications/{application_id}?error="+str(exc).replace(" ","+"),303)

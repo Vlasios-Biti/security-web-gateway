@@ -127,6 +127,9 @@ jobs:
           forbidden="$(printf '\147\162\157\167\151\156')"
           ! grep -RniI --exclude=CHECKSUMS.sha256 "$forbidden" .
           ! find . -iname "*${forbidden}*" -print | grep .
+      - name: Customer-specific example scan
+        run: |
+          ! grep -RniI -E --exclude=CHECKSUMS.sha256 --exclude-dir=.git '(royalmail|royal mail|growinops)' app templates static docs README.md SECURITY_MODEL.md
 
 
   python-314-compat:

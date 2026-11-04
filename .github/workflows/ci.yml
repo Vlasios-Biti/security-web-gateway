@@ -46,7 +46,7 @@ jobs:
           grep -q 'Activity' templates/base.html
           grep -q 'Approve &amp; apply' templates/deployments/review.html
           grep -q '>Save<' templates/applications/form.html
-          grep -q 'save-and-apply' app/services/apply.py
+          grep -q 'def apply_saved_change' app/services/apply.py
           test -s static/css/ui-v37.css
           test -s static/favicon.svg
       - name: Application version matches VERSION

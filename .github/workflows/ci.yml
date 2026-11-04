@@ -49,6 +49,23 @@ jobs:
           grep -q 'def apply_saved_change' app/services/apply.py
           test -s static/css/ui-v37.css
           test -s static/favicon.svg
+      - name: v3.9 operations console contract
+        run: |
+          grep -q 'ui-v39.css' templates/base.html
+          grep -q 'Health &amp; performance' templates/base.html
+          grep -q 'Storage' templates/base.html
+          grep -q 'Administrators' templates/base.html
+          grep -q 'Policy &amp; tools' templates/base.html
+          grep -q 'system-performance-chart' templates/system/health.html
+          grep -q 'TLS certificate' templates/system/health.html
+          grep -q 'NTP synchronization' templates/system/health.html
+          grep -q 'Recovery posture' templates/system/health.html
+          grep -q 'data-live-traffic-refresh' templates/traffic/explorer.html
+          grep -q 'setupLiveTrafficRefresh' static/js/app.js
+          grep -q 'profile-stats' static/css/ui-v39.css
+          grep -q 'system-traffic-filter' static/css/ui-v39.css
+          grep -q 'application_count' app/routers/overview.py
+          test -s static/css/ui-v39.css
       - name: Application version matches VERSION
         run: |
           python - <<'PY'

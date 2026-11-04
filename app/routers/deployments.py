@@ -20,11 +20,17 @@ def review(request:Request):
     reconcile_pending_if_no_diff()
     c=connect()
     try:
-        rows=[dict(x) for x in c.execute("SELECT * FROM deployments ORDER BY id DESC LIMIT 8")]
+        rows=[dict(x) for x in c.execute("SELECT * FROM deployments ORDER BY id DESC LIMIT 12")]
+        audits=[dict(x) for x in c.execute("SELECT * FROM audit_events ORDER BY id DESC LIMIT 30")]
+        failed_applies=c.execute("SELECT COUNT(*) c FROM audit_events WHERE action='SAVE_APPLY' AND result='FAILED'").fetchone()["c"]
+        backup_count=c.execute("SELECT COUNT(*) c FROM audit_events WHERE action='SYSTEM_BACKUP' AND result='SUCCESS'").fetchone()["c"]
+        last_backup=c.execute("SELECT timestamp,result FROM audit_events WHERE action='SYSTEM_BACKUP' ORDER BY id DESC LIMIT 1").fetchone()
     finally:
         c.close()
+    drift=drift_status();pc=pending_count()
     return request.app.state.templates.TemplateResponse(request=request,name="deployments/review.html",
-        context={"request":request,"page_title":"Activity","pending_count":pending_count(),"diff":preview_diff(),"rows":rows,"drift":drift_status()})
+        context={"request":request,"page_title":"Activity","pending_count":pc,"diff":preview_diff(),"rows":rows,"drift":drift,
+        "audit_rows":audits,"failed_applies":failed_applies,"backup_count":backup_count,"last_backup":dict(last_backup) if last_backup else None})
 
 @router.get("/drift",response_class=HTMLResponse)
 def drift(request:Request):

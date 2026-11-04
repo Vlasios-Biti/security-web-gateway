@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="/static/css/app.css">
   <link rel="stylesheet" href="/static/css/ui-v36.css">
   <link rel="stylesheet" href="/static/css/ui-v37.css">
+  <link rel="stylesheet" href="/static/css/ui-v39.css">
   <script defer src="/static/js/app.js"></script>
 </head>
 <body>
@@ -43,32 +44,29 @@
         {% if request.state.user.role in ('admin','operator') %}<span class="nav-count" data-pending-count></span>{% endif %}
       </a>
 
-      <details class="nav-group" {% if '/system/' in request.url.path or '/security/' in request.url.path %}open{% endif %}>
+      <details class="nav-group" {% if '/system/' in request.url.path or '/security/users' in request.url.path %}open{% endif %}>
         <summary><span class="nav-summary-main"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="6" rx="2"/><rect x="4" y="14" width="16" height="6" rx="2"/></svg><span>System</span></span><span class="nav-chevron">›</span></summary>
         <div class="nav-children">
-          <a href="/system/health" class="{% if request.url.path=='/system/health' %}active{% endif %}">Health</a>
-          <a href="/system/performance" class="{% if request.url.path=='/system/performance' %}active{% endif %}">Performance</a>
+          <a href="/system/health" class="{% if request.url.path=='/system/health' or request.url.path=='/system/performance' %}active{% endif %}">Health &amp; performance</a>
           {% if request.state.user.role=='admin' %}
+          <a href="/system/storage" class="{% if request.url.path=='/system/storage' %}active{% endif %}">Storage</a>
           <a href="/system/backups" class="{% if request.url.path=='/system/backups' %}active{% endif %}">Backups</a>
+          <a href="/security/users" class="{% if request.url.path.startswith('/security/users') %}active{% endif %}">Administrators</a>
           {% endif %}
         </div>
       </details>
 
-      <details class="nav-group nav-advanced" {% if '/policies/' in request.url.path or '/rules/' in request.url.path or '/bulk/' in request.url.path or '/intelligence/' in request.url.path or request.url.path=='/changes/audit' or request.url.path=='/system/storage' or '/security/users' in request.url.path %}open{% endif %}>
-        <summary><span class="nav-summary-main"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18"/></svg><span>Advanced</span></span><span class="nav-chevron">›</span></summary>
+      <details class="nav-group nav-advanced" {% if '/policies/' in request.url.path or '/rules/' in request.url.path or '/bulk/' in request.url.path or '/intelligence/' in request.url.path or request.url.path=='/changes/audit' %}open{% endif %}>
+        <summary><span class="nav-summary-main"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18"/></svg><span>Policy &amp; tools</span></span><span class="nav-chevron">›</span></summary>
         <div class="nav-children">
-          <a href="/policies/groups">Access profiles</a>
-          <a href="/policies/networks">Network scopes</a>
-          <a href="/rules/domains">Domain rules</a>
-          <a href="/rules/ips">IP rules</a>
-          <a href="/intelligence/simulator">Policy simulator</a>
-          <a href="/intelligence/dependency-candidates">Dependency review</a>
-          <a href="/bulk/import">Import / export</a>
-          <a href="/changes/audit">Audit log</a>
-          {% if request.state.user.role=='admin' %}
-          <a href="/system/storage">Storage &amp; telemetry</a>
-          <a href="/security/users">Administrators</a>
-          {% endif %}
+          <a href="/policies/groups" class="{% if request.url.path.startswith('/policies/groups') %}active{% endif %}">Access profiles</a>
+          <a href="/policies/networks" class="{% if request.url.path.startswith('/policies/networks') %}active{% endif %}">Network scopes</a>
+          <a href="/rules/domains" class="{% if request.url.path.startswith('/rules/domains') %}active{% endif %}">Domain rules</a>
+          <a href="/rules/ips" class="{% if request.url.path.startswith('/rules/ips') %}active{% endif %}">IP rules</a>
+          <a href="/intelligence/simulator" class="{% if request.url.path=='/intelligence/simulator' %}active{% endif %}">Policy simulator</a>
+          <a href="/intelligence/dependency-candidates" class="{% if request.url.path=='/intelligence/dependency-candidates' %}active{% endif %}">Dependency review</a>
+          <a href="/bulk/import" class="{% if request.url.path.startswith('/bulk/') %}active{% endif %}">Import / export</a>
+          <a href="/changes/audit" class="{% if request.url.path=='/changes/audit' %}active{% endif %}">Audit log</a>
         </div>
       </details>
     </nav>

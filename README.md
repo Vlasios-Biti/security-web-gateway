@@ -1,6 +1,6 @@
 # Security Web Gateway
 
-**Version:** 3.8.0  
+**Version:** 3.9.0  
 **Target:** single-VM, on-prem enterprise appliance  
 **Target OS:** Ubuntu Server 24.04 LTS / 26.04 LTS  
 **Architecture:** Squid explicit proxy + FastAPI management plane + Nginx TLS + SQLite/WAL policy and telemetry store + isolated background workers + restricted privileged deployment helper.
@@ -53,6 +53,15 @@ Sizing should ultimately follow concurrent CONNECT sessions, requests/sec, WAN t
 - Operator changes remain pending for Admin approval. Advanced manual/HAR discovery remains available for authenticated or unusual workflows.
 - Browser discovery rejects private/reserved targets and DNS-rebinding/SSRF-style pivots.
 - PAC supports explicit DIRECT bypasses plus fail-open `PROXY ...; DIRECT` behavior.
+
+## v3.9.0 — enterprise operations console
+
+- **System** is the operational hub for health/performance, storage, backups and administrators.
+- **Policy & Tools** contains access profiles, network scopes, explicit rules, simulation, dependency review, import/export and audit.
+- Overview, Applications, Traffic and Activity share one light enterprise visual system with a restrained graphite navigation plane.
+- System monitoring includes performance history, DNS/TLS/NTP state, worker health, storage/retention, recovery posture and actionable alerts.
+- Live Traffic refreshes automatically while preserving safe interaction with active filters.
+- The routine policy workflow remains v3.8 **Save & Apply** with validation, audit and rollback.
 
 ## v3.4.0 — performance and application intelligence
 
@@ -214,11 +223,11 @@ Keep the repository private unless publication is intentional.
 git add -A
 git status
 git diff --cached
-git commit -m "Security Web Gateway v3.8.0"
+git commit -m "Security Web Gateway v3.9.0"
 git push
 
-git tag -a v3.8.0 -m "Security Web Gateway v3.8.0"
-git push origin v3.8.0
+git tag -a v3.9.0 -m "Security Web Gateway v3.9.0"
+git push origin v3.9.0
 ```
 
 Never stage `.db`, `.sqlite*`, `.env`, TLS/private-key material, HAR files, logs or backups.

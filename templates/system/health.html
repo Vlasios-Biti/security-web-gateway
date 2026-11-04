@@ -1,4 +1,108 @@
-{% extends "base.html" %}{% block content %}<div class="metrics"><div class="metric"><span>SQUID</span><strong class="{% if squid=='active' %}good{% else %}bad{% endif %}">{{ squid|upper }}</strong><small>Filtering data plane</small></div><div class="metric"><span>NGINX</span><strong class="{% if nginx=='active' %}good{% else %}bad{% endif %}">{{ nginx|upper }}</strong><small>HTTPS management edge</small></div><div class="metric"><span>SWG MANAGER</span><strong class="{% if app=='active' %}good{% else %}bad{% endif %}">{{ app|upper }}</strong><small>{{ mode|upper }} application</small></div><div class="metric"><span>TCP/3128</span><strong class="{% if port_ok %}good{% else %}bad{% endif %}">{{ 'OPEN' if port_ok else 'DOWN' }}</strong><small>Explicit proxy endpoint</small></div><div class="metric"><span>CONFIG DRIFT</span><strong class="{% if drift.state=='clean' %}good{% elif drift.state=='drift' %}bad{% else %}warn{% endif %}">{{ drift.state|upper }}</strong><small>{{ drift.message }}</small></div></div>
-<div class="grid2"><section class="panel"><header><div><h2>Resources</h2><p>Host resource posture</p></div></header><div class="rows"><div><span>Disk<small>{{ disk.free_gb }} GB free</small></span><b>{{ disk.percent }}%</b></div><div><span>Memory<small>{{ memory.used_mb }} / {{ memory.total_mb }} MB</small></span><b>{{ memory.percent }}%</b></div></div></section><section class="panel"><header><div><h2>DNS Health</h2><p>Authoritative AD DNS reachability</p></div></header><div class="rows">{% for d in dns %}<div><span><code>{{ d.server }}</code></span><b class="{% if d.ok %}good{% else %}bad{% endif %}">{{ 'OK' if d.ok else 'FAILED' }}</b><small>{{ d.role or 'dns' }} · {{ d.latency_ms or '—' }} ms</small></div>{% endfor %}</div></section></div><section class="panel space-top"><header><div><h2>Traffic Telemetry</h2><p>Persistent searchable index fed from Squid access.log.</p></div><a class="link" href="/traffic/explorer">Open Explorer</a></header><div class="integrity-grid"><div><span>Collector Timer</span><b class="{{ 'good' if telemetry_service=='active' else 'bad' }}">{{ telemetry_service|upper }}</b></div><div><span>Performance Timer</span><b class="{{ 'good' if performance_service=='active' else 'bad' }}">{{ performance_service|upper }}</b></div><div><span>Indexed Events</span><b>{{ telemetry.events }}</b></div><div><span>Last Event</span><b>{{ telemetry.last_event or '—' }}</b></div><div><span>Retention</span><b>{{ telemetry.retention_days }} days</b></div></div><div class="telemetry-note" style="margin:14px"><b>Health snapshot:</b> {{ health_cache.cache_generated_at or 'warming' }}{% if health_cache.cache_stale %} · STALE{% endif %}<br><b>Coverage:</b> {{ telemetry.source }} only. PAC DIRECT bypass is not visible until router/IPFIX integration.</div></section>
-<section class="panel space-top"><header><div><h2>Managed Configuration Integrity</h2><p>Expected configuration from last successful deployment compared with the live Squid managed policy.</p></div></header><div class="integrity-grid"><div><span>State</span><b class="{{ 'good' if drift.state=='clean' else 'bad' if drift.state=='drift' else 'warn' }}">{{ drift.state|upper }}</b></div><div><span>Baseline</span><b>{{ drift.version or 'Not initialized' }}</b></div><div><span>Expected SHA256</span><code>{{ (drift.expected_sha or '—')[:16] }}{% if drift.expected_sha %}…{% endif %}</code></div><div><span>Live SHA256</span><code>{{ (drift.live_sha or '—')[:16] }}{% if drift.live_sha %}…{% endif %}</code></div></div></section>
-{% if request.state.user.role=='admin' %}<section class="panel space-top"><header><div><h2>Controlled Maintenance</h2><p>Typed operations only — no shell, arbitrary commands or raw configuration editor.</p></div></header><div class="maintenance-actions">{% if mode=='production' %}<form method="post" action="/system/actions/validate-squid"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><button class="btn ghost">Validate Squid</button></form><form method="post" action="/system/actions/reload-squid" data-confirm="Reload Squid after validating the current configuration?"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><button class="btn ghost">Validate & Reload Squid</button></form><form method="post" action="/system/actions/backup"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><button class="btn primary">Create Configuration Backup</button></form>{% else %}<span class="badge warn-bg">Privileged actions disabled in candidate preview</span>{% endif %}</div></section>{% endif %}{% endblock %}
+{% extends "base.html" %}{% block content %}
+<div class="ops-page-head">
+  <div><span class="ops-kicker">Appliance operations</span><h2>Appliance health &amp; capacity</h2><p>Data plane, management plane, workers, storage, DNS, certificates and recovery posture.</p></div>
+  {% if request.state.user.role=='admin' %}
+  <div class="head-actions">
+    <form method="post" action="/system/actions/backup"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><button class="btn primary">Create backup</button></form>
+    <form method="post" action="/system/actions/validate-squid"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><button class="btn ghost">Validate config</button></form>
+  </div>
+  {% endif %}
+</div>
+
+<section class="ops-metrics six">
+  <article><span>CPU</span><strong>{{ perf.cpu_percent if perf else 0 }}%</strong><small>I/O wait {{ perf.iowait_percent if perf else 0 }}%</small></article>
+  <article><span>MEMORY</span><strong>{{ memory.percent }}%</strong><small>{{ '%.1f'|format(memory.used_mb/1024) }} / {{ '%.1f'|format(memory.total_mb/1024) }} GB</small></article>
+  <article><span>DISK</span><strong>{{ disk.percent }}%</strong><small>{{ disk.free_gb }} GB free</small></article>
+  <article><span>PROXY P95</span><strong class="accent-violet-text">{{ perf.proxy_p95_ms if perf and perf.proxy_p95_ms is not none else '—' }}{% if perf and perf.proxy_p95_ms is not none %} ms{% endif %}</strong><small>p99 {{ perf.proxy_p99_ms if perf and perf.proxy_p99_ms is not none else '—' }} ms</small></article>
+  <article><span>CONNECTIONS</span><strong class="accent-blue-text">{{ perf.proxy_connections if perf else 0 }}</strong><small>Established sessions</small></article>
+  <article><span>TELEMETRY LAG</span><strong class="{{ 'good' if perf and perf.telemetry_lag_seconds is not none and perf.telemetry_lag_seconds < 30 else 'warn' }}">{{ (perf.telemetry_lag_seconds|round(1)) if perf and perf.telemetry_lag_seconds is not none else '—' }}{% if perf and perf.telemetry_lag_seconds is not none %} s{% endif %}</strong><small>{{ telemetry.events }} indexed events</small></article>
+</section>
+
+<section class="ops-grid primary">
+  <article class="ops-card performance-card">
+    <header><div><h3>Performance trends</h3><p>CPU, memory and proxy latency · last 6 hours</p></div><a href="/system/performance" class="text-link">Open detail →</a></header>
+    <div class="ops-chart-wrap"><canvas id="system-performance-chart" height="230"></canvas><div class="chart-empty" id="system-performance-empty"><strong>Waiting for samples</strong><small>Performance history will appear after collection intervals.</small></div></div>
+    <div class="ops-chart-legend"><span><i class="legend cpu"></i>CPU</span><span><i class="legend memory"></i>Memory</span><span><i class="legend latency"></i>Proxy p95</span></div>
+  </article>
+
+  <article class="ops-card">
+    <header><div><h3>Core services</h3><p>Data plane and background worker freshness</p></div></header>
+    <div class="ops-status-list">
+      {% set core = [
+        ('Squid data plane', squid),
+        ('Nginx management edge', nginx),
+        ('Manager API', app),
+        ('TCP/3128 listener', 'active' if port_ok else 'down'),
+        ('Telemetry timer', health.workers.telemetry if health.workers else 'unknown'),
+        ('Performance timer', health.workers.performance if health.workers else 'unknown'),
+        ('Discovery timer', health.workers.discovery if health.workers else 'unknown'),
+        ('Source sync timer', health.workers.source_sync if health.workers else 'unknown')
+      ] %}
+      {% for label,state in core %}
+      <div><span>{{ label }}</span><b class="status-pill {{ 'healthy' if state in ('active','open') else 'danger' }}">{{ state|capitalize }}</b></div>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+
+<section class="ops-grid tertiary">
+  <article class="ops-card">
+    <header><div><h3>Network dependencies</h3><p>DNS, TLS and time synchronization</p></div></header>
+    <div class="ops-status-list">
+      {% for d in dns %}
+      <div><span>{{ 'Local DNS cache' if d.role=='local-cache' else 'Enterprise DNS' }} <code>{{ d.server }}</code></span><b class="status-pill {{ 'healthy' if d.ok else 'danger' }}">{{ (d.latency_ms|string ~ ' ms') if d.ok else 'Failed' }}</b></div>
+      {% endfor %}
+      <div><span>TLS certificate</span><b class="status-pill {{ 'healthy' if health.certificate.ok else 'warning' }}">{{ (health.certificate.days_remaining|string ~ ' days') if health.certificate.days_remaining is not none else 'Unknown' }}</b></div>
+      <div><span>NTP synchronization</span><b class="status-pill {{ 'healthy' if health.ntp.ok else 'warning' }}">{{ health.ntp.state|capitalize }}</b></div>
+      <div><span>Host uptime</span><b>{{ '%.1f'|format((health.uptime_seconds or 0)/86400) }} days</b></div>
+    </div>
+  </article>
+
+  <article class="ops-card">
+    <header><div><h3>Storage &amp; retention</h3><p>Telemetry and raw log capacity</p></div><a href="/system/storage" class="text-link">Manage →</a></header>
+    <div class="ops-status-list">
+      <div><span>Database file</span><b>{{ '%.2f'|format(telemetry.db_file_bytes/1073741824) }} GB</b></div>
+      <div><span>Logical telemetry used</span><b>{{ '%.2f'|format(telemetry.logical_used_bytes/1073741824) }} GB</b></div>
+      <div><span>Searchable retention</span><b>{{ telemetry.retention_days }} days</b></div>
+      <div><span>Raw Squid logs</span><b>{{ telemetry.raw_log_retention_days }} days</b></div>
+      <div><span>Minimum disk floor</span><b>{{ '%.0f'|format(telemetry.min_free_bytes/1073741824) }} GB</b></div>
+      <div><span>Swap pressure</span><b class="{{ 'warn' if swap.percent >= 50 else '' }}">{{ swap.percent or 0 }}%</b></div>
+    </div>
+  </article>
+
+  <article class="ops-card">
+    <header><div><h3>Recovery posture</h3><p>Backups, integrity and rollback readiness</p></div><a href="/system/backups" class="text-link">Backups →</a></header>
+    <div class="ops-status-list">
+      <div><span>Configuration drift</span><b class="status-pill {{ 'healthy' if drift.state=='clean' else 'danger' }}">{{ drift.state|capitalize }}</b></div>
+      <div><span>Latest backup</span><b>{{ recovery.last_backup.timestamp if recovery.last_backup else 'None recorded' }}</b></div>
+      <div><span>Backup count</span><b>{{ recovery.backup_count }}</b></div>
+      <div><span>Last apply</span><b class="{{ 'good' if recovery.last_apply and recovery.last_apply.status=='deployed' else '' }}">{{ recovery.last_apply.status|capitalize if recovery.last_apply else 'None' }}</b></div>
+      <div><span>Rollback point</span><b class="{{ 'good' if recovery.rollback_available else 'warn' }}">{{ 'Available' if recovery.rollback_available else 'Not initialized' }}</b></div>
+      <div><span>Health cache</span><b class="{{ 'warn' if health.cache_stale else 'good' }}">{{ 'Stale' if health.cache_stale else 'Current' }}</b></div>
+    </div>
+  </article>
+</section>
+
+<section class="ops-card alerts-card">
+  <header><div><h3>System events &amp; alerts</h3><p>Only operational issues requiring attention appear here.</p></div></header>
+  {% if alerts %}
+  <div class="ops-alerts">{% for a in alerts %}<div class="ops-alert {{ a.severity }}"><span></span><div><b>{{ a.title }}</b><small>{{ a.detail }}</small></div></div>{% endfor %}</div>
+  {% else %}
+  <div class="ops-all-clear"><span>✓</span><b>No active system alerts.</b><small>All monitored controls are within expected thresholds.</small></div>
+  {% endif %}
+</section>
+
+{% if request.state.user.role=='admin' %}
+<details class="advanced-card space-top">
+  <summary>Controlled maintenance</summary>
+  <div class="advanced-body maintenance-actions">
+    {% if mode=='production' %}
+    <form method="post" action="/system/actions/reload-squid" data-confirm="Validate and reload Squid?"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><button class="btn ghost">Validate &amp; reload Squid</button></form>
+    <a class="btn ghost" href="/changes/drift">Inspect config drift</a>
+    <a class="btn ghost" href="/changes/deployments">Apply history &amp; rollback</a>
+    {% else %}<span class="badge warn-bg">Privileged actions disabled in candidate preview</span>{% endif %}
+  </div>
+</details>
+{% endif %}
+<script id="system-performance-data" type="application/json">{{ history|tojson }}</script>
+{% endblock %}

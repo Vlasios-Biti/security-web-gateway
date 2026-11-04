@@ -1,43 +1,55 @@
 {% extends "base.html" %}{% block content %}
-<div class="page-head simple-page-head">
-  <div><span class="section-kicker">Audit &amp; recovery</span><h2>Activity</h2><p>Successful Saves are applied automatically. This page keeps deployment history, drift status, rollback access and exceptional approvals.</p></div>
+<div class="ops-page-head">
+  <div><span class="ops-kicker">Audit &amp; recovery</span><h2>Activity</h2><p>Save &amp; Apply history, approvals, configuration integrity, backups and rollback readiness.</p></div>
+  <div class="head-actions"><a class="btn ghost" href="/changes/audit">Audit log</a><a class="btn ghost" href="/changes/deployments">Apply history &amp; rollback</a></div>
 </div>
 
-<section class="change-summary-grid">
-  <div class="change-summary-card"><span>Approval required</span><strong>{{ pending_count }}</strong><small>{{ 'Legacy or Operator changes need Admin approval' if pending_count else 'No approval queue' }}</small></div>
-  <div class="change-summary-card"><span>Production drift</span><strong class="{{ 'good' if drift.state=='clean' else 'warn' }}">{{ drift.state|capitalize }}</strong><small>{{ drift.message }}</small></div>
-  <div class="change-summary-card"><span>Last applied</span><strong>{{ rows[0].version if rows else 'None' }}</strong><small>{{ rows[0].deployed_at if rows and rows[0].deployed_at else 'No deployment yet' }}</small></div>
+<section class="activity-summary-v39">
+  <div><span>Approval queue</span><strong class="{{ 'warn' if pending_count else 'good' }}">{{ pending_count }}</strong><small>{{ 'Admin attention required' if pending_count else 'Queue empty' }}</small></div>
+  <div><span>Config drift</span><strong class="{{ 'good' if drift.state=='clean' else 'bad' }}">{{ drift.state|capitalize }}</strong><small>{{ drift.message }}</small></div>
+  <div><span>Last apply</span><strong>{{ rows[0].status|capitalize if rows else 'None' }}</strong><small>{{ rows[0].deployed_at if rows else 'Not initialized' }}</small></div>
+  <div><span>Failed applies</span><strong class="{{ 'bad' if failed_applies else 'good' }}">{{ failed_applies }}</strong><small>Audited Save &amp; Apply failures</small></div>
+  <div><span>Backups</span><strong class="accent-blue-text">{{ backup_count }}</strong><small>{{ last_backup.timestamp if last_backup else 'No GUI backup yet' }}</small></div>
+  <div><span>Rollback</span><strong class="{{ 'good' if rows else 'warn' }}">{{ 'Available' if rows else 'Not initialized' }}</strong><small>{{ 'Recent apply points retained' if rows else 'No apply baseline' }}</small></div>
 </section>
 
 {% if diff %}
-<section class="primary-action-card space-top">
-  <div><span class="section-kicker">Exceptional approval</span><h3>Unapplied policy changes exist</h3><p>This normally appears only for Operator-created changes or policy that existed before automatic Save &amp; Apply was enabled. Review once, then apply.</p></div>
+<section class="primary-action-card">
+  <div><span class="section-kicker">Exceptional approval</span><h3>Unapplied policy changes exist</h3><p>This appears for Operator-created or legacy pending work. Review the effective policy once, then approve.</p></div>
   {% if request.state.user.role=='admin' and request.app.state.mode=='production' %}
-  <form method="post" action="/changes/deploy">
-    <input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}">
-    <input name="description" placeholder="Optional approval note">
-    <button class="btn primary large">Approve &amp; apply</button>
-  </form>
+  <form method="post" action="/changes/deploy"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><input name="description" placeholder="Optional approval note"><button class="btn primary">Approve &amp; apply</button></form>
   {% else %}<span class="muted">Administrator approval required.</span>{% endif %}
 </section>
-
-<details class="advanced-card space-top">
-  <summary>Review pending policy diff</summary>
-  <div class="advanced-body"><pre class="diff">{{ diff }}</pre></div>
-</details>
-{% else %}
-<section class="empty-state-card space-top"><div class="empty-orb">✓</div><h3>Production is synchronized</h3><p>Normal Admin Saves validate and apply automatically. There is nothing waiting for a separate deployment.</p></section>
 {% endif %}
 
-{% if rows %}
-<details class="advanced-card space-top" open>
-  <summary>Apply history</summary>
-  <div class="advanced-body">
-    <table class="table"><thead><tr><th>Version</th><th>Status</th><th>Applied</th><th>By</th><th>Description</th></tr></thead><tbody>
-    {% for d in rows %}<tr><td><code>{{ d.version }}</code></td><td><span class="badge {{ 'ok' if d.status=='deployed' else ('danger' if d.status=='failed' else 'off') }}">{{ d.status|upper }}</span></td><td>{{ d.deployed_at or '—' }}</td><td>{{ d.created_by }}</td><td>{{ d.description or '—' }}</td></tr>{% endfor %}
-    </tbody></table>
-    <div class="advanced-footer"><a class="text-link" href="/changes/deployments">Full history &amp; rollback</a><a class="text-link" href="/changes/audit">Audit log</a></div>
-  </div>
-</details>
-{% endif %}
+<div class="activity-layout-v39">
+  <section class="ops-card">
+    <header><div><h3>Administrative activity</h3><p>Recent configuration, security, discovery and recovery actions.</p></div><a href="/changes/audit" class="text-link">Full audit →</a></header>
+    <div class="activity-timeline">
+      {% for a in audit_rows %}
+      <div class="activity-event {{ 'failure' if a.result in ('FAILED','FAILURE') else '' }}"><span class="event-dot"></span><div><strong>{{ a.action|replace('_',' ')|title }}</strong><small>{{ a.actor }} · {{ a.timestamp }}{% if a.object_type %} · {{ a.object_type }}{% endif %}</small></div><span class="status-pill {{ 'danger' if a.result in ('FAILED','FAILURE') else ('warning' if 'PENDING' in a.result else 'healthy') }}">{{ a.result|replace('_',' ')|title }}</span></div>
+      {% else %}<div class="empty">No administrative activity recorded.</div>{% endfor %}
+    </div>
+  </section>
+
+  <aside class="activity-side">
+    <section class="ops-card">
+      <header><div><h3>Approval queue</h3><p>Only exceptional pending work appears here.</p></div></header>
+      {% if pending_count %}<div class="ops-alert warning"><span></span><div><b>{{ pending_count }} item{{ '' if pending_count==1 else 's' }} need approval</b><small>Review the effective diff before apply.</small></div></div>{% else %}<div class="ops-all-clear"><span>✓</span><b>No approval required</b></div>{% endif %}
+      {% if diff %}<details class="advanced-card activity-diff"><summary>Pending policy diff</summary><div class="advanced-body"><pre class="diff">{{ diff }}</pre></div></details>{% endif %}
+    </section>
+
+    <section class="ops-card">
+      <header><div><h3>Recovery posture</h3><p>Recent apply points and rollback readiness.</p></div></header>
+      <div class="ops-status-list">
+        <div><span>Current baseline</span><b>{{ rows[0].version if rows else 'None' }}</b></div>
+        <div><span>Last apply</span><b class="{{ 'good' if rows and rows[0].status=='deployed' else 'warn' }}">{{ rows[0].status|capitalize if rows else 'None' }}</b></div>
+        <div><span>Rollback point</span><b class="{{ 'good' if rows else 'warn' }}">{{ 'Available' if rows else 'Unavailable' }}</b></div>
+        <div><span>Latest backup</span><b>{{ last_backup.timestamp if last_backup else 'None' }}</b></div>
+        <div><span>Config integrity</span><b class="{{ 'good' if drift.state=='clean' else 'bad' }}">{{ drift.state|capitalize }}</b></div>
+      </div>
+      <div class="activity-actions"><a class="btn ghost" href="/changes/deployments">Rollback history</a><a class="btn ghost" href="/changes/drift">Inspect drift</a></div>
+    </section>
+  </aside>
+</div>
 {% endblock %}

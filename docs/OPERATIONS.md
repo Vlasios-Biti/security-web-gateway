@@ -1,4 +1,4 @@
-# Operations — Security Web Gateway 3.8
+# Operations — Security Web Gateway 3.9
 
 ## Services
 
@@ -82,4 +82,28 @@ Normal Admin changes do not require a second Deploy screen. The control plane ex
 If validation or reload fails, the privileged helper restores the previous managed policy. The desired state remains visible for troubleshooting while the previous production policy continues to run.
 
 If effective unapplied policy already existed before a new Save, automatic apply is blocked so the new Save cannot silently publish unrelated older work. The exceptional queue is visible under **Activity** and requires one-time Admin approval.
+
+
+
+## System operations console
+
+The System workspace is an operations console rather than a collection of unrelated settings pages.
+
+Cached background health collection includes:
+
+- Squid, Nginx and Manager state
+- proxy listener state
+- telemetry/performance/discovery/source-sync/storage worker state
+- CPU, I/O wait, memory, swap, load and disk
+- proxy P50/P95/P99 latency and established connections
+- telemetry ingestion lag
+- enterprise/local DNS latency
+- management TLS certificate expiry
+- NTP synchronization and host uptime
+- configuration drift
+- backup and rollback posture
+
+GUI requests read cached health/performance data. External/system probes remain in the low-priority performance worker so management page loads do not compete with Squid.
+
+System events are exception-oriented: healthy controls stay compact while service, DNS, certificate, NTP, disk/memory, telemetry-lag or drift issues produce actionable alerts.
 

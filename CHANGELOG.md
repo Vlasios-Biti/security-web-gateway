@@ -1,5 +1,19 @@
 # Changelog
 
+## 3.9.0
+
+- Rebuilt the management experience around a professional enterprise operations-console design created in Figma.
+- Reorganized navigation: System now owns Health & Performance, Storage, Backups and Administrators; Policy & Tools contains policy, investigation, import/export and audit workflows only.
+- Added a unified System operations console with CPU, memory, disk, proxy latency, connections, telemetry lag, performance trends, service/worker status, DNS health, TLS certificate expiry, NTP synchronization, uptime, storage/retention posture, backup/rollback state and operational alerts.
+- Added cached system-health signals for swap pressure, host uptime, NTP synchronization, management certificate expiry and worker/service status.
+- Redesigned Overview with real application counts, performance/telemetry state, recovery posture and corrected policy coverage semantics.
+- Redesigned Applications into a managed-service workspace with summary metrics, search, dependency health and exception-driven discovery status.
+- Redesigned Activity into an audit/recovery console with approval queue, configuration drift, apply failures, backups and rollback readiness.
+- Added safe 10-second auto-refresh to Live Traffic while avoiding refresh during active form editing.
+- Removed legacy dark controls from the light workspace, including Access Profile selectors, profile statistics, system-traffic filter, telemetry and policy cards.
+- Simplified Access Profiles and Administrators terminology.
+- Added v3.9 design/IA CI contracts while preserving v3.8 Save & Apply, default-deny enforcement and schema 015.
+
 ## 3.8.0
 
 - Replaced the normal two-step Pending/Deploy operator workflow with transactional **Save & Apply** for Administrators.

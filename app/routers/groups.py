@@ -23,7 +23,7 @@ def _ctx(request,group=None,error=None):
 
 @router.get("",response_class=HTMLResponse)
 def index(request:Request):
-    return request.app.state.templates.TemplateResponse(request=request,name="groups/list.html",context={"request":request,"page_title":"Policy Groups / Access Profiles","groups":list_policy_groups()})
+    return request.app.state.templates.TemplateResponse(request=request,name="groups/list.html",context={"request":request,"page_title":"Access Profiles","groups":list_policy_groups()})
 
 @router.get("/add",response_class=HTMLResponse)
 def add_page(request:Request):

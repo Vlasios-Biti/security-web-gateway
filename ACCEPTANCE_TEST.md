@@ -1,7 +1,7 @@
-# Security Web Gateway v3.8.0 Acceptance Test
+# Security Web Gateway v3.9.0 Acceptance Test
 
-1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.8.0`.
-2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.8.0`, mode `production`.
+1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.9.0`.
+2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.9.0`, mode `production`.
 3. `SELECT MAX(version) FROM schema_migrations` returns `015`; `PRAGMA integrity_check` returns `ok`; `PRAGMA foreign_key_check` returns no rows.
 4. `squid -k parse` and `nginx -t` succeed.
 5. `security-web-gateway.service`, `squid.service`, `nginx.service`, and `security-web-gateway-deploy-helper.socket` are active.
@@ -36,3 +36,11 @@
 31. Operator Save never publishes production policy.
 32. If effective pending policy existed before a new Save, the new Save does not silently publish it; Activity shows an exceptional approval queue.
 33. Automatic application discovery started by an Admin applies only after discovery completes, and UI polling shows the final result without manual refresh.
+
+34. System navigation contains Health & Performance, Storage, Backups and Administrators; Storage/Administrators are not duplicated under Policy & Tools.
+35. System console shows cached CPU/memory/disk/proxy latency/connections/telemetry lag plus DNS, TLS certificate expiry, NTP, worker health, storage and recovery posture.
+36. Live Traffic auto-refreshes every 10 seconds only while the user is not actively editing a filter control.
+37. Access Profile selectors, profile statistics and the Include System Traffic filter use the light workspace visual system; no legacy black control blocks remain.
+38. Overview policy coverage reports actual Application objects rather than system-domain rule count.
+39. Applications provides summary metrics, card search and recent dependency health.
+40. Activity provides approvals, drift, apply failures, backups, audit timeline and rollback readiness.

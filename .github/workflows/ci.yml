@@ -32,14 +32,16 @@ jobs:
               env.parse(p.read_text(encoding='utf-8'))
               print('TEMPLATE OK',p)
           PY
-      - name: v3.6 UI contract
+      - name: v3.7 UI contract
         run: |
-          grep -q 'ui-v36.css' templates/base.html
-          grep -q 'ui-v36.css' templates/login.html
-          grep -q 'data-command-open' templates/base.html
-          grep -q 'command-center' templates/overview.html
-          grep -q 'Search navigation' templates/base.html
-          test -s static/css/ui-v36.css
+          grep -q 'ui-v37.css' templates/base.html
+          grep -q 'ui-v37.css' templates/login.html
+          grep -q 'favicon.svg' templates/base.html
+          grep -q 'Add application' templates/applications/discover.html
+          grep -q 'Delete application' templates/applications/detail.html
+          grep -q 'data-select-candidates-all' templates/applications/discovery_result.html
+          test -s static/css/ui-v37.css
+          test -s static/favicon.svg
       - name: Application version matches VERSION
         run: |
           python - <<'PY'
@@ -79,7 +81,7 @@ jobs:
           c=sqlite3.connect('/tmp/swg-ci.db')
           assert c.execute('pragma integrity_check').fetchone()[0]=='ok'
           assert not list(c.execute('pragma foreign_key_check'))
-          assert c.execute('select max(version) from schema_migrations').fetchone()[0]=='013'
+          assert c.execute('select max(version) from schema_migrations').fetchone()[0]=='014'
           assert c.execute('pragma journal_mode').fetchone()[0].lower()=='wal'
           PY
       - name: v3.3.1 to v3.4 migration
@@ -93,7 +95,7 @@ jobs:
           python - <<'PY'
           import sqlite3
           c=sqlite3.connect('/tmp/swg-v331.db')
-          assert c.execute('select max(version) from schema_migrations').fetchone()[0]=='013'
+          assert c.execute('select max(version) from schema_migrations').fetchone()[0]=='014'
           assert c.execute('pragma integrity_check').fetchone()[0]=='ok'
           assert not list(c.execute('pragma foreign_key_check'))
           PY
@@ -101,6 +103,8 @@ jobs:
         run: python tests/smoke_v331.py
       - name: v3.4 performance and intelligence smoke tests
         run: python tests/smoke_v340.py
+      - name: v3.7 application workflow smoke tests
+        run: python tests/smoke_v370.py
       - name: App import
         env:
           SWG_DB_PATH: /tmp/swg-ci.db
@@ -138,5 +142,7 @@ jobs:
         run: |
           python tools/migrate.py --db /tmp/swg-py314.db --root .
           python -c 'from app.main import app; print(app.title, len(app.routes))'
-      - name: Python 3.14 v3.4 smoke
-        run: python tests/smoke_v340.py
+      - name: Python 3.14 smoke
+        run: |
+          python tests/smoke_v340.py
+          python tests/smoke_v370.py

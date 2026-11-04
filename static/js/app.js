@@ -84,6 +84,12 @@ document.addEventListener("DOMContentLoaded",()=>{
  document.querySelectorAll("[data-filter-table]").forEach(i=>{const t=document.getElementById(i.dataset.filterTable);if(!t)return;i.addEventListener("input",()=>{const q=i.value.toLowerCase().trim();t.querySelectorAll("tbody tr").forEach(r=>r.style.display=r.textContent.toLowerCase().includes(q)?"":"none")})});
  document.querySelectorAll("[data-reload]").forEach(b=>b.addEventListener("click",()=>location.reload()));
  document.querySelectorAll("[data-page-size-select]").forEach(s=>s.addEventListener("change",()=>{const u=new URL(location.href);u.searchParams.set("page_size",s.value);u.searchParams.set("page","1");location.href=u.toString()}));
+ document.querySelectorAll("[data-select-candidates-all]").forEach(master=>{
+   const boxes=[...document.querySelectorAll('input[name="candidate_ids"]:not(:disabled)')];
+   const sync=()=>{const n=boxes.filter(x=>x.checked).length;master.checked=boxes.length>0&&n===boxes.length;master.indeterminate=n>0&&n<boxes.length};
+   master.addEventListener("change",()=>{boxes.forEach(x=>x.checked=master.checked);sync()});
+   boxes.forEach(x=>x.addEventListener("change",sync));sync();
+ });
  setupNavigation();setupCommandPalette();refreshCharts();if(document.getElementById("traffic-chart"))setInterval(refreshCharts,15000);
 });
 window.addEventListener("resize",()=>{clearTimeout(window.__pmResize);window.__pmResize=setTimeout(refreshCharts,160)});

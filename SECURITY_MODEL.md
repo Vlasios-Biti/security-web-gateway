@@ -14,7 +14,7 @@ Security Web Gateway is primarily a **single-VM on-prem appliance**. Squid is th
 
 **Privileged deploy helper** is root-owned/socket-activated and accepts only typed deployment operations. The management application has no arbitrary shell primitive.
 
-**Discovery Engine** processes untrusted external evidence. Provider data, HTML, browser requests, HAR data, DNS-derived endpoints and observed traffic must pass normalization/classification and administrator review before becoming policy.
+**Discovery Engine** processes untrusted external evidence. Provider data, HTML, browser requests, HAR data, DNS-derived endpoints and observed traffic are untrusted. Normal onboarding may automatically stage isolated-browser evidence as desired-state policy, but production enforcement still requires an explicit Administrator deployment.
 
 **Local DNS cache** is a performance layer only. Enterprise DNS servers remain the configured upstream authority.
 
@@ -39,8 +39,9 @@ Protocol is an atomic destination property. Discovery/manual attachment cannot s
 - Observed Squid discovery is troubleshooting-only because workstation traffic can contain unrelated browser/OS/application requests.
 - Ongoing dependency candidates are created only from conservative same-client correlation with a recently active **single** Application.
 - Obvious analytics/OS/background noise is filtered before candidate creation.
-- Candidates carry evidence/confidence and are never automatically allowed.
-- Approving a candidate only creates normal pending policy; Diff/Deploy remains mandatory.
+- Ongoing blocked-traffic candidates carry evidence/confidence and remain review-only.
+- Initial isolated-browser onboarding may auto-stage observed public dependencies as pending desired state.
+- No discovery path can invoke production enforcement directly; effective policy still requires Diff/Deploy.
 
 ## Discovery network controls
 
@@ -53,7 +54,7 @@ Protocol is an atomic destination property. Discovery/manual attachment cannot s
 
 ## Change control
 
-`GUI edit/discovery approval → desired state → Pending → generated Diff → Admin Deploy → checksum → privileged helper → squid -k parse → atomic managed-config replacement → reload/health verification → rollback on failure`
+`GUI edit / automatic discovery staging → desired state → Pending → generated Diff → Admin Deploy → checksum → privileged helper → squid -k parse → atomic managed-config replacement → reload/health verification → rollback on failure`
 
 ## RBAC
 

@@ -77,13 +77,13 @@ Security Web Gateway intentionally separates three different concepts:
 
 ## Application intelligence path
 
-`Browser/HAR/vendor evidence → classify → candidate/dependency → admin review → Pending → Diff → Deploy`
+`Browser evidence → classify → automatic pending dependencies → Diff → Admin Deploy`\n\nAdvanced/authenticated workflows remain:\n\n`HAR/vendor/manual evidence → review as needed → Pending → Diff → Admin Deploy`
 
 For ongoing application use:
 
 `DENY event → same-client recent single-application correlation → noise filtering → confidence → Dependency Candidate`
 
-A candidate never changes production policy automatically.
+An ongoing blocked-traffic candidate never changes production policy automatically. Automatic onboarding can stage desired state, but cannot deploy it.
 
 ## Visibility boundary
 

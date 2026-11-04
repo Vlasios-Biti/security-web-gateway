@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse,RedirectResponse
 from app import auth
 from app.db import connect
 from app.services.rules import pending_count
-from app.services.deployment import preview_diff,deploy,rollback_to,drift_status,current_live
+from app.services.deployment import preview_diff,deploy,rollback_to,drift_status,current_live,reconcile_pending_if_no_diff
 from app.config import MODE
 router=APIRouter(prefix="/changes")
 @router.get("/deployments",response_class=HTMLResponse)
@@ -16,8 +16,14 @@ def index(request:Request):
 @router.get("/review",response_class=HTMLResponse)
 def review(request:Request):
     if request.state.user["role"] not in("admin","operator"):return HTMLResponse("Forbidden",403)
+    reconcile_pending_if_no_diff()
+    c=connect()
+    try:
+        rows=[dict(x) for x in c.execute("SELECT * FROM deployments ORDER BY id DESC LIMIT 8")]
+    finally:
+        c.close()
     return request.app.state.templates.TemplateResponse(request=request,name="deployments/review.html",
-        context={"request":request,"page_title":"Review Pending Changes","pending_count":pending_count(),"diff":preview_diff()})
+        context={"request":request,"page_title":"Changes","pending_count":pending_count(),"diff":preview_diff(),"rows":rows,"drift":drift_status()})
 
 @router.get("/drift",response_class=HTMLResponse)
 def drift(request:Request):
@@ -31,12 +37,12 @@ def drift(request:Request):
 
 @router.post("/deploy")
 def deploy_now(request:Request,description:str=Form(""),csrf_token:str=Form(...)):
-    if MODE != "production": return RedirectResponse("/changes/deployments?error=Deploy+is+disabled+in+candidate+preview",303)
+    if MODE != "production": return RedirectResponse("/changes/review?error=Deploy+is+disabled+in+candidate+preview",303)
     u=request.state.user
     if u["role"]!="admin":return HTMLResponse("Forbidden",403)
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
     result=deploy(u["username"],auth.client_ip(request),description)
-    return RedirectResponse("/changes/deployments?msg=Deployment+successful" if result.get("ok") else "/changes/deployments?error=Deployment+failed",303)
+    return RedirectResponse("/changes/review?msg=Deployment+successful" if result.get("ok") else "/changes/review?error=Deployment+failed",303)
 @router.post("/rollback/{deployment_id}")
 def rollback(deployment_id:int,request:Request,csrf_token:str=Form(...)):
     if MODE != "production": return RedirectResponse("/changes/deployments?error=Rollback+is+disabled+in+candidate+preview",303)

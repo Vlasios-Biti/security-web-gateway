@@ -1,6 +1,6 @@
 # Security Web Gateway
 
-**Version:** 3.6.1  
+**Version:** 3.7.0  
 **Target:** single-VM, on-prem enterprise appliance  
 **Target OS:** Ubuntu Server 24.04 LTS / 26.04 LTS  
 **Architecture:** Squid explicit proxy + FastAPI management plane + Nginx TLS + SQLite/WAL policy and telemetry store + isolated background workers + restricted privileged deployment helper.
@@ -48,7 +48,9 @@ Sizing should ultimately follow concurrent CONNECT sessions, requests/sec, WAN t
 - Management GUI binds to loopback and is published by Nginx over HTTPS.
 - GUI runs unprivileged as `proxy-mgmt`.
 - Squid deployment uses a narrow Unix-socket privileged helper; there is no web shell or unrestricted sudo path.
-- Discovery can only create evidence/candidates. `Discovery → Review → Pending → Diff → Deploy` remains mandatory.
+- Normal application onboarding is automatic: isolated browser discovery stages observed public dependencies as pending changes.
+- Production remains protected by explicit change control: only an Administrator can deploy an effective Squid policy diff.
+- Advanced manual/HAR discovery remains available for authenticated or unusual workflows.
 - Browser discovery rejects private/reserved targets and DNS-rebinding/SSRF-style pivots.
 - PAC supports explicit DIRECT bypasses plus fail-open `PROXY ...; DIRECT` behavior.
 
@@ -89,7 +91,7 @@ Sizing should ultimately follow concurrent CONNECT sessions, requests/sec, WAN t
 - **Policy Simulator** explains what would happen for a client IP + destination + protocol/port without changing policy.
 - **Why Blocked?** explains a denied telemetry event using effective Network/Profile/Application/Rule scope.
 - **Application Dependency Candidates** correlate new blocked destinations with a recently active single application, classify them and score confidence.
-- Candidates are **never auto-allowed**. Approving a candidate creates a normal pending Application dependency that still requires Diff/Deploy.
+- Blocked-traffic dependency candidates remain review-only. Initial isolated-browser onboarding can automatically stage observed dependencies, but nothing is enforced until normal Diff/Deploy.
 
 ### Application discovery
 
@@ -212,11 +214,11 @@ Keep the repository private unless publication is intentional.
 git add -A
 git status
 git diff --cached
-git commit -m "Security Web Gateway v3.6.1"
+git commit -m "Security Web Gateway v3.7.0"
 git push
 
-git tag -a v3.6.1 -m "Security Web Gateway v3.6.1"
-git push origin v3.6.1
+git tag -a v3.7.0 -m "Security Web Gateway v3.7.0"
+git push origin v3.7.0
 ```
 
 Never stage `.db`, `.sqlite*`, `.env`, TLS/private-key material, HAR files, logs or backups.
@@ -228,6 +230,7 @@ python3 -m compileall -q app bin tools privileged tests
 bash -n deploy/*.sh scripts/*.sh
 python3 tools/migrate.py --db /tmp/swg-test.db --root .
 python3 tests/smoke_v340.py
+python3 tests/smoke_v370.py
 ```
 
 See `docs/ARCHITECTURE.md`, `docs/DEPLOYMENT.md`, `docs/PERFORMANCE.md`, `docs/OPERATIONS.md`, and `SECURITY_MODEL.md`.

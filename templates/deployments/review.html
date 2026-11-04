@@ -1,4 +1,43 @@
-{% extends "base.html" %}{% block content %}<div class="page-head"><div><h2>Review Pending Changes</h2><p>{{ pending_count }} pending change(s). Production is unchanged until Deploy is confirmed.</p></div><a class="btn ghost" href="/changes/deployments">Cancel</a></div>
-<section class="panel"><header><div><h2>Generated Squid Policy Diff</h2><p>Candidate versus deployed managed policy</p></div></header><pre class="diff">{{ diff if diff else 'No configuration differences.' }}</pre></section>
-{% if diff and request.state.user.role=='admin' and request.app.state.mode=='production' %}<section class="form-panel space-top"><form method="post" action="/changes/deploy"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><label>Deployment description<input name="description" placeholder="Reason / change ticket"></label>
-<div class="warning-box">Backup → candidate validation → squid -k parse → reload → health check. Failure triggers automatic rollback.</div><button class="btn primary">Deploy to Production</button></form></section>{% elif diff %}<div class="warning-box space-top">Diff is reviewable, but only a Production Administrator can deploy. Candidate preview can never deploy.</div>{% endif %}{% endblock %}
+{% extends "base.html" %}{% block content %}
+<div class="page-head simple-page-head">
+  <div><span class="section-kicker">Change control</span><h2>Changes</h2><p>Review what will change, then deploy once.</p></div>
+</div>
+
+<section class="change-summary-grid">
+  <div class="change-summary-card"><span>Pending</span><strong>{{ pending_count }}</strong><small>{{ 'Ready for review' if pending_count else 'No pending policy changes' }}</small></div>
+  <div class="change-summary-card"><span>Production drift</span><strong class="{{ 'good' if drift.state=='clean' else 'warn' }}">{{ drift.state|capitalize }}</strong><small>{{ drift.message }}</small></div>
+  <div class="change-summary-card"><span>Last deployment</span><strong>{{ rows[0].version if rows else 'None' }}</strong><small>{{ rows[0].deployed_at if rows and rows[0].deployed_at else 'No deployment yet' }}</small></div>
+</section>
+
+{% if diff %}
+<section class="primary-action-card space-top">
+  <div><span class="section-kicker">Ready to deploy</span><h3>{{ pending_count }} pending change{{ '' if pending_count==1 else 's' }}</h3><p>SWG will create a backup, validate the candidate configuration, reload Squid and automatically roll back if validation fails.</p></div>
+  {% if request.state.user.role=='admin' and request.app.state.mode=='production' %}
+  <form method="post" action="/changes/deploy">
+    <input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}">
+    <input name="description" placeholder="Optional deployment note">
+    <button class="btn primary large">Deploy changes</button>
+  </form>
+  {% else %}<span class="muted">Administrator approval required.</span>{% endif %}
+</section>
+
+<details class="advanced-card space-top">
+  <summary>Review configuration diff</summary>
+  <div class="advanced-body"><pre class="diff">{{ diff }}</pre></div>
+</details>
+{% else %}
+<section class="empty-state-card space-top"><div class="empty-orb">✓</div><h3>Production is up to date</h3><p>There are no effective policy changes waiting to be deployed.</p></section>
+{% endif %}
+
+{% if rows %}
+<details class="advanced-card space-top">
+  <summary>Deployment history</summary>
+  <div class="advanced-body">
+    <table class="table"><thead><tr><th>Version</th><th>Status</th><th>Deployed</th><th>By</th></tr></thead><tbody>
+    {% for d in rows %}<tr><td><code>{{ d.version }}</code></td><td><span class="badge {{ 'ok' if d.status=='deployed' else ('danger' if d.status=='failed' else 'off') }}">{{ d.status|upper }}</span></td><td>{{ d.deployed_at or '—' }}</td><td>{{ d.created_by }}</td></tr>{% endfor %}
+    </tbody></table>
+    <div class="advanced-footer"><a class="text-link" href="/changes/deployments">Full history &amp; rollback</a><a class="text-link" href="/changes/audit">Audit log</a></div>
+  </div>
+</details>
+{% endif %}
+{% endblock %}

@@ -463,11 +463,11 @@ def _execute_run(c,run_id,application_id,query,method,source_ref,client_ip,windo
     c.commit()
 
 
-def create_run(application_id,query,method,actor,source_ref=None,client_ip=None,window_minutes=None,catalog_key=None):
+def create_run(application_id,query,method,actor,source_ref=None,client_ip=None,window_minutes=None,catalog_key=None,auto_approve=False):
     c=connect();run_id=None
     try:
-        cur=c.execute("""INSERT INTO discovery_runs(application_id,query,method,status,source_ref,client_ip,window_minutes,started_by)
-          VALUES(?,?,?,'running',?,?,?,?)""",(application_id,query or None,method,source_ref or None,client_ip or None,window_minutes,actor));run_id=cur.lastrowid;c.commit()
+        cur=c.execute("""INSERT INTO discovery_runs(application_id,query,method,status,source_ref,client_ip,window_minutes,started_by,auto_approve)
+          VALUES(?,?,?,'running',?,?,?,?,?)""",(application_id,query or None,method,source_ref or None,client_ip or None,window_minutes,actor,1 if auto_approve else 0));run_id=cur.lastrowid;c.commit()
         # Browser execution is deliberately deferred to the systemd worker so a
         # Chromium session can never hold an Nginx/GUI request open long enough
         # to produce a 504. The review page can be refreshed while status=running.
@@ -493,17 +493,34 @@ def process_browser_queue(max_runs=1):
               ORDER BY id ASC LIMIT 1""").fetchone()
             if not run:break
             run=dict(run)
-        finally:c.close()
-        c=connect()
+        finally:
+            c.close()
+
         try:
-            _execute_run(c,run['id'],run.get('application_id'),run.get('query'),run['method'],run.get('source_ref'),run.get('client_ip'),run.get('window_minutes'))
-            processed.append({'id':run['id'],'status':'ready'})
-        except Exception as exc:
+            c=connect()
             try:
-                c.rollback();c.execute("UPDATE discovery_runs SET status='failed',error_text=?,completed_at=CURRENT_TIMESTAMP WHERE id=?",(str(exc),run['id']));c.commit()
-            except Exception:pass
+                _execute_run(c,run['id'],run.get('application_id'),run.get('query'),run['method'],run.get('source_ref'),run.get('client_ip'),run.get('window_minutes'))
+            finally:
+                c.close()
+
+            if bool(run.get('auto_approve')):
+                ready=get_run(run['id'])
+                ids=[x['id'] for x in ready.get('candidates',[])] if ready else []
+                if ids:
+                    approve_run(run['id'],ids,run.get('started_by') or 'system')
+                    processed.append({'id':run['id'],'status':'approved','auto_approved':len(ids)})
+                else:
+                    processed.append({'id':run['id'],'status':'ready','auto_approved':0})
+            else:
+                processed.append({'id':run['id'],'status':'ready'})
+        except Exception as exc:
+            c=connect()
+            try:
+                c.execute("UPDATE discovery_runs SET status='failed',error_text=?,completed_at=CURRENT_TIMESTAMP WHERE id=?",(str(exc),run['id']))
+                c.commit()
+            finally:
+                c.close()
             processed.append({'id':run['id'],'status':'failed','error':str(exc)})
-        finally:c.close()
     return processed
 
 
@@ -541,7 +558,16 @@ def list_runs(limit=50):
 
 
 def _category_for_app(c,app):
-    slug="app-"+app["slug"];c.execute("INSERT OR IGNORE INTO categories(name,slug,system_managed) VALUES(?,?,?)",(app["name"],slug,app["system_managed"]));return c.execute("SELECT id FROM categories WHERE slug=?",(slug,)).fetchone()["id"]
+    slug="app-"+app["slug"]
+    row=c.execute("SELECT id FROM categories WHERE slug=?",(slug,)).fetchone()
+    if row:return row["id"]
+    # Legacy bootstrap categories such as "Google Maps" may already occupy
+    # the unique category name. Use an application-specific display name.
+    name=f"Application: {app['name']} [{app['id']}]"
+    c.execute("INSERT INTO categories(name,slug,system_managed) VALUES(?,?,?)",(name,slug,app["system_managed"]))
+    row=c.execute("SELECT id FROM categories WHERE slug=?",(slug,)).fetchone()
+    if not row:raise RuntimeError(f"Failed to create discovery category for {app['name']}.")
+    return row["id"]
 
 
 def _merge_protocol(a,b):

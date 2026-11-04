@@ -57,11 +57,15 @@ def list_applications(include_deleted=False):
 def get_application(application_id):
     c=connect()
     try:
-        r=c.execute("SELECT * FROM applications WHERE id=?",(application_id,)).fetchone()
+        r=c.execute("SELECT * FROM applications WHERE id=? AND status!='deleted'",(application_id,)).fetchone()
         if not r:return None
         d=dict(r)
         d["network_ids"]=[x["network_id"] for x in c.execute("SELECT network_id FROM application_networks WHERE application_id=?",(application_id,))]
         d["group_ids"]=[x["group_id"] for x in c.execute("SELECT group_id FROM policy_group_applications WHERE application_id=?",(application_id,))]
+        d["networks"]=[dict(x) for x in c.execute("""SELECT n.* FROM networks n JOIN application_networks an ON an.network_id=n.id
+            WHERE an.application_id=? ORDER BY COALESCE(n.vlan_id,99999),n.name""",(application_id,))]
+        d["groups"]=[dict(x) for x in c.execute("""SELECT pg.* FROM policy_groups pg JOIN policy_group_applications pga ON pga.group_id=pg.id
+            WHERE pga.application_id=? AND pg.status!='deleted' ORDER BY pg.name""",(application_id,))]
         d["dependencies"]=[dict(x) for x in c.execute("""SELECT r.*,ar.required,ar.source,ar.confidence,ar.metadata_json,ar.enabled dependency_enabled
              FROM rules r JOIN application_rules ar ON ar.rule_id=r.id WHERE ar.application_id=? AND r.status!='deleted'
              ORDER BY r.rule_type,r.destination""",(application_id,))]
@@ -124,6 +128,26 @@ def set_application_status(application_id,status,actor):
         if not row:raise ValueError("Application not found.")
         changed=row['status']!=status
         c.execute("UPDATE applications SET status=?,pending=CASE WHEN ? THEN 1 ELSE pending END,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",(status,1 if changed else 0,actor,application_id));c.commit()
+    finally:c.close()
+
+
+def delete_application(application_id,actor):
+    c=connect()
+    try:
+        app=c.execute("SELECT * FROM applications WHERE id=? AND status!='deleted'",(application_id,)).fetchone()
+        if not app:raise ValueError("Application not found.")
+        groups={x["group_id"] for x in c.execute("SELECT group_id FROM policy_group_applications WHERE application_id=?",(application_id,))}
+        c.execute("BEGIN IMMEDIATE")
+        c.execute("DELETE FROM application_networks WHERE application_id=?",(application_id,))
+        c.execute("DELETE FROM policy_group_applications WHERE application_id=?",(application_id,))
+        for gid in groups:
+            c.execute("UPDATE policy_groups SET pending=1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",(actor,gid))
+        c.execute("""UPDATE applications
+          SET status='deleted',pending=1,name=?,slug=?,updated_by=?,updated_at=CURRENT_TIMESTAMP
+          WHERE id=?""",(f"{app['name']} [deleted {application_id}]",f"{app['slug']}-deleted-{application_id}",actor,application_id))
+        c.commit()
+    except Exception:
+        c.rollback();raise
     finally:c.close()
 
 

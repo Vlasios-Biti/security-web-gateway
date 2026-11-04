@@ -1,8 +1,8 @@
-# Security Web Gateway v3.6.1 Acceptance Test
+# Security Web Gateway v3.7.0 Acceptance Test
 
-1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.6.1`.
-2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.6.1`, mode `production`.
-3. `SELECT MAX(version) FROM schema_migrations` returns `013`; `PRAGMA integrity_check` returns `ok`; `PRAGMA foreign_key_check` returns no rows.
+1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.7.0`.
+2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.7.0`, mode `production`.
+3. `SELECT MAX(version) FROM schema_migrations` returns `014`; `PRAGMA integrity_check` returns `ok`; `PRAGMA foreign_key_check` returns no rows.
 4. `squid -k parse` and `nginx -t` succeed.
 5. `security-web-gateway.service`, `squid.service`, `nginx.service`, and `security-web-gateway-deploy-helper.socket` are active.
 6. Telemetry, storage-maintenance, discovery, source-sync and **performance** timers are enabled/active.
@@ -15,11 +15,15 @@
 13. `System → Performance` receives samples after the performance timer runs.
 14. If local DNS cache is enabled, Unbound answers on loopback and forwards successfully to enterprise DNS.
 15. `System → Storage / Telemetry` shows age/storage/free-space guardrails.
-16. Browser discovery completes through the discovery timer and requires explicit Review/Approve/Deploy.
+16. Normal application onboarding completes through the discovery timer and automatically stages observed public dependencies as pending changes; production still requires explicit Deploy.
 17. HAR discovery does not persist the uploaded raw HAR and classifies obvious analytics/background endpoints as IGNORE.
 18. `Policy Simulator` returns an explainable ALLOW/DENY result without changing policy.
 19. `Why Blocked?` explains a denied event from effective network/profile/rule/application scope.
 20. A correlated new blocked application dependency appears only as a review candidate; it is not auto-allowed.
-21. Approving a candidate creates normal pending policy and still requires Diff/Deploy.
+21. Manual candidate approval and automatic application onboarding both create normal pending policy relationships; only an effective policy diff can be deployed.
 22. Existing production Squid policy is not auto-deployed merely by upgrading application code.
 23. On failed upgrade cutover, DB/release/units and all worker timers can be restored by the rollback path.
+
+24. Deleting an Application removes it from active policy management, preserves audit/discovery history, and allows the same application name to be recreated.
+25. Legacy category names such as Google Maps do not break discovery approval.
+26. Metadata-only pending changes are reconciled without creating a meaningless deployment.

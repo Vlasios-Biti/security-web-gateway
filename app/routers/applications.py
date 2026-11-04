@@ -1,9 +1,10 @@
 import json
+from urllib.parse import urlparse
 from fastapi import APIRouter,Request,Form,File,UploadFile
 from fastapi.responses import HTMLResponse,RedirectResponse
 from app import auth
 from app.db import audit,connect
-from app.services.access_model import list_applications,get_application,create_application,update_application,set_application_status,list_policy_groups,create_application_dependency,set_application_dependency_status
+from app.services.access_model import list_applications,get_application,create_application,update_application,set_application_status,delete_application,list_policy_groups,create_application_dependency,set_application_dependency_status
 from app.services.discovery import catalog_search,create_run,create_har_run,get_run,list_runs,approve_run
 from app.services.rules import list_networks
 router=APIRouter(prefix="/applications")
@@ -60,13 +61,16 @@ def discover_catalog(request:Request,catalog_key:str=Form(...),policy_group_ids:
     except Exception as exc:return RedirectResponse("/applications/discover?error="+str(exc).replace(" ","+"),303)
 
 @router.post("/discover/custom")
-def discover_custom(request:Request,name:str=Form(...),seed_domain:str=Form(""),method:str=Form(...),source_ref:str=Form(""),client_ip:str=Form(""),window_minutes:int=Form(10),policy_group_ids:list[int]=Form(default=[]),csrf_token:str=Form(...)):
+def discover_custom(request:Request,name:str=Form(...),seed_domain:str=Form(""),method:str=Form(...),source_ref:str=Form(""),client_ip:str=Form(""),window_minutes:int=Form(10),auto_approve:int=Form(0),policy_group_ids:list[int]=Form(default=[]),csrf_token:str=Form(...)):
     u=request.state.user
     if not can_manage(request):return HTMLResponse("Forbidden",403)
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
     try:
+        if method=="browser_auto" and not seed_domain.strip():
+            p=urlparse(source_ref.strip())
+            seed_domain=(p.hostname or "").strip().lower()
         c=connect();existing=c.execute("SELECT id FROM applications WHERE name=? AND status!='deleted'",(name.strip(),)).fetchone();c.close()
-        aid=existing["id"] if existing else create_application(name,"Custom",f"Discovered application: {name}",seed_domain,"official_url" if method=="official_url" else "observed",source_ref,False,u["username"])
+        aid=existing["id"] if existing else create_application(name,"Custom",f"Managed web application: {name}",seed_domain,"official_url" if method=="official_url" else "observed",source_ref,False,u["username"])
         if policy_group_ids:
             c=connect()
             try:
@@ -74,7 +78,10 @@ def discover_custom(request:Request,name:str=Form(...),seed_domain:str=Form(""),
                 c.commit()
             finally:c.close()
         query=seed_domain if method=="seed_probe" else (source_ref if method=="browser_auto" else name)
-        rid=create_run(aid,query,method,u["username"],source_ref=source_ref,client_ip=client_ip,window_minutes=window_minutes);audit(u["username"],"DISCOVERY_START","SUCCESS","discovery_run",rid,auth.client_ip(request),json.dumps({"method":method}));return RedirectResponse(f"/applications/discovery/{rid}",303)
+        rid=create_run(aid,query,method,u["username"],source_ref=source_ref,client_ip=client_ip,window_minutes=window_minutes,auto_approve=bool(auto_approve));audit(u["username"],"DISCOVERY_START","SUCCESS","discovery_run",rid,auth.client_ip(request),json.dumps({"method":method,"automatic":bool(auto_approve)}))
+        if auto_approve:
+            return RedirectResponse(f"/applications/{aid}?msg=Application+created.+Dependencies+are+being+discovered+automatically",303)
+        return RedirectResponse(f"/applications/discovery/{rid}",303)
     except Exception as exc:return RedirectResponse("/applications/discover?error="+str(exc).replace(" ","+"),303)
 
 @router.post("/discover/har")
@@ -145,6 +152,20 @@ def edit_submit(application_id:int,request:Request,name:str=Form(...),provider:s
     try:update_application(application_id,name,provider,description,seed_domain,source_kind,source_ref,bool(auto_monitor),network_ids,u["username"],policy_group_ids);audit(u["username"],"APPLICATION_EDIT","SUCCESS","application",application_id,auth.client_ip(request));return RedirectResponse(f"/applications/{application_id}?msg=Application+updated+as+pending+change",303)
     except Exception as exc:return request.app.state.templates.TemplateResponse(request=request,name="applications/form.html",context={"request":request,"page_title":"Edit Application Policy","application":get_application(application_id),"networks":list_networks(),"groups":list_policy_groups(),"error":str(exc)},status_code=400)
 
+@router.post("/{application_id}/delete")
+def delete(application_id:int,request:Request,csrf_token:str=Form(...)):
+    u=request.state.user;app=get_application(application_id)
+    if not app:return HTMLResponse("Not found",404)
+    if not can_modify_application(request,app):return HTMLResponse("Forbidden",403)
+    if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
+    try:
+        delete_application(application_id,u["username"])
+        audit(u["username"],"APPLICATION_DELETE","SUCCESS","application",application_id,auth.client_ip(request))
+        return RedirectResponse("/applications?msg=Application+removed+as+pending+change",303)
+    except Exception as exc:
+        return RedirectResponse(f"/applications/{application_id}?error="+str(exc).replace(" ","+"),303)
+
+
 @router.post("/{application_id}/status")
 def status(application_id:int,request:Request,status:str=Form(...),csrf_token:str=Form(...)):
     u=request.state.user;app=get_application(application_id)
@@ -174,12 +195,15 @@ def dependency_status(application_id:int,rule_id:int,request:Request,status:str=
     except Exception as exc:return RedirectResponse(f"/applications/{application_id}?error="+str(exc).replace(" ","+"),303)
 
 @router.post("/{application_id}/discover")
-def discover_existing(application_id:int,request:Request,method:str=Form(...),source_ref:str=Form(""),client_ip:str=Form(""),window_minutes:int=Form(10),csrf_token:str=Form(...)):
+def discover_existing(application_id:int,request:Request,method:str=Form(...),source_ref:str=Form(""),client_ip:str=Form(""),window_minutes:int=Form(10),auto_approve:int=Form(0),csrf_token:str=Form(...)):
     u=request.state.user;app=get_application(application_id)
     if not app:return HTMLResponse("Not found",404)
     if not can_modify_application(request,app):return HTMLResponse("Forbidden",403)
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
     try:
         catalog_key=app["source_ref"] if method in("catalog","official_api") else None;query=app["seed_domain"] if method=="seed_probe" else (catalog_key or app["name"])
-        rid=create_run(application_id,query,method,u["username"],source_ref=source_ref or app.get("source_ref"),client_ip=client_ip,window_minutes=window_minutes,catalog_key=catalog_key);return RedirectResponse(f"/applications/discovery/{rid}",303)
+        rid=create_run(application_id,query,method,u["username"],source_ref=source_ref or app.get("source_ref"),client_ip=client_ip,window_minutes=window_minutes,catalog_key=catalog_key,auto_approve=bool(auto_approve))
+        if auto_approve:
+            return RedirectResponse(f"/applications/{application_id}?msg=Dependency+refresh+started",303)
+        return RedirectResponse(f"/applications/discovery/{rid}",303)
     except Exception as exc:return RedirectResponse(f"/applications/{application_id}?error="+str(exc).replace(" ","+"),303)

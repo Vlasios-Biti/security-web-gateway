@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.4.5
+
+- Fixed telemetry cleanup on an empty/fresh telemetry database where `after_count` was referenced before assignment.
+- Telemetry event count is now recalculated directly from SQLite after cleanup before updating telemetry state.
+- Added regression coverage for cleanup/collector execution with zero indexed events.
+- No Squid policy, schema, management UI, or application-intelligence behavior changes from v3.4.4.
+
 ## 3.4.4
 
 - Fixed background worker imports when systemd launches scripts by absolute path.

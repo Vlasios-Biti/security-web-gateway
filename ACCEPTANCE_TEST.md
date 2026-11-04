@@ -1,7 +1,7 @@
-# Security Web Gateway v3.4.4 Acceptance Test
+# Security Web Gateway v3.4.5 Acceptance Test
 
-1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.4.4`.
-2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.4.4`, mode `production`.
+1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.4.5`.
+2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.4.5`, mode `production`.
 3. `SELECT MAX(version) FROM schema_migrations` returns `013`; `PRAGMA integrity_check` returns `ok`; `PRAGMA foreign_key_check` returns no rows.
 4. `squid -k parse` and `nginx -t` succeed.
 5. `security-web-gateway.service`, `squid.service`, `nginx.service`, and `security-web-gateway-deploy-helper.socket` are active.

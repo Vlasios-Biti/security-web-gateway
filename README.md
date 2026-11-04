@@ -1,6 +1,6 @@
 # Security Web Gateway
 
-**Version:** 3.4.4  
+**Version:** 3.4.5  
 **Target:** single-VM, on-prem enterprise appliance  
 **Target OS:** Ubuntu Server 24.04 LTS / 26.04 LTS  
 **Architecture:** Squid explicit proxy + FastAPI management plane + Nginx TLS + SQLite/WAL policy and telemetry store + isolated background workers + restricted privileged deployment helper.
@@ -212,11 +212,11 @@ Keep the repository private unless publication is intentional.
 git add -A
 git status
 git diff --cached
-git commit -m "Security Web Gateway v3.4.4"
+git commit -m "Security Web Gateway v3.4.5"
 git push
 
-git tag -a v3.4.4 -m "Security Web Gateway v3.4.4"
-git push origin v3.4.4
+git tag -a v3.4.5 -m "Security Web Gateway v3.4.5"
+git push origin v3.4.5
 ```
 
 Never stage `.db`, `.sqlite*`, `.env`, TLS/private-key material, HAR files, logs or backups.

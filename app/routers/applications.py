@@ -1,5 +1,5 @@
 import json
-from urllib.parse import urlparse
+from urllib.parse import urlparse,quote_plus
 from fastapi import APIRouter,Request,Form,File,UploadFile
 from fastapi.responses import HTMLResponse,RedirectResponse
 from app import auth
@@ -7,6 +7,7 @@ from app.db import audit,connect
 from app.services.access_model import list_applications,get_application,create_application,update_application,set_application_status,delete_application,list_policy_groups,create_application_dependency,set_application_dependency_status
 from app.services.discovery import catalog_search,create_run,create_har_run,get_run,list_runs,approve_run
 from app.services.rules import list_networks
+from app.services.apply import save_apply_state,apply_saved_change,apply_message
 router=APIRouter(prefix="/applications")
 
 def can_manage(r):return r.state.user and r.state.user["role"] in("admin","operator")
@@ -16,6 +17,10 @@ def admin(r):return r.state.user and r.state.user["role"]=="admin"
 def can_modify_application(r,app):
     if not can_manage(r):return False
     return admin(r) if app and app.get("system_managed") else True
+
+def _apply_after_save(request,user,description,baseline_dirty):
+    result=apply_saved_change(user["username"],auth.client_ip(request),description,preexisting_dirty=baseline_dirty,role=user["role"])
+    return result,apply_message(result)
 
 @router.get("",response_class=HTMLResponse)
 def index(request:Request):
@@ -32,7 +37,11 @@ def add_submit(request:Request,name:str=Form(...),provider:str=Form(""),descript
     if not can_manage(request):return HTMLResponse("Forbidden",403)
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
     try:
-        aid=create_application(name,provider,description,seed_domain,source_kind,source_ref,bool(auto_monitor),u["username"]);update_application(aid,name,provider,description,seed_domain,source_kind,source_ref,bool(auto_monitor),network_ids,u["username"],policy_group_ids);audit(u["username"],"APPLICATION_CREATE","SUCCESS","application",aid,auth.client_ip(request));return RedirectResponse(f"/applications/{aid}?msg=Application+created.+Add+or+discover+dependencies",303)
+        baseline_dirty=save_apply_state()["dirty"]
+        aid=create_application(name,provider,description,seed_domain,source_kind,source_ref,bool(auto_monitor),u["username"]);update_application(aid,name,provider,description,seed_domain,source_kind,source_ref,bool(auto_monitor),network_ids,u["username"],policy_group_ids);audit(u["username"],"APPLICATION_CREATE","SUCCESS","application",aid,auth.client_ip(request))
+        result,msg=_apply_after_save(request,u,f"Save application {name}",baseline_dirty)
+        key="msg" if result.get("ok") else "error"
+        return RedirectResponse(f"/applications/{aid}?{key}="+quote_plus(msg),303)
     except Exception as exc:return request.app.state.templates.TemplateResponse(request=request,name="applications/form.html",context={"request":request,"page_title":"Add Application Policy","application":None,"networks":list_networks(),"groups":list_policy_groups(),"error":str(exc)},status_code=400)
 
 @router.get("/discover",response_class=HTMLResponse)
@@ -66,6 +75,7 @@ def discover_custom(request:Request,name:str=Form(...),seed_domain:str=Form(""),
     if not can_manage(request):return HTMLResponse("Forbidden",403)
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
     try:
+        baseline_dirty=save_apply_state()["dirty"]
         if method=="browser_auto" and not seed_domain.strip():
             p=urlparse(source_ref.strip())
             seed_domain=(p.hostname or "").strip().lower()
@@ -78,7 +88,7 @@ def discover_custom(request:Request,name:str=Form(...),seed_domain:str=Form(""),
                 c.commit()
             finally:c.close()
         query=seed_domain if method=="seed_probe" else (source_ref if method=="browser_auto" else name)
-        rid=create_run(aid,query,method,u["username"],source_ref=source_ref,client_ip=client_ip,window_minutes=window_minutes,auto_approve=bool(auto_approve));audit(u["username"],"DISCOVERY_START","SUCCESS","discovery_run",rid,auth.client_ip(request),json.dumps({"method":method,"automatic":bool(auto_approve)}))
+        rid=create_run(aid,query,method,u["username"],source_ref=source_ref,client_ip=client_ip,window_minutes=window_minutes,auto_approve=bool(auto_approve),auto_apply=bool(auto_approve and u["role"]=="admin"),baseline_dirty=baseline_dirty);audit(u["username"],"DISCOVERY_START","SUCCESS","discovery_run",rid,auth.client_ip(request),json.dumps({"method":method,"automatic":bool(auto_approve)}))
         if auto_approve:
             return RedirectResponse(f"/applications/{aid}?msg=Application+created.+Dependencies+are+being+discovered+automatically",303)
         return RedirectResponse(f"/applications/discovery/{rid}",303)
@@ -171,7 +181,12 @@ def edit_submit(application_id:int,request:Request,name:str=Form(...),provider:s
     if not app:return HTMLResponse("Not found",404)
     if not can_modify_application(request,app):return HTMLResponse("Forbidden",403)
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
-    try:update_application(application_id,name,provider,description,seed_domain,source_kind,source_ref,bool(auto_monitor),network_ids,u["username"],policy_group_ids);audit(u["username"],"APPLICATION_EDIT","SUCCESS","application",application_id,auth.client_ip(request));return RedirectResponse(f"/applications/{application_id}?msg=Application+updated+as+pending+change",303)
+    try:
+        baseline_dirty=save_apply_state()["dirty"]
+        update_application(application_id,name,provider,description,seed_domain,source_kind,source_ref,bool(auto_monitor),network_ids,u["username"],policy_group_ids);audit(u["username"],"APPLICATION_EDIT","SUCCESS","application",application_id,auth.client_ip(request))
+        result,msg=_apply_after_save(request,u,f"Save application {name}",baseline_dirty)
+        key="msg" if result.get("ok") else "error"
+        return RedirectResponse(f"/applications/{application_id}?{key}="+quote_plus(msg),303)
     except Exception as exc:return request.app.state.templates.TemplateResponse(request=request,name="applications/form.html",context={"request":request,"page_title":"Edit Application Policy","application":get_application(application_id),"networks":list_networks(),"groups":list_policy_groups(),"error":str(exc)},status_code=400)
 
 @router.post("/{application_id}/delete")
@@ -181,9 +196,13 @@ def delete(application_id:int,request:Request,csrf_token:str=Form(...)):
     if not can_modify_application(request,app):return HTMLResponse("Forbidden",403)
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
     try:
+        baseline_dirty=save_apply_state()["dirty"]
+        name=app["name"]
         delete_application(application_id,u["username"])
         audit(u["username"],"APPLICATION_DELETE","SUCCESS","application",application_id,auth.client_ip(request))
-        return RedirectResponse("/applications?msg=Application+removed+as+pending+change",303)
+        result,msg=_apply_after_save(request,u,f"Delete application {name}",baseline_dirty)
+        key="msg" if result.get("ok") else "error"
+        return RedirectResponse("/applications?"+key+"="+quote_plus(msg),303)
     except Exception as exc:
         return RedirectResponse(f"/applications/{application_id}?error="+str(exc).replace(" ","+"),303)
 
@@ -194,7 +213,11 @@ def status(application_id:int,request:Request,status:str=Form(...),csrf_token:st
     if not app:return HTMLResponse("Not found",404)
     if not can_modify_application(request,app):return HTMLResponse("Forbidden",403)
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
-    set_application_status(application_id,status,u["username"]);audit(u["username"],"APPLICATION_"+status.upper(),"SUCCESS","application",application_id,auth.client_ip(request));return RedirectResponse("/applications?msg=Application+state+saved+as+pending",303)
+    baseline_dirty=save_apply_state()["dirty"]
+    set_application_status(application_id,status,u["username"]);audit(u["username"],"APPLICATION_"+status.upper(),"SUCCESS","application",application_id,auth.client_ip(request))
+    result,msg=_apply_after_save(request,u,f"Set application {app['name']} {status}",baseline_dirty)
+    key="msg" if result.get("ok") else "error"
+    return RedirectResponse("/applications?"+key+"="+quote_plus(msg),303)
 
 
 @router.post("/{application_id}/dependency/add")
@@ -204,7 +227,11 @@ def dependency_add(application_id:int,request:Request,kind:str=Form(...),destina
     if not can_modify_application(request,app):return HTMLResponse("Forbidden",403)
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
     try:
-        rid=create_application_dependency(application_id,kind,destination,protocol,u["username"],reason);audit(u["username"],"APPLICATION_DEPENDENCY_ADD","SUCCESS","rule",rid,auth.client_ip(request),json.dumps({"application_id":application_id}));return RedirectResponse(f"/applications/{application_id}?msg=Dependency+added+as+pending+change",303)
+        baseline_dirty=save_apply_state()["dirty"]
+        rid=create_application_dependency(application_id,kind,destination,protocol,u["username"],reason);audit(u["username"],"APPLICATION_DEPENDENCY_ADD","SUCCESS","rule",rid,auth.client_ip(request),json.dumps({"application_id":application_id}))
+        result,msg=_apply_after_save(request,u,f"Add dependency to {app['name']}",baseline_dirty)
+        key="msg" if result.get("ok") else "error"
+        return RedirectResponse(f"/applications/{application_id}?{key}="+quote_plus(msg),303)
     except Exception as exc:return RedirectResponse(f"/applications/{application_id}?error="+str(exc).replace(" ","+"),303)
 
 @router.post("/{application_id}/dependency/{rule_id}/status")
@@ -213,7 +240,12 @@ def dependency_status(application_id:int,rule_id:int,request:Request,status:str=
     if not app:return HTMLResponse("Not found",404)
     if not can_modify_application(request,app):return HTMLResponse("Forbidden",403)
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
-    try:set_application_dependency_status(application_id,rule_id,status,u["username"]);audit(u["username"],"APPLICATION_DEPENDENCY_"+status.upper(),"SUCCESS","rule",rule_id,auth.client_ip(request));return RedirectResponse(f"/applications/{application_id}?msg=Dependency+state+saved+as+pending",303)
+    try:
+        baseline_dirty=save_apply_state()["dirty"]
+        set_application_dependency_status(application_id,rule_id,status,u["username"]);audit(u["username"],"APPLICATION_DEPENDENCY_"+status.upper(),"SUCCESS","rule",rule_id,auth.client_ip(request))
+        result,msg=_apply_after_save(request,u,f"Update dependency in {app['name']}",baseline_dirty)
+        key="msg" if result.get("ok") else "error"
+        return RedirectResponse(f"/applications/{application_id}?{key}="+quote_plus(msg),303)
     except Exception as exc:return RedirectResponse(f"/applications/{application_id}?error="+str(exc).replace(" ","+"),303)
 
 @router.post("/{application_id}/discover")
@@ -223,8 +255,9 @@ def discover_existing(application_id:int,request:Request,method:str=Form(...),so
     if not can_modify_application(request,app):return HTMLResponse("Forbidden",403)
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
     try:
+        baseline_dirty=save_apply_state()["dirty"]
         catalog_key=app["source_ref"] if method in("catalog","official_api") else None;query=app["seed_domain"] if method=="seed_probe" else (catalog_key or app["name"])
-        rid=create_run(application_id,query,method,u["username"],source_ref=source_ref or app.get("source_ref"),client_ip=client_ip,window_minutes=window_minutes,catalog_key=catalog_key,auto_approve=bool(auto_approve))
+        rid=create_run(application_id,query,method,u["username"],source_ref=source_ref or app.get("source_ref"),client_ip=client_ip,window_minutes=window_minutes,catalog_key=catalog_key,auto_approve=bool(auto_approve),auto_apply=bool(auto_approve and u["role"]=="admin"),baseline_dirty=baseline_dirty)
         if auto_approve:
             return RedirectResponse(f"/applications/{application_id}?msg=Dependency+refresh+started",303)
         return RedirectResponse(f"/applications/discovery/{rid}",303)

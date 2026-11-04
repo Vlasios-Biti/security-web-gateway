@@ -79,7 +79,11 @@
       <a href="/changes/review"><span>Pending changes</span><strong class="{{ 'warn' if pending_count else 'good' }}">{{ pending_count }}</strong><small>{{ 'Review before deploy' if pending_count else 'Configuration synchronized' }}</small></a>
       <a href="/changes/drift"><span>Config drift</span><strong class="{{ 'good' if drift.state=='clean' else 'bad' if drift.state=='drift' else 'warn' }}">{{ drift.state|capitalize }}</strong><small>Expected vs live Squid policy</small></a>
       <a href="/system/performance"><span>Host pressure</span><strong>{{ memory.percent }}% RAM</strong><small>{{ disk.percent }}% disk · load {{ load.one }}</small></a>
+      {% if request.state.user.role=='admin' %}
       <a href="/system/storage"><span>Telemetry</span><strong>{{ telemetry_health.events }}</strong><small>Indexed proxy events</small></a>
+      {% else %}
+      <a href="/traffic/explorer"><span>Telemetry</span><strong>{{ telemetry_health.events }}</strong><small>Indexed proxy events</small></a>
+      {% endif %}
     </div>
     <div class="coverage-row">
       <a href="/applications"><strong>{{ system_domain_count }}</strong><span>Apps</span></a>

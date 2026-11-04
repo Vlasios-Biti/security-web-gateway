@@ -92,3 +92,19 @@ code{color:#344054!important}.muted,.cell-sub{color:#98a2b3!important}
 .policy-explainer{background:#fff!important;border:1px solid var(--border)!important;color:#667085!important;box-shadow:var(--shadow)!important}
 .telemetry-note{background:#f8fafc!important;border-color:#dfe5ed!important;color:#667085!important}
 .diff{background:#151922!important;color:#d8dee9!important;border-radius:10px!important}
+
+/* v3.7.1 onboarding polish */
+.scope-picker .checks{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))!important;gap:8px!important}
+.scope-picker .check,.advanced-body .checks .check{
+  background:#f8fafc!important;
+  border:1px solid #dfe5ed!important;
+  color:#344054!important;
+  border-radius:10px!important;
+  padding:10px 12px!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:8px!important;
+}
+.scope-picker .check:hover,.advanced-body .checks .check:hover{background:#fff!important;border-color:#c9d2df!important}
+.scope-picker .check input,.advanced-body .checks .check input{accent-color:#5b5ce2!important;background:#fff!important;margin:0!important}
+.scope-picker .check small,.advanced-body .checks .check small{color:#98a2b3!important;margin-left:auto}

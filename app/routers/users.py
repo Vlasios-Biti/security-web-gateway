@@ -14,7 +14,7 @@ def page(request:Request):
         rows=[dict(x) for x in c.execute("SELECT id,username,role,enabled,failed_attempts,locked_until,last_login_at,created_at FROM users ORDER BY username")]
         sessions=[dict(x) for x in c.execute("""SELECT s.id,u.username,s.source_ip,s.user_agent,s.created_at,s.expires_at,s.last_seen_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.revoked_at IS NULL AND s.expires_at>? ORDER BY s.last_seen_at DESC""",(datetime.now(timezone.utc).isoformat(),))]
     finally:c.close()
-    return request.app.state.templates.TemplateResponse(request=request,name="users/list.html",context={"request":request,"page_title":"Users & Sessions","rows":rows,"sessions":sessions})
+    return request.app.state.templates.TemplateResponse(request=request,name="users/list.html",context={"request":request,"page_title":"Administrators & Sessions","rows":rows,"sessions":sessions})
 @router.get("/users/add",response_class=HTMLResponse)
 def add_page(request:Request):
     if not admin(request):return HTMLResponse("Forbidden",403)

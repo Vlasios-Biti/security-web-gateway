@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.7.0
+
+- Reworked the product around a simple application-first workflow: Add application → automatic dependency discovery → pending policy → one reviewed deployment.
+- Automatic isolated-browser discovery now stages observed public runtime dependencies without requiring per-endpoint checkbox approval in the normal workflow.
+- Advanced HAR/manual discovery remains available for authenticated or edge-case workflows.
+- Added safe Application deletion with audit/history retention and clean recreation of the same application name.
+- Fixed discovery approval collisions with legacy/system categories such as Google Maps and Google Search.
+- Added native Select All support to manual Discovery Review.
+- Consolidated change control into one Changes workspace and automatically clears metadata-only pending flags when no effective Squid policy diff exists.
+- Simplified primary navigation to Overview, Applications, Traffic, Changes and System; low-level rule/import/intelligence tools moved under Advanced.
+- Added a light neutral management workspace with a restrained dark sidebar for lower visual fatigue.
+- Added a consistent product favicon/brand mark for the browser tab, sidebar and login.
+- Added migration 014 and regression tests for application deletion/recreation and legacy category collision handling.
+- Default-deny enforcement, privileged deployment validation and rollback behavior remain unchanged.
+
 ## 3.6.1
 
 - Replaced the active self-connect proxy health probe with a passive TCP listener check so gateway health monitoring no longer creates Squid access-log artifacts.

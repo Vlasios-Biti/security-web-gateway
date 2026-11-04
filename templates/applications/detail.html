@@ -12,6 +12,12 @@
   <div><span>Last checked</span><strong>{{ application.last_discovery_at or 'Never' }}</strong></div>
 </section>
 
+{% if runs and runs[0].status=='running' %}
+<div class="flash info-box space-top"><b>Discovering dependencies…</b> SWG is checking the application in the background. This page can be refreshed safely.</div>
+{% elif runs and runs[0].status=='failed' %}
+<div class="flash danger-box space-top"><b>Automatic discovery needs attention.</b> {{ runs[0].error_text or 'Discovery failed.' }}</div>
+{% endif %}
+
 {% if can_change %}
 <section class="primary-action-card space-top">
   <div><span class="section-kicker">Automatic dependency management</span><h3>Refresh application access</h3><p>SWG will revisit the website, discover its current public dependencies and stage any new endpoints automatically.</p></div>

@@ -102,7 +102,7 @@ jobs:
           python - <<'PY'
           import sqlite3
           c=sqlite3.connect('/tmp/swg-v331.db')
-          assert c.execute('select max(version) from schema_migrations').fetchone()[0]=='014'
+          assert c.execute('select max(version) from schema_migrations').fetchone()[0]=='015'
           assert c.execute('pragma integrity_check').fetchone()[0]=='ok'
           assert not list(c.execute('pragma foreign_key_check'))
           PY

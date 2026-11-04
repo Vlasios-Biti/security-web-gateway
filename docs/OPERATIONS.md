@@ -71,4 +71,4 @@ After approval, use normal `Pending → Diff → Deploy`.
 
 ## Browser discovery
 
-Primary discovery uses isolated server-side Chromium. Authenticated/click-driven workflows use HAR evidence. Observed Squid mode remains troubleshooting-only because it can collect unrelated workstation traffic.
+Primary onboarding uses isolated server-side Chromium and automatically stages discovered public dependencies. Authenticated/click-driven workflows use HAR evidence under Advanced. Observed Squid mode remains troubleshooting-only because it can collect unrelated workstation traffic.

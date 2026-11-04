@@ -15,13 +15,36 @@ import urllib.parse
 import zipfile
 from xml.sax.saxutils import escape
 
-from app.config import SQUID_ACCESS_LOG, DATA_ROOT, DB_PATH, SQUID_LOG_DIR
+from app.config import SQUID_ACCESS_LOG, DATA_ROOT, DB_PATH, SQUID_LOG_DIR, PROXY_IP
 from app.db import connect
 
 _PTR_CACHE = {}
 _ATTR_CACHE = {"ts": 0.0, "data": None}
 _NETWORK_CACHE = {"ts": 0.0, "data": None}
 _LOCK_PATH = DATA_ROOT / "telemetry.lock"
+
+
+def _canonical_ip(value):
+    try:
+        return str(ipaddress.ip_address((value or "").strip()))
+    except Exception:
+        return (value or "").strip()
+
+
+_SYSTEM_CLIENT_IPS = tuple(sorted({
+    _canonical_ip(PROXY_IP),
+    _canonical_ip("127.0.0.1"),
+    _canonical_ip("::1"),
+} - {""}))
+
+
+def is_system_client(value):
+    return _canonical_ip(value) in _SYSTEM_CLIENT_IPS
+
+
+def _system_exclusion_sql(column="client_ip"):
+    placeholders = ",".join("?" for _ in _SYSTEM_CLIENT_IPS)
+    return f"{column} NOT IN ({placeholders})", list(_SYSTEM_CLIENT_IPS)
 
 
 def _setting(c, key, default):
@@ -258,6 +281,10 @@ def _enrich(c, record, networks=None, attrs=None):
         "matched_rule_id": None, "matched_rule_destination": "",
         "access_profile_names": "", "traffic_path": "PROXY",
     })
+    if is_system_client(record.get("client_ip")):
+        record["network_name"] = "System appliance"
+        record["access_profile_names"] = "Internal / diagnostic"
+        return record
     try:
         cip = ipaddress.ip_address(record["client_ip"])
         for n in networks:
@@ -430,6 +457,12 @@ def _range_epochs(range_key="1h", date_from=None, date_to=None):
 
 def _filter_sql(filters, alias="t"):
     clauses=[]; params=[]
+    include_system = str(filters.get("include_system", "")).strip().lower() in ("1","true","yes","on")
+    explicit_client = (filters.get("client_ip") or "").strip()
+    if not include_system and not is_system_client(explicit_client):
+        clause, values = _system_exclusion_sql(f"{alias}.client_ip")
+        clauses.append(clause)
+        params.extend(values)
     start,end=_range_epochs(filters.get("range","1h"), filters.get("date_from"), filters.get("date_to"))
     if start is not None: clauses.append(f"{alias}.epoch>=?");params.append(start)
     if end is not None: clauses.append(f"{alias}.epoch<=?");params.append(end)
@@ -470,6 +503,8 @@ def list_events(filters=None, page=1, page_size=100):
     try:
         total=c.execute("SELECT COUNT(*) c FROM telemetry_events t"+where,params).fetchone()["c"]
         rows=[dict(r) for r in c.execute("SELECT t.* FROM telemetry_events t"+where+" ORDER BY t.epoch DESC LIMIT ? OFFSET ?",params+[page_size,(page-1)*page_size])]
+        for row in rows:
+            row["is_system"] = is_system_client(row.get("client_ip"))
         pages=max(1,(total+page_size-1)//page_size)
         return {"rows":rows,"total":total,"page":page,"page_size":page_size,"pages":pages}
     finally:c.close()
@@ -510,7 +545,8 @@ def top_items(filters=None, field="destination_host", limit=10):
 
 def timeline(minutes=60,bucket_minutes=5):
     ensure_fresh();minutes=max(15,min(int(minutes),1440));bucket_minutes=max(1,min(int(bucket_minutes),60));start=time.time()-minutes*60;c=connect()
-    try: rows=[dict(r) for r in c.execute("SELECT epoch,decision,client_ip,bytes FROM telemetry_events WHERE epoch>=? ORDER BY epoch",(start,))]
+    clause, values = _system_exclusion_sql("client_ip")
+    try: rows=[dict(r) for r in c.execute("SELECT epoch,decision,client_ip,bytes FROM telemetry_events WHERE epoch>=? AND "+clause+" ORDER BY epoch",[start]+values)]
     finally:c.close()
     now=datetime.now().replace(second=0,microsecond=0);startdt=now-timedelta(minutes=minutes);buckets=defaultdict(lambda:{"allowed":0,"denied":0,"clients":set(),"bytes":0})
     for r in rows:
@@ -526,12 +562,13 @@ def timeline(minutes=60,bucket_minutes=5):
 
 def network_breakdown(minutes=1440):
     ensure_fresh();start=time.time()-max(15,min(int(minutes),43200))*60;c=connect()
+    clause, values = _system_exclusion_sql("client_ip")
     try:
         rows=c.execute("""SELECT COALESCE(network_name,'Unmapped') name,vlan_id,
           SUM(CASE WHEN decision='ALLOW' THEN 1 ELSE 0 END) allowed,
           SUM(CASE WHEN decision='DENY' THEN 1 ELSE 0 END) denied,
           COUNT(DISTINCT client_ip) clients,COALESCE(SUM(bytes),0) bytes
-          FROM telemetry_events WHERE epoch>=? GROUP BY network_id,network_name,vlan_id ORDER BY allowed+denied DESC""",(start,)).fetchall()
+          FROM telemetry_events WHERE epoch>=? AND """+clause+""" GROUP BY network_id,network_name,vlan_id ORDER BY allowed+denied DESC""",[start]+values).fetchall()
         return [dict(r) for r in rows]
     finally:c.close()
 
@@ -617,9 +654,10 @@ def refresh_dependency_candidates(max_denied=2000):
     try:
         window=max(30,min(900,int(_setting(c,"dependency_candidate_window_seconds","120"))))
         last=float(_get_state(c,"dependency_candidate_scan_epoch",str(max(0,time.time()-300))) or 0)
+        system_clause, system_values = _system_exclusion_sql("client_ip")
         denied=[dict(r) for r in c.execute("""SELECT id,epoch,event_time,client_ip,destination_host,destination_port
-            FROM telemetry_events WHERE epoch>? AND decision='DENY' AND destination_host!=''
-            ORDER BY epoch ASC LIMIT ?""",(last,max(100,min(int(max_denied),10000))))]
+            FROM telemetry_events WHERE epoch>? AND decision='DENY' AND destination_host!='' AND """+system_clause+"""
+            ORDER BY epoch ASC LIMIT ?""",[last]+system_values+[max(100,min(int(max_denied),10000))])]
         max_epoch=last
         for d in denied:
             max_epoch=max(max_epoch,float(d['epoch']))

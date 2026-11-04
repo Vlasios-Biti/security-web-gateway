@@ -1,7 +1,6 @@
 import json
 import os
 import shutil
-import socket
 import subprocess
 import time
 
@@ -60,11 +59,31 @@ def load_average():
 
 
 def port_open(host=PROXY_IP, port=PROXY_PORT):
-    try:
-        with socket.create_connection((host, port), timeout=1):
-            return True
-    except Exception:
-        return False
+    """Passively verify that a TCP listener exists without connecting to Squid.
+
+    An active self-connect pollutes Squid access.log with
+    transaction-end-before-headers events and makes the appliance appear as a
+    client. Listener state is enough here because service_status('squid') is
+    collected separately in the same health payload.
+    """
+    wanted = f"{int(port):04X}"
+    for table in ("/proc/net/tcp", "/proc/net/tcp6"):
+        try:
+            with open(table, "r", encoding="utf-8") as f:
+                next(f, None)
+                for line in f:
+                    parts = line.split()
+                    if len(parts) < 4 or parts[3] != "0A":
+                        continue
+                    local = parts[1]
+                    if ":" not in local:
+                        continue
+                    _, hex_port = local.rsplit(":", 1)
+                    if hex_port.upper() == wanted:
+                        return True
+        except OSError:
+            continue
+    return False
 
 
 def _dig(server):

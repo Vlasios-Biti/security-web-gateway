@@ -37,9 +37,15 @@
   <section class="panel quick-actions-panel">
     <header><div><h2>Quick actions</h2><p>Common administration tasks.</p></div></header>
     <div class="quick-actions">
+      {% if request.state.user.role in ('admin','operator') %}
       <a href="/changes/review"><strong>Review changes</strong><small>{{ pending_count }} pending item{{ '' if pending_count==1 else 's' }}</small><span>›</span></a>
+      {% endif %}
       <a href="/traffic/explorer"><strong>Investigate traffic</strong><small>Search clients and destinations</small><span>›</span></a>
+      {% if request.state.user.role in ('admin','operator') %}
       <a href="/applications/discover"><strong>Add an application</strong><small>Discover required dependencies</small><span>›</span></a>
+      {% else %}
+      <a href="/applications"><strong>View applications</strong><small>Review configured application policies</small><span>›</span></a>
+      {% endif %}
       <a href="/intelligence/simulator"><strong>Test a policy</strong><small>Preview an access decision</small><span>›</span></a>
     </div>
   </section>

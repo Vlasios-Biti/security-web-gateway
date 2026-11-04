@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.6.1
+
+- Replaced the active self-connect proxy health probe with a passive TCP listener check so gateway health monitoring no longer creates Squid access-log artifacts.
+- Treats the configured proxy IP plus loopback addresses as appliance system identities for telemetry analytics.
+- Excludes appliance self-traffic from client counts, dashboard KPIs, timelines, network breakdowns, top destinations/clients, exports and dependency-candidate generation by default.
+- Added an explicit `Include system traffic` Traffic Explorer option so diagnostic events remain available for troubleshooting.
+- Existing historical self-traffic is preserved but no longer pollutes normal business traffic views.
+- Added regression coverage proving system traffic is excluded by default and remains queryable on demand.
+- No policy, schema, or enforcement behavior changes from v3.6.0.
+
 ## 3.6.0
 
 - Reworked information architecture around task-oriented enterprise security workflows: Overview, Monitor, Configure, Investigate, Changes, and Platform.

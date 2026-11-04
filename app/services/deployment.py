@@ -65,6 +65,14 @@ def preview_diff():
     return "".join(difflib.unified_diff(current_live().splitlines(True),generate_config().splitlines(True),fromfile="production",tofile="candidate"))
 
 
+def _effective_policy_text(text):
+    return "\n".join(line.strip() for line in (text or "").splitlines() if line.strip() and not line.lstrip().startswith("#"))
+
+
+def effective_policy_changed():
+    return _effective_policy_text(current_live()) != _effective_policy_text(generate_config())
+
+
 def _rows(c,table):return [dict(r) for r in c.execute(f"SELECT * FROM {table} ORDER BY 1")]
 
 
@@ -145,9 +153,7 @@ def reconcile_pending_if_no_diff():
 
     Release/version comments are ignored; ACL/http_access directives are not.
     """
-    def effective(text):
-        return "\n".join(line.strip() for line in text.splitlines() if line.strip() and not line.lstrip().startswith("#"))
-    live=effective(current_live());candidate=effective(generate_config())
+    live=_effective_policy_text(current_live());candidate=_effective_policy_text(generate_config())
     if live!=candidate:
         diff="".join(difflib.unified_diff(live.splitlines(True),candidate.splitlines(True),fromfile="production-effective",tofile="candidate-effective"))
         return {"cleared":False,"reason":"effective policy diff exists","diff_lines":len(diff.splitlines())}

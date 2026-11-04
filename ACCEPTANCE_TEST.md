@@ -1,7 +1,7 @@
-# Security Web Gateway v3.7.0 Acceptance Test
+# Security Web Gateway v3.7.1 Acceptance Test
 
-1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.7.0`.
-2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.7.0`, mode `production`.
+1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.7.1`.
+2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.7.1`, mode `production`.
 3. `SELECT MAX(version) FROM schema_migrations` returns `014`; `PRAGMA integrity_check` returns `ok`; `PRAGMA foreign_key_check` returns no rows.
 4. `squid -k parse` and `nginx -t` succeed.
 5. `security-web-gateway.service`, `squid.service`, `nginx.service`, and `security-web-gateway-deploy-helper.socket` are active.
@@ -27,3 +27,6 @@
 24. Deleting an Application removes it from active policy management, preserves audit/discovery history, and allows the same application name to be recreated.
 25. Legacy category names such as Google Maps do not break discovery approval.
 26. Metadata-only pending changes are reconciled without creating a meaningless deployment.
+
+27. While an Application discovery run is active, the Application page polls activity automatically and refreshes itself when the run completes; no manual browser refresh is required.
+28. Access Profile choices in Add Application use the light-theme control styling and remain readable.

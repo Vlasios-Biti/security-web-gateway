@@ -64,3 +64,9 @@ code{color:#344054!important}.muted,.cell-sub{color:#98a2b3!important}
 @media(max-width:1100px){.application-summary-v37,.change-summary-grid{grid-template-columns:repeat(2,1fr)}.onboarding-fields{grid-template-columns:1fr}}
 @media(max-width:960px){.shell{grid-template-columns:1fr!important}.sidebar{width:250px!important}.content{padding:22px 16px 44px!important}}
 @media(max-width:680px){.application-summary-v37,.change-summary-grid{grid-template-columns:1fr}.primary-action-card{align-items:flex-start;flex-direction:column}.app-card-v37{grid-template-columns:42px 1fr}.app-actions{grid-column:1/-1;display:flex;justify-content:flex-end}.content{padding:18px 12px 38px!important}}
+
+.info-box{background:#eef4ff!important;border:1px solid #c8d7ff!important;color:#31528a!important}
+.success-box{background:#ecfdf3!important;border:1px solid #b7ebcd!important;color:#18794e!important}
+.danger-box{background:#fff1f3!important;border:1px solid #f2c1c8!important;color:#a61b2b!important}
+.candidate-banner{background:#fff7e6!important;border:1px solid #f1d59a!important;color:#8a5b00!important}
+.login-brand-logo{width:52px;height:52px;border-radius:14px;margin-bottom:38px;box-shadow:0 12px 28px rgba(0,0,0,.2)}

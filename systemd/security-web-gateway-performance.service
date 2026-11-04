@@ -9,6 +9,7 @@ Group=proxy-mgmt
 SupplementaryGroups=proxy
 WorkingDirectory=/opt/security-web-gateway/current
 EnvironmentFile=/etc/security-web-gateway/production.env
+Environment=PYTHONPATH=/opt/security-web-gateway/current
 ExecStart=/opt/security-web-gateway/venv/bin/python /opt/security-web-gateway/current/bin/collect_performance.py
 Nice=10
 CPUWeight=20

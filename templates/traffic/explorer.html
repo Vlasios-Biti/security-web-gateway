@@ -1,5 +1,5 @@
 {% extends "base.html" %}{% block content %}
-<div class="page-head"><div><h2>{{ page_title }}</h2><p>Searchable Squid telemetry with VLAN, client, destination and application attribution.</p></div><div class="head-actions"><a class="btn ghost" href="/traffic/export.csv?{{ export_query }}">Export CSV</a><a class="btn" href="/traffic/export.xlsx?{{ export_query }}">Export XLSX</a></div></div>
+<div class="page-head" {% if page_title=='Live Traffic' %}data-live-traffic-refresh="10"{% endif %}><div><h2>{{ page_title }}</h2><p>Searchable Squid telemetry with VLAN, client, destination and application attribution.{% if page_title=='Live Traffic' %} <span class="live-refresh-label">Auto-refresh 10s</span>{% endif %}</p></div><div class="head-actions"><a class="btn ghost" href="/traffic/export.csv?{{ export_query }}">Export CSV</a><a class="btn" href="/traffic/export.xlsx?{{ export_query }}">Export XLSX</a></div></div>
 <div class="telemetry-note"><b>Visibility source: Squid access.log.</b> Requests using PAC <code>DIRECT</code> bypass do not traverse Squid and are intentionally not present here. Router/IPFIX visibility belongs to the network-observability phase.</div>
 
 <div class="metrics traffic-kpis">

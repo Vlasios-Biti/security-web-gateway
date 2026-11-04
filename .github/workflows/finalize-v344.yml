@@ -1,0 +1,29 @@
+name: Finalize Security Web Gateway v3.4.4
+
+on:
+  push:
+    branches:
+      - release/v3.4.4
+
+permissions:
+  contents: write
+
+jobs:
+  finalize-release:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_SHA: 41ea5a71af68a467d13e11f3b59d350670db8372
+    steps:
+      - name: Create v3.4.4 tag and GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v3.4.4" >/dev/null 2>&1; then
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" -f ref='refs/tags/v3.4.4' -f sha="$RELEASE_SHA" >/dev/null
+          fi
+          if ! gh release view v3.4.4 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create v3.4.4 --repo "$GITHUB_REPOSITORY" --target "$RELEASE_SHA" --title 'Security Web Gateway v3.4.4' --notes 'Background worker reliability hotfix. Fixes systemd worker imports with explicit PYTHONPATH and self-bootstrap collectors; adds CI coverage. No Squid policy/schema/telemetry-model behavior changes from v3.4.3.'
+          fi
+          gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v3.4.4" --jq '.object.sha'
+          gh release view v3.4.4 --repo "$GITHUB_REPOSITORY" --json tagName,name,url,targetCommitish

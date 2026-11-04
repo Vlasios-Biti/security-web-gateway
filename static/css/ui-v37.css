@@ -70,3 +70,25 @@ code{color:#344054!important}.muted,.cell-sub{color:#98a2b3!important}
 .danger-box{background:#fff1f3!important;border:1px solid #f2c1c8!important;color:#a61b2b!important}
 .candidate-banner{background:#fff7e6!important;border:1px solid #f1d59a!important;color:#8a5b00!important}
 .login-brand-logo{width:52px;height:52px;border-radius:14px;margin-bottom:38px;box-shadow:0 12px 28px rgba(0,0,0,.2)}
+
+/* overview and remaining v3.6 surfaces */
+.command-center{background:linear-gradient(135deg,#ffffff,#f7f8ff)!important;border-color:#dfe3ef!important;box-shadow:var(--shadow)!important}
+.command-center-main{color:var(--text)!important}.command-title-row h2{color:var(--text)!important}.command-title-row p{color:var(--muted)!important}
+.command-center-side{background:#f8fafc!important;border-left-color:var(--border)!important}.side-label,.endpoint-meta{color:var(--muted)!important}.command-center-side>strong{color:#344054!important}
+.hero-service-row>span{background:#f8fafc!important;border-color:#e5e9f0!important;color:#667085!important}.hero-service-row b{color:#344054!important}
+.hero-health.healthy{background:#ecfdf3!important;border-color:#b7ebcd!important;color:#18794e!important}
+.hero-health.attention{background:#fff1f3!important;border-color:#f2c1c8!important;color:#b42335!important}
+.action-row>a{background:#fff!important;border-color:var(--border)!important;box-shadow:0 6px 18px rgba(16,24,40,.04)!important}.action-row>a:hover{background:#fafbff!important;border-color:#cbd2df!important}.action-row strong{color:#344054!important}.action-row small{color:#98a2b3!important}
+.kpi-card{background:#fff!important;border-color:var(--border)!important;box-shadow:var(--shadow)!important}.kpi-head{color:#667085!important}.kpi-card>strong{color:#18212f!important}.kpi-card>small{color:#98a2b3!important}
+.chart-empty{color:#98a2b3!important}.chart-empty strong{color:#475467!important}.chart-legend-modern{color:#667085!important}
+.posture-list a{border-color:#edf0f4!important}.posture-list a:hover{background:#fafbfc!important}.posture-list span{color:#667085!important}.posture-list strong{color:#344054!important}.posture-list small{color:#98a2b3!important}
+.coverage-row{background:#f8fafc!important;border-color:var(--border)!important}.coverage-row a+a{border-color:var(--border)!important}.coverage-row strong{color:#344054!important}.coverage-row span{color:#98a2b3!important}
+.rank-meta code{color:#344054!important}.bar-track{background:#eef1f5!important}
+.activity-item{border-color:#edf0f4!important}.activity-main strong{color:#344054!important}.activity-main small{color:#98a2b3!important}
+.dashboard-footnote{color:#98a2b3!important}.dashboard-footnote code{color:#667085!important}
+.warning-box{background:#fff8e8!important;border:1px solid #f1d79d!important;color:#805700!important}
+.integrity-grid{background:#fff!important;border:1px solid var(--border)!important;border-radius:14px!important;overflow:hidden!important;box-shadow:var(--shadow)!important}
+.integrity-grid>div{background:#fff!important;border-color:var(--border)!important}.integrity-grid span{color:#98a2b3!important}.integrity-grid b,.integrity-grid code{color:#344054!important}
+.policy-explainer{background:#fff!important;border:1px solid var(--border)!important;color:#667085!important;box-shadow:var(--shadow)!important}
+.telemetry-note{background:#f8fafc!important;border-color:#dfe5ed!important;color:#667085!important}
+.diff{background:#151922!important;color:#d8dee9!important;border-radius:10px!important}

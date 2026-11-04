@@ -3,10 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="light dark">
   <title>{{ page_title }} | Security Web Gateway</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="stylesheet" href="/static/css/app.css">
   <link rel="stylesheet" href="/static/css/ui-v36.css">
+  <link rel="stylesheet" href="/static/css/ui-v37.css">
   <script defer src="/static/js/app.js"></script>
 </head>
 <body>
@@ -14,81 +16,58 @@
   <aside class="sidebar" id="primary-navigation" aria-label="Primary navigation">
     <div class="brand">
       <a href="/" class="brand-lockup" aria-label="Security Web Gateway overview">
-        <span class="brand-icon">SWG</span>
-        <span class="brand-copy"><strong>Security Web Gateway</strong><small>Policy &amp; traffic control</small></span>
+        <img class="brand-logo" src="/static/favicon.svg" alt="">
+        <span class="brand-copy"><strong>Security Web Gateway</strong><small>Web access control</small></span>
       </a>
     </div>
 
-    <nav class="sidebar-nav">
+    <nav class="sidebar-nav simple-nav">
       <a href="/" class="nav-primary {% if request.url.path=='/' %}active{% endif %}">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h6V4H4v9Zm0 7h6v-5H4v5Zm10 0h6v-9h-6v9Zm0-16v5h6V4h-6Z"/></svg>
-        <span>Overview</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h6V4H4v9Zm0 7h6v-5H4v5Zm10 0h6v-9h-6v9Zm0-16v5h6V4h-6Z"/></svg><span>Overview</span>
+      </a>
+      <a href="/applications" class="nav-primary {% if '/applications' in request.url.path %}active{% endif %}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="7" height="7" rx="2"/><rect x="13" y="5" width="7" height="7" rx="2"/><rect x="4" y="14" width="7" height="5" rx="2"/><rect x="13" y="14" width="7" height="5" rx="2"/></svg><span>Applications</span>
       </a>
 
       <details class="nav-group" {% if '/traffic/' in request.url.path %}open{% endif %}>
-        <summary>
-          <span class="nav-summary-main"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17h2.5l3-7 4 10 3-7 2 4H21"/></svg><span>Monitor</span></span>
-          <span class="nav-chevron">›</span>
-        </summary>
+        <summary><span class="nav-summary-main"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17h2.5l3-7 4 10 3-7 2 4H21"/></svg><span>Traffic</span></span><span class="nav-chevron">›</span></summary>
         <div class="nav-children">
-          <a href="/traffic/explorer" class="{% if request.url.path=='/traffic/explorer' %}active{% endif %}">Traffic explorer</a>
           <a href="/traffic/live" class="{% if request.url.path=='/traffic/live' %}active{% endif %}">Live traffic</a>
+          <a href="/traffic/explorer" class="{% if request.url.path=='/traffic/explorer' %}active{% endif %}">Search traffic</a>
           <a href="/traffic/clients" class="{% if request.url.path.startswith('/traffic/clients') %}active{% endif %}">Clients</a>
         </div>
       </details>
 
-      <details class="nav-group" {% if '/applications' in request.url.path or '/policies/' in request.url.path or '/rules/' in request.url.path or '/bulk/' in request.url.path %}open{% endif %}>
-        <summary>
-          <span class="nav-summary-main"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h3M11 12h9M4 18h7M15 18h5"/><circle cx="16" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="13" cy="18" r="2"/></svg><span>Configure</span></span>
-          <span class="nav-chevron">›</span>
-        </summary>
-        <div class="nav-children">
-          <a href="/applications" class="{% if '/applications' in request.url.path %}active{% endif %}">Applications</a>
-          <a href="/policies/groups" class="{% if '/policies/groups' in request.url.path %}active{% endif %}">Access profiles</a>
-          <a href="/policies/networks" class="{% if '/policies/networks' in request.url.path %}active{% endif %}">Network scopes</a>
-          <a href="/rules/domains" class="{% if '/rules/domains' in request.url.path %}active{% endif %}">Domains</a>
-          <a href="/rules/ips" class="{% if '/rules/ips' in request.url.path %}active{% endif %}">IP destinations</a>
-          <a href="/bulk/import" class="{% if '/bulk/' in request.url.path %}active{% endif %}">Import / export</a>
-        </div>
-      </details>
-
-      <details class="nav-group" {% if '/intelligence/' in request.url.path or request.url.path in ['/traffic/blocked','/traffic/allowed'] %}open{% endif %}>
-        <summary>
-          <span class="nav-summary-main"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4M11 8v6M8 11h6"/></svg><span>Investigate</span></span>
-          <span class="nav-chevron">›</span>
-        </summary>
-        <div class="nav-children">
-          <a href="/traffic/blocked" class="{% if request.url.path=='/traffic/blocked' %}active{% endif %}">Blocked requests</a>
-          <a href="/intelligence/simulator" class="{% if request.url.path=='/intelligence/simulator' %}active{% endif %}">Policy simulator</a>
-          <a href="/intelligence/dependency-candidates" class="{% if request.url.path=='/intelligence/dependency-candidates' %}active{% endif %}">Dependency review</a>
-        </div>
-      </details>
-
-      <details class="nav-group" {% if '/changes/' in request.url.path %}open{% endif %}>
-        <summary>
-          <span class="nav-summary-main"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="5" r="2"/><circle cx="18" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M6 7v6a6 6 0 0 0 6 6h4M8 5h8"/></svg><span>Changes</span></span>
-          <span class="nav-chevron">›</span>
-        </summary>
-        <div class="nav-children">
-          <a href="/changes/review" class="{% if request.url.path=='/changes/review' %}active{% endif %}">Review &amp; deploy</a>
-          <a href="/changes/deployments" class="{% if '/changes/deploy' in request.url.path %}active{% endif %}">Deployment history</a>
-          <a href="/changes/drift" class="{% if request.url.path=='/changes/drift' %}active{% endif %}">Configuration drift</a>
-          <a href="/changes/audit" class="{% if request.url.path=='/changes/audit' %}active{% endif %}">Audit log</a>
-        </div>
-      </details>
+      <a href="/changes/review" class="nav-primary {% if '/changes/' in request.url.path and request.url.path!='/changes/audit' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg><span>Changes</span>
+        {% if request.state.user.role in ('admin','operator') %}<span class="nav-count" data-pending-count></span>{% endif %}
+      </a>
 
       <details class="nav-group" {% if '/system/' in request.url.path or '/security/' in request.url.path %}open{% endif %}>
-        <summary>
-          <span class="nav-summary-main"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="6" rx="2"/><rect x="4" y="14" width="16" height="6" rx="2"/><path d="M8 7h.01M8 17h.01"/></svg><span>Platform</span></span>
-          <span class="nav-chevron">›</span>
-        </summary>
+        <summary><span class="nav-summary-main"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="6" rx="2"/><rect x="4" y="14" width="16" height="6" rx="2"/></svg><span>System</span></span><span class="nav-chevron">›</span></summary>
         <div class="nav-children">
           <a href="/system/health" class="{% if request.url.path=='/system/health' %}active{% endif %}">Health</a>
           <a href="/system/performance" class="{% if request.url.path=='/system/performance' %}active{% endif %}">Performance</a>
           {% if request.state.user.role=='admin' %}
-          <a href="/system/storage" class="{% if request.url.path=='/system/storage' %}active{% endif %}">Storage &amp; telemetry</a>
           <a href="/system/backups" class="{% if request.url.path=='/system/backups' %}active{% endif %}">Backups</a>
-          <a href="/security/users" class="{% if '/security/users' in request.url.path %}active{% endif %}">Administrators</a>
+          {% endif %}
+        </div>
+      </details>
+
+      <details class="nav-group nav-advanced" {% if '/policies/' in request.url.path or '/rules/' in request.url.path or '/bulk/' in request.url.path or '/intelligence/' in request.url.path or request.url.path=='/changes/audit' or request.url.path=='/system/storage' or '/security/users' in request.url.path %}open{% endif %}>
+        <summary><span class="nav-summary-main"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18"/></svg><span>Advanced</span></span><span class="nav-chevron">›</span></summary>
+        <div class="nav-children">
+          <a href="/policies/groups">Access profiles</a>
+          <a href="/policies/networks">Network scopes</a>
+          <a href="/rules/domains">Domain rules</a>
+          <a href="/rules/ips">IP rules</a>
+          <a href="/intelligence/simulator">Policy simulator</a>
+          <a href="/intelligence/dependency-candidates">Dependency review</a>
+          <a href="/bulk/import">Import / export</a>
+          <a href="/changes/audit">Audit log</a>
+          {% if request.state.user.role=='admin' %}
+          <a href="/system/storage">Storage &amp; telemetry</a>
+          <a href="/security/users">Administrators</a>
           {% endif %}
         </div>
       </details>
@@ -97,15 +76,12 @@
     <div class="sidebar-foot">
       <div class="environment-card">
         <span class="environment-led {{ 'candidate-led' if request.app.state.mode=='candidate' else '' }}"></span>
-        <div><strong>{{ 'Candidate' if request.app.state.mode=='candidate' else 'Production' }}</strong><small>Gateway · v{{ request.app.state.version }}</small></div>
+        <div><strong>{{ 'Candidate' if request.app.state.mode=='candidate' else 'Production' }}</strong><small>v{{ request.app.state.version }}</small></div>
       </div>
       <div class="sidebar-user">
         <span class="user-avatar">{{ request.state.user.username[:1]|upper }}</span>
         <div class="user-meta"><strong>{{ request.state.user.username }}</strong><small>{{ request.state.user.role|capitalize }}</small></div>
-        <form method="post" action="/logout">
-          <input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}">
-          <button class="icon-button" title="Sign out" aria-label="Sign out">↗</button>
-        </form>
+        <form method="post" action="/logout"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><button class="icon-button" title="Sign out" aria-label="Sign out">↗</button></form>
       </div>
     </div>
   </aside>
@@ -116,29 +92,18 @@
     <header class="topbar">
       <div class="topbar-left">
         <button class="mobile-nav-button" data-nav-toggle aria-label="Open navigation" aria-controls="primary-navigation">☰</button>
-        <div class="page-heading">
-          <span class="crumb">Security Web Gateway</span>
-          <h1>{{ page_title }}</h1>
-        </div>
+        <div class="page-heading"><span class="crumb">Security Web Gateway</span><h1>{{ page_title }}</h1></div>
       </div>
-
       <div class="topbar-actions">
         <button class="command-search" type="button" data-command-open>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg>
-          <span>Search navigation</span><kbd>Ctrl K</kbd>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg><span>Search</span><kbd>Ctrl K</kbd>
         </button>
-        {% if request.app.state.mode=='candidate' %}
-          <span class="mode-pill warning">Candidate</span>
-        {% else %}
-          <span class="mode-pill healthy"><span class="status-dot"></span>Production</span>
-        {% endif %}
+        {% if request.app.state.mode=='candidate' %}<span class="mode-pill warning">Candidate</span>{% else %}<span class="mode-pill healthy"><span class="status-dot"></span>Production</span>{% endif %}
       </div>
     </header>
 
     <main class="content">
-      {% if request.app.state.mode=='candidate' %}
-      <div class="candidate-banner"><b>Candidate preview.</b> Changes are isolated and production deployment actions are disabled.</div>
-      {% endif %}
+      {% if request.app.state.mode=='candidate' %}<div class="candidate-banner"><b>Candidate preview.</b> Production deployment is disabled.</div>{% endif %}
       {% if request.query_params.get('msg') %}<div class="flash success-box">{{ request.query_params.get('msg') }}</div>{% endif %}
       {% if request.query_params.get('error') %}<div class="flash danger-box">{{ request.query_params.get('error') }}</div>{% endif %}
       {% block content %}{% endblock %}
@@ -149,11 +114,7 @@
 <div class="command-palette" data-command-palette hidden>
   <button class="command-palette-backdrop" data-command-close aria-label="Close search"></button>
   <section class="command-dialog" role="dialog" aria-modal="true" aria-label="Search navigation">
-    <div class="command-input-wrap">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg>
-      <input type="search" placeholder="Find a page…" autocomplete="off" data-command-input>
-      <kbd>Esc</kbd>
-    </div>
+    <div class="command-input-wrap"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg><input type="search" placeholder="Find a page…" autocomplete="off" data-command-input><kbd>Esc</kbd></div>
     <div class="command-results" data-command-results></div>
   </section>
 </div>

@@ -57,7 +57,7 @@ def list_applications(include_deleted=False):
 def get_application(application_id):
     c=connect()
     try:
-        r=c.execute("SELECT * FROM applications WHERE id=?",(application_id,)).fetchone()
+        r=c.execute("SELECT * FROM applications WHERE id=? AND status!='deleted'",(application_id,)).fetchone()
         if not r:return None
         d=dict(r)
         d["network_ids"]=[x["network_id"] for x in c.execute("SELECT network_id FROM application_networks WHERE application_id=?",(application_id,))]

@@ -78,7 +78,10 @@ def discover_custom(request:Request,name:str=Form(...),seed_domain:str=Form(""),
                 c.commit()
             finally:c.close()
         query=seed_domain if method=="seed_probe" else (source_ref if method=="browser_auto" else name)
-        rid=create_run(aid,query,method,u["username"],source_ref=source_ref,client_ip=client_ip,window_minutes=window_minutes,auto_approve=bool(auto_approve));audit(u["username"],"DISCOVERY_START","SUCCESS","discovery_run",rid,auth.client_ip(request),json.dumps({"method":method}));return RedirectResponse(f"/applications/discovery/{rid}",303)
+        rid=create_run(aid,query,method,u["username"],source_ref=source_ref,client_ip=client_ip,window_minutes=window_minutes,auto_approve=bool(auto_approve));audit(u["username"],"DISCOVERY_START","SUCCESS","discovery_run",rid,auth.client_ip(request),json.dumps({"method":method,"automatic":bool(auto_approve)}))
+        if auto_approve:
+            return RedirectResponse(f"/applications/{aid}?msg=Application+created.+Dependencies+are+being+discovered+automatically",303)
+        return RedirectResponse(f"/applications/discovery/{rid}",303)
     except Exception as exc:return RedirectResponse("/applications/discover?error="+str(exc).replace(" ","+"),303)
 
 @router.post("/discover/har")

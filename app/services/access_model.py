@@ -62,6 +62,10 @@ def get_application(application_id):
         d=dict(r)
         d["network_ids"]=[x["network_id"] for x in c.execute("SELECT network_id FROM application_networks WHERE application_id=?",(application_id,))]
         d["group_ids"]=[x["group_id"] for x in c.execute("SELECT group_id FROM policy_group_applications WHERE application_id=?",(application_id,))]
+        d["networks"]=[dict(x) for x in c.execute("""SELECT n.* FROM networks n JOIN application_networks an ON an.network_id=n.id
+            WHERE an.application_id=? ORDER BY COALESCE(n.vlan_id,99999),n.name""",(application_id,))]
+        d["groups"]=[dict(x) for x in c.execute("""SELECT pg.* FROM policy_groups pg JOIN policy_group_applications pga ON pga.group_id=pg.id
+            WHERE pga.application_id=? AND pg.status!='deleted' ORDER BY pg.name""",(application_id,))]
         d["dependencies"]=[dict(x) for x in c.execute("""SELECT r.*,ar.required,ar.source,ar.confidence,ar.metadata_json,ar.enabled dependency_enabled
              FROM rules r JOIN application_rules ar ON ar.rule_id=r.id WHERE ar.application_id=? AND r.status!='deleted'
              ORDER BY r.rule_type,r.destination""",(application_id,))]

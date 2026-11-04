@@ -1,0 +1,27 @@
+name: Finalize Security Web Gateway v3.6.0
+
+on:
+  push:
+    branches:
+      - release/v3.6.0
+
+permissions:
+  contents: write
+
+jobs:
+  finalize-release:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_SHA: 844e371d6cfa3be306580ba17c71a59f4bcd401e
+    steps:
+      - name: Create v3.6.0 tag and GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v3.6.0" >/dev/null 2>&1; then
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" -f ref='refs/tags/v3.6.0' -f sha="$RELEASE_SHA" >/dev/null
+          fi
+          if ! gh release view v3.6.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create v3.6.0 --repo "$GITHUB_REPOSITORY" --target "$RELEASE_SHA" --title 'Security Web Gateway v3.6.0' --notes 'Enterprise UI/UX redesign: task-oriented navigation, larger typography and stronger hierarchy, richer semantic color system, Ctrl+K navigation search, command-center Overview, contextual empty states, redesigned login and responsive navigation. No enforcement-plane behavior changes from v3.5.0.'
+          fi

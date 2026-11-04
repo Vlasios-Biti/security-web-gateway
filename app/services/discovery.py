@@ -518,6 +518,13 @@ def process_browser_queue(max_runs=1):
                             f"Automatic application dependency update for application {run.get('application_id')}",
                             preexisting_dirty=bool(run.get('baseline_dirty')),
                         )
+                        if apply_result and not apply_result.get('ok'):
+                            c=connect()
+                            try:
+                                c.execute("UPDATE discovery_runs SET error_text=? WHERE id=?",(apply_result.get('error') or 'Production apply failed; previous policy remains active.',run['id']))
+                                c.commit()
+                            finally:
+                                c.close()
                     processed.append({'id':run['id'],'status':'approved','auto_approved':len(ids),'apply':apply_result})
                 else:
                     processed.append({'id':run['id'],'status':'ready','auto_approved':0})

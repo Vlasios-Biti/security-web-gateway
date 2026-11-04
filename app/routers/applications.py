@@ -127,6 +127,28 @@ def discovery_approve(run_id:int,request:Request,candidate_ids:list[int]=Form(de
     try:r=approve_run(run_id,candidate_ids,u["username"]);audit(u["username"],"DISCOVERY_APPROVE","SUCCESS","discovery_run",run_id,auth.client_ip(request),json.dumps(r));run=get_run(run_id);return RedirectResponse(f"/applications/{run['application_id']}?msg=Discovery+approved+as+pending+change",303)
     except Exception as exc:return RedirectResponse(f"/applications/discovery/{run_id}?error="+str(exc).replace(" ","+"),303)
 
+@router.get("/{application_id}/activity")
+def application_activity(application_id:int,request:Request):
+    app=get_application(application_id)
+    if not app:return {"status":"missing"}
+    c=connect()
+    try:
+        run=c.execute("""SELECT status,error_text,started_at,completed_at
+          FROM discovery_runs WHERE application_id=? ORDER BY id DESC LIMIT 1""",(application_id,)).fetchone()
+    finally:
+        c.close()
+    active_dependencies=sum(1 for x in app.get("dependencies",[]) if x.get("dependency_enabled")==1 and x.get("status")=="active")
+    return {
+        "status": run["status"] if run else "idle",
+        "error": run["error_text"] if run else None,
+        "started_at": run["started_at"] if run else None,
+        "completed_at": run["completed_at"] if run else None,
+        "dependency_count": active_dependencies,
+        "last_discovery_at": app.get("last_discovery_at"),
+        "pending": bool(app.get("pending")),
+    }
+
+
 @router.get("/{application_id}",response_class=HTMLResponse)
 def detail(application_id:int,request:Request):
     app=get_application(application_id)

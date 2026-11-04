@@ -127,6 +127,26 @@ def set_application_status(application_id,status,actor):
     finally:c.close()
 
 
+def delete_application(application_id,actor):
+    c=connect()
+    try:
+        app=c.execute("SELECT * FROM applications WHERE id=? AND status!='deleted'",(application_id,)).fetchone()
+        if not app:raise ValueError("Application not found.")
+        groups={x["group_id"] for x in c.execute("SELECT group_id FROM policy_group_applications WHERE application_id=?",(application_id,))}
+        c.execute("BEGIN IMMEDIATE")
+        c.execute("DELETE FROM application_networks WHERE application_id=?",(application_id,))
+        c.execute("DELETE FROM policy_group_applications WHERE application_id=?",(application_id,))
+        for gid in groups:
+            c.execute("UPDATE policy_groups SET pending=1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",(actor,gid))
+        c.execute("""UPDATE applications
+          SET status='deleted',pending=1,name=?,slug=?,updated_by=?,updated_at=CURRENT_TIMESTAMP
+          WHERE id=?""",(f"{app['name']} [deleted {application_id}]",f"{app['slug']}-deleted-{application_id}",actor,application_id))
+        c.commit()
+    except Exception:
+        c.rollback();raise
+    finally:c.close()
+
+
 def attach_rule_to_application(application_id,rule_id,source="manual",confidence="high",required=True,metadata_json=None):
     c=connect()
     try:

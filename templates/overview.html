@@ -1,99 +1,136 @@
 {% extends "base.html" %}{% block content %}
-<section class="overview-hero">
-  <div>
-    <span class="section-kicker">Gateway overview</span>
-    <h2>{{ 'Everything looks healthy' if squid_status=='active' and app_status=='active' and port_ok else 'Some items need attention' }}</h2>
-    <p>Current proxy health, traffic activity and configuration changes in one place.</p>
-  </div>
-  <div class="hero-status">
-    <span class="status-dot {{ 'ok' if squid_status=='active' and port_ok else 'error' }}"></span>
-    <div>
-      <strong>{{ 'Gateway operational' if squid_status=='active' and port_ok else 'Gateway attention required' }}</strong>
-      <small>{{ proxy_ip }}:{{ proxy_port }}</small>
+<section class="command-center">
+  <div class="command-center-main">
+    <span class="eyebrow">Security posture</span>
+    <div class="command-title-row">
+      <div>
+        <h2>{{ 'Gateway is healthy' if squid_status=='active' and app_status=='active' and nginx_status=='active' and port_ok else 'Gateway needs attention' }}</h2>
+        <p>{{ 'Traffic enforcement and the management plane are operational.' if squid_status=='active' and app_status=='active' and port_ok else 'One or more gateway components require review.' }}</p>
+      </div>
+      <span class="hero-health {{ 'healthy' if squid_status=='active' and app_status=='active' and port_ok else 'attention' }}">
+        <span class="hero-health-dot"></span>{{ 'Healthy' if squid_status=='active' and app_status=='active' and port_ok else 'Attention' }}
+      </span>
+    </div>
+
+    <div class="hero-service-row">
+      <span><b>Proxy</b>{{ squid_status|capitalize }}</span>
+      <span><b>Management</b>{{ app_status|capitalize }}</span>
+      <span><b>HTTPS</b>{{ nginx_status|capitalize }}</span>
+      <span><b>DNS</b>{{ dns[0].server if dns else 'Warming up' }}</span>
     </div>
   </div>
+
+  <aside class="command-center-side">
+    <span class="side-label">Proxy endpoint</span>
+    <strong>{{ proxy_ip }}<small>:{{ proxy_port }}</small></strong>
+    <div class="endpoint-meta"><span class="status-dot ok"></span>Explicit proxy ready</div>
+  </aside>
 </section>
 
-<section class="status-strip" aria-label="Service health">
-  <div><span class="status-dot {{ 'ok' if squid_status=='active' else 'error' }}"></span><div><small>Proxy</small><strong>{{ squid_status|capitalize }}</strong></div></div>
-  <div><span class="status-dot {{ 'ok' if app_status=='active' else 'error' }}"></span><div><small>Management</small><strong>{{ app_status|capitalize }}</strong></div></div>
-  <div><span class="status-dot {{ 'ok' if nginx_status=='active' else 'error' }}"></span><div><small>HTTPS</small><strong>{{ nginx_status|capitalize }}</strong></div></div>
-  <div><span class="status-dot {{ 'ok' if dns and dns[0].ok else 'muted' }}"></span><div><small>DNS</small><strong>{{ dns[0].server if dns else 'Warming up' }}</strong></div></div>
+<section class="action-row" aria-label="Quick actions">
+  <a href="/traffic/explorer"><span class="action-icon monitor">↗</span><div><strong>Investigate traffic</strong><small>Search clients, domains and decisions</small></div></a>
+  {% if request.state.user.role in ('admin','operator') %}
+  <a href="/applications/discover"><span class="action-icon configure">＋</span><div><strong>Add application</strong><small>Discover and review dependencies</small></div></a>
+  <a href="/changes/review"><span class="action-icon changes">✓</span><div><strong>Review changes</strong><small>{{ pending_count }} pending item{{ '' if pending_count==1 else 's' }}</small></div></a>
+  {% endif %}
+  <a href="/intelligence/simulator"><span class="action-icon investigate">⌕</span><div><strong>Simulate policy</strong><small>Explain an access decision before deploy</small></div></a>
 </section>
 
-<section class="summary-grid">
-  <article class="summary-card"><span>Active clients</span><strong>{{ traffic.clients }}</strong><small>Last 60 minutes</small></article>
-  <article class="summary-card"><span>Blocked requests</span><strong class="bad">{{ traffic.denied }}</strong><small>Last 60 minutes</small></article>
-  <article class="summary-card"><span>Allowed requests</span><strong class="good">{{ traffic.allowed }}</strong><small>Last 60 minutes</small></article>
-  <article class="summary-card"><span>Transferred</span><strong>{{ "%.1f"|format((traffic.bytes or 0)/1048576) }} <em>MB</em></strong><small>Logged proxy traffic</small></article>
+<section class="kpi-grid">
+  <article class="kpi-card accent-blue">
+    <div class="kpi-head"><span>Active clients</span><span class="kpi-icon">●</span></div>
+    <strong>{{ traffic.clients }}</strong><small>Seen in the last 60 minutes</small>
+  </article>
+  <article class="kpi-card accent-red">
+    <div class="kpi-head"><span>Blocked</span><span class="kpi-icon">↓</span></div>
+    <strong>{{ traffic.denied }}</strong><small>Denied requests · 60 min</small>
+  </article>
+  <article class="kpi-card accent-green">
+    <div class="kpi-head"><span>Allowed</span><span class="kpi-icon">↑</span></div>
+    <strong>{{ traffic.allowed }}</strong><small>Allowed requests · 60 min</small>
+  </article>
+  <article class="kpi-card accent-violet">
+    <div class="kpi-head"><span>Transferred</span><span class="kpi-icon">↔</span></div>
+    <strong>{{ "%.1f"|format((traffic.bytes or 0)/1048576) }} <em>MB</em></strong><small>Logged proxy traffic · 60 min</small>
+  </article>
 </section>
 
-<div class="overview-layout">
-  <section class="panel overview-traffic">
-    <header><div><h2>Traffic activity</h2><p>Allowed and blocked requests over the last hour.</p></div><a class="link" href="/traffic/explorer">Open explorer</a></header>
-    <div class="chart-body"><canvas id="traffic-chart" height="230" aria-label="Traffic activity chart"></canvas><div class="chart-loading" id="traffic-chart-loading">Waiting for telemetry…</div></div>
-  </section>
-
-  <section class="panel quick-actions-panel">
-    <header><div><h2>Quick actions</h2><p>Common administration tasks.</p></div></header>
-    <div class="quick-actions">
-      {% if request.state.user.role in ('admin','operator') %}
-      <a href="/changes/review"><strong>Review changes</strong><small>{{ pending_count }} pending item{{ '' if pending_count==1 else 's' }}</small><span>›</span></a>
-      {% endif %}
-      <a href="/traffic/explorer"><strong>Investigate traffic</strong><small>Search clients and destinations</small><span>›</span></a>
-      {% if request.state.user.role in ('admin','operator') %}
-      <a href="/applications/discover"><strong>Add an application</strong><small>Discover required dependencies</small><span>›</span></a>
-      {% else %}
-      <a href="/applications"><strong>View applications</strong><small>Review configured application policies</small><span>›</span></a>
-      {% endif %}
-      <a href="/intelligence/simulator"><strong>Test a policy</strong><small>Preview an access decision</small><span>›</span></a>
+<section class="dashboard-primary-grid">
+  <article class="panel traffic-command-panel">
+    <header class="panel-header">
+      <div><span class="panel-kicker">Monitor</span><h3>Traffic activity</h3><p>Allowed and blocked requests over the last hour.</p></div>
+      <a class="text-link" href="/traffic/explorer">Open explorer <span>→</span></a>
+    </header>
+    <div class="chart-shell">
+      <canvas id="traffic-chart" height="300" aria-label="Traffic activity chart"></canvas>
+      <div class="chart-empty" id="traffic-chart-loading">
+        <span class="empty-orb">↗</span>
+        <strong>Waiting for proxy traffic</strong>
+        <small>Activity will appear here as clients begin using the gateway.</small>
+      </div>
     </div>
-  </section>
+    <div class="chart-legend-modern"><span><i class="allow-dot"></i>Allowed</span><span><i class="deny-dot"></i>Blocked</span><span class="chart-range">Last 60 minutes</span></div>
+  </article>
 
-  <section class="panel">
-    <header><div><h2>Traffic by network</h2><p>Requests grouped by source network.</p></div></header>
-    <div class="chart-body"><canvas id="network-chart" height="230" aria-label="Traffic by network chart"></canvas><div class="chart-loading" id="network-chart-loading">Waiting for telemetry…</div></div>
-  </section>
-
-  <section class="panel">
-    <header><div><h2>Most blocked destinations</h2><p>Destinations currently generating denied requests.</p></div><a class="link" href="/traffic/blocked">View all</a></header>
-    <div class="rank-bars">{% set mx = traffic.top_blocked[0].count if traffic.top_blocked else 1 %}{% for row in traffic.top_blocked[:6] %}<div class="rank-bar"><div class="rank-meta"><code>{{ row.name }}</code><b>{{ row.count }}</b></div><div class="bar-track"><span class="bar-fill deny-fill" style="width:{{ (row.count * 100 / mx)|round(1) }}%"></span></div></div>{% else %}<p class="empty">No blocked requests yet.</p>{% endfor %}</div>
-  </section>
-
-  <section class="panel">
-    <header><div><h2>System health</h2><p>Host and management-plane status.</p></div><a class="link" href="/system/health">View details</a></header>
-    <div class="health-list">
-      <div><span>Memory</span><strong>{{ memory.percent }}%</strong><small>{{ memory.used_mb }} / {{ memory.total_mb }} MB</small></div>
-      <div><span>Disk</span><strong>{{ disk.percent }}%</strong><small>{{ disk.free_gb }} GB free</small></div>
-      <div><span>Load average</span><strong>{{ load.one }}</strong><small>{{ load.five }} / {{ load.fifteen }}</small></div>
-      <div><span>Telemetry</span><strong>{{ telemetry_health.events }}</strong><small>indexed events</small></div>
+  <aside class="panel posture-panel">
+    <header class="panel-header"><div><span class="panel-kicker">At a glance</span><h3>Gateway posture</h3><p>Health, changes and resource pressure.</p></div></header>
+    <div class="posture-list">
+      <a href="/system/health"><span>Core services</span><strong class="good">Operational</strong><small>Proxy, manager and HTTPS</small></a>
+      <a href="/changes/review"><span>Pending changes</span><strong class="{{ 'warn' if pending_count else 'good' }}">{{ pending_count }}</strong><small>{{ 'Review before deploy' if pending_count else 'Configuration synchronized' }}</small></a>
+      <a href="/changes/drift"><span>Config drift</span><strong class="{{ 'good' if drift.state=='clean' else 'bad' if drift.state=='drift' else 'warn' }}">{{ drift.state|capitalize }}</strong><small>Expected vs live Squid policy</small></a>
+      <a href="/system/performance"><span>Host pressure</span><strong>{{ memory.percent }}% RAM</strong><small>{{ disk.percent }}% disk · load {{ load.one }}</small></a>
+      <a href="/system/storage"><span>Telemetry</span><strong>{{ telemetry_health.events }}</strong><small>Indexed proxy events</small></a>
     </div>
-  </section>
-
-  <section class="panel">
-    <header><div><h2>Policy coverage</h2><p>What is currently represented in policy.</p></div></header>
-    <div class="coverage-grid">
-      <a href="/applications"><strong>{{ system_domain_count }}</strong><span>Applications</span></a>
-      <a href="/rules/domains"><strong>{{ custom_domain_count }}</strong><span>Domains</span></a>
-      <a href="/rules/ips"><strong>{{ ip_count }}</strong><span>IP addresses</span></a>
+    <div class="coverage-row">
+      <a href="/applications"><strong>{{ system_domain_count }}</strong><span>Apps</span></a>
       <a href="/policies/networks"><strong>{{ network_count }}</strong><span>Networks</span></a>
+      <a href="/rules/domains"><strong>{{ custom_domain_count + ip_count }}</strong><span>Destinations</span></a>
     </div>
-  </section>
+  </aside>
+</section>
 
-  <section class="panel">
-    <header><div><h2>Change status</h2><p>Deployment and configuration integrity.</p></div><a class="link" href="/changes/review">Review</a></header>
-    <div class="change-list">
-      <div><span>Pending changes</span><strong class="{{ 'warn' if pending_count else 'good' }}">{{ pending_count }}</strong></div>
-      <div><span>Configuration drift</span><strong class="{{ 'good' if drift.state=='clean' else 'bad' if drift.state=='drift' else 'warn' }}">{{ drift.state|capitalize }}</strong></div>
-      <div><span>Last deployment</span><strong>{{ last_deployment.version if last_deployment else 'None yet' }}</strong><small>{{ last_deployment.deployed_at if last_deployment else 'No deployment history' }}</small></div>
+<section class="dashboard-secondary-grid">
+  <article class="panel">
+    <header class="panel-header">
+      <div><span class="panel-kicker">Investigate</span><h3>Most blocked destinations</h3><p>Top destinations currently denied by policy.</p></div>
+      <a class="text-link" href="/traffic/blocked">View blocked <span>→</span></a>
+    </header>
+    <div class="rank-bars modern-rank">{% set mx = traffic.top_blocked[0].count if traffic.top_blocked else 1 %}{% for row in traffic.top_blocked[:6] %}<div class="rank-bar"><div class="rank-meta"><code>{{ row.name }}</code><b>{{ row.count }}</b></div><div class="bar-track"><span class="bar-fill deny-fill" style="width:{{ (row.count * 100 / mx)|round(1) }}%"></span></div></div>{% else %}<div class="panel-empty"><span class="empty-orb shield">✓</span><strong>No blocked traffic yet</strong><small>Blocked destinations will appear here when policy starts denying requests.</small></div>{% endfor %}</div>
+  </article>
+
+  <article class="panel">
+    <header class="panel-header">
+      <div><span class="panel-kicker">Networks</span><h3>Traffic by network</h3><p>Requests grouped by configured source network.</p></div>
+      <a class="text-link" href="/policies/networks">Manage networks <span>→</span></a>
+    </header>
+    <div class="chart-shell compact">
+      <canvas id="network-chart" height="250" aria-label="Traffic by network chart"></canvas>
+      <div class="chart-empty" id="network-chart-loading">
+        <span class="empty-orb network">⌘</span>
+        <strong>No network activity yet</strong>
+        <small>Mapped network traffic will appear as clients use the proxy.</small>
+      </div>
     </div>
-  </section>
+  </article>
+</section>
 
-  <section class="panel audit-wide">
-    <header><div><h2>Recent administrative activity</h2><p>Latest configuration and security actions.</p></div><a class="link" href="/changes/audit">Audit log</a></header>
-    <div class="audit-mini">{% for a in audit_rows %}<div><span>{{ a.timestamp }}</span><b>{{ a.actor }}</b><code>{{ a.action }}</code><em class="{{ 'good' if a.result=='SUCCESS' else 'bad' }}">{{ a.result|capitalize }}</em></div>{% else %}<p class="empty">No administrative activity yet.</p>{% endfor %}</div>
-  </section>
-</div>
+<section class="panel activity-panel">
+  <header class="panel-header">
+    <div><span class="panel-kicker">Audit</span><h3>Recent administrative activity</h3><p>Latest configuration and security actions.</p></div>
+    <a class="text-link" href="/changes/audit">Open audit log <span>→</span></a>
+  </header>
+  <div class="activity-list">
+    {% for a in audit_rows %}
+    <div class="activity-item">
+      <span class="activity-status {{ 'success' if a.result=='SUCCESS' else 'failure' }}"></span>
+      <div class="activity-main"><strong>{{ a.action.replace('_',' ')|title }}</strong><small>{{ a.actor }} · {{ a.timestamp }}</small></div>
+      <span class="activity-result {{ 'good' if a.result=='SUCCESS' else 'bad' }}">{{ a.result|capitalize }}</span>
+    </div>
+    {% else %}
+    <div class="panel-empty compact-empty"><span class="empty-orb">≡</span><strong>No administrative activity yet</strong><small>Configuration changes and security actions will appear here.</small></div>
+    {% endfor %}
+  </div>
+</section>
 
-<div class="dashboard-footnote">Traffic metrics include requests handled by Squid. PAC <code>DIRECT</code> traffic is outside this view.</div>
+<div class="dashboard-footnote">Traffic metrics show requests handled by Squid. PAC <code>DIRECT</code> bypass traffic is not included.</div>
 {% endblock %}

@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.7.1
+
+- Application detail now polls lightweight discovery activity only while a browser discovery run is active.
+- The page automatically refreshes once discovery completes or fails, so newly discovered dependencies and final status appear without manual browser refresh.
+- Added a lightweight read-only application activity endpoint for polling; no policy mutation occurs through this endpoint.
+- Fixed Access Profile checkbox/card styling in the light theme so onboarding no longer renders a dark legacy control.
+- No schema or enforcement-policy changes from v3.7.0.
+
 ## 3.7.0
 
 - Reworked the product around a simple application-first workflow: Add application → automatic dependency discovery → pending policy → one reviewed deployment.

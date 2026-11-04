@@ -463,11 +463,11 @@ def _execute_run(c,run_id,application_id,query,method,source_ref,client_ip,windo
     c.commit()
 
 
-def create_run(application_id,query,method,actor,source_ref=None,client_ip=None,window_minutes=None,catalog_key=None):
+def create_run(application_id,query,method,actor,source_ref=None,client_ip=None,window_minutes=None,catalog_key=None,auto_approve=False):
     c=connect();run_id=None
     try:
-        cur=c.execute("""INSERT INTO discovery_runs(application_id,query,method,status,source_ref,client_ip,window_minutes,started_by)
-          VALUES(?,?,?,'running',?,?,?,?)""",(application_id,query or None,method,source_ref or None,client_ip or None,window_minutes,actor));run_id=cur.lastrowid;c.commit()
+        cur=c.execute("""INSERT INTO discovery_runs(application_id,query,method,status,source_ref,client_ip,window_minutes,started_by,auto_approve)
+          VALUES(?,?,?,'running',?,?,?,?,?)""",(application_id,query or None,method,source_ref or None,client_ip or None,window_minutes,actor,1 if auto_approve else 0));run_id=cur.lastrowid;c.commit()
         # Browser execution is deliberately deferred to the systemd worker so a
         # Chromium session can never hold an Nginx/GUI request open long enough
         # to produce a 504. The review page can be refreshed while status=running.
@@ -493,11 +493,23 @@ def process_browser_queue(max_runs=1):
               ORDER BY id ASC LIMIT 1""").fetchone()
             if not run:break
             run=dict(run)
-        finally:c.close()
+        finally:
+            if c:c.close()
         c=connect()
         try:
             _execute_run(c,run['id'],run.get('application_id'),run.get('query'),run['method'],run.get('source_ref'),run.get('client_ip'),run.get('window_minutes'))
-            processed.append({'id':run['id'],'status':'ready'})
+            auto_approve=bool(run.get('auto_approve'))
+            if auto_approve:
+                c.close();c=None
+                ready=get_run(run['id'])
+                ids=[x['id'] for x in ready.get('candidates',[])] if ready else []
+                if ids:
+                    approve_run(run['id'],ids,run.get('started_by') or 'system')
+                    processed.append({'id':run['id'],'status':'approved','auto_approved':len(ids)})
+                else:
+                    processed.append({'id':run['id'],'status':'ready','auto_approved':0})
+            else:
+                processed.append({'id':run['id'],'status':'ready'})
         except Exception as exc:
             try:
                 c.rollback();c.execute("UPDATE discovery_runs SET status='failed',error_text=?,completed_at=CURRENT_TIMESTAMP WHERE id=?",(str(exc),run['id']));c.commit()

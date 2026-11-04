@@ -13,7 +13,7 @@
 </section>
 
 {% if runs and runs[0].status=='running' %}
-<div class="flash info-box space-top"><b>Discovering dependencies…</b> SWG is checking the application in the background. This page can be refreshed safely.</div>
+<div class="flash info-box space-top" data-application-activity data-activity-url="/applications/{{ application.id }}/activity"><b>Discovering dependencies…</b> SWG is checking the application in the background. Results will appear automatically when discovery finishes.</div>
 {% elif runs and runs[0].status=='failed' %}
 <div class="flash danger-box space-top"><b>Automatic discovery needs attention.</b> {{ runs[0].error_text or 'Discovery failed.' }}</div>
 {% endif %}

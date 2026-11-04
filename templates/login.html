@@ -1,7 +1,29 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Secure Login | Security Web Gateway Manager</title><link rel="stylesheet" href="/static/css/app.css"></head>
-<body class="login-body"><div class="login-panel"><div class="login-mark">SWG</div><h1>Security Web Gateway</h1>
-<p>Restricted security management console</p>{% if error %}<div class="flash danger-box">{{ error }}</div>{% endif %}
-<form method="post" action="/login"><label>Username<input name="username" autocomplete="username" required autofocus></label>
-<label>Password<input name="password" type="password" autocomplete="current-password" required></label>
-<button class="btn primary full">Sign in securely</button></form><small>proxy.example.internal · HTTPS only</small></div></body></html>
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark"><title>Sign in | Security Web Gateway</title>
+<link rel="stylesheet" href="/static/css/app.css"><link rel="stylesheet" href="/static/css/ui-v36.css"></head>
+<body class="login-body">
+  <div class="login-shell">
+    <section class="login-brand-panel">
+      <div class="login-brand-mark">SWG</div>
+      <span class="eyebrow">Security Web Gateway</span>
+      <h1>Control web access with confidence.</h1>
+      <p>Policy enforcement, traffic visibility and change control from a single management plane.</p>
+      <div class="login-feature-list">
+        <span><i></i>Default-deny policy model</span>
+        <span><i></i>Searchable proxy telemetry</span>
+        <span><i></i>Audited change workflow</span>
+      </div>
+    </section>
+    <section class="login-panel">
+      <div class="login-heading"><span>Administrator access</span><h2>Sign in</h2><p>Use your Security Web Gateway administrator account.</p></div>
+      {% if error %}<div class="flash danger-box">{{ error }}</div>{% endif %}
+      <form method="post" action="/login">
+        <label>Username<input name="username" autocomplete="username" required autofocus placeholder="admin"></label>
+        <label>Password<input name="password" type="password" autocomplete="current-password" required placeholder="••••••••••••••"></label>
+        <button class="btn primary full">Sign in to console</button>
+      </form>
+      <small class="login-security-note">Restricted management interface · HTTPS only</small>
+    </section>
+  </div>
+</body></html>

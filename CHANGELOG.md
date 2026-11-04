@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.6.0
+
+- Reworked information architecture around task-oriented enterprise security workflows: Overview, Monitor, Configure, Investigate, Changes, and Platform.
+- Added a global navigation command palette with Ctrl+K search.
+- Increased typography, spacing, contrast, and visual hierarchy across the management console.
+- Introduced a richer restrained enterprise palette using indigo/cyan for navigation and monitoring, green for healthy state, amber for change state, and red only for deny/error.
+- Rebuilt the Overview as a command-center style dashboard with a single primary traffic visualization, gateway posture, quick actions, compact KPIs, network activity, blocked destinations, and recent audit activity.
+- Empty analytics no longer render meaningless flat charts; they show contextual next-step states.
+- Simplified permanent navigation by removing secondary traffic views such as Allowed Requests from the sidebar while preserving their routes.
+- Added a redesigned administrator login experience and responsive navigation/search behavior.
+- No Squid policy, schema, telemetry model, or enforcement behavior changes from v3.5.0.
+
 ## 3.5.0
 
 - Redesigned the management console navigation around five human-readable task groups instead of exposing every route at once.

@@ -32,6 +32,14 @@ jobs:
               env.parse(p.read_text(encoding='utf-8'))
               print('TEMPLATE OK',p)
           PY
+      - name: v3.6 UI contract
+        run: |
+          grep -q 'ui-v36.css' templates/base.html
+          grep -q 'ui-v36.css' templates/login.html
+          grep -q 'data-command-open' templates/base.html
+          grep -q 'command-center' templates/overview.html
+          grep -q 'Search navigation' templates/base.html
+          test -s static/css/ui-v36.css
       - name: Application version matches VERSION
         run: |
           python - <<'PY'

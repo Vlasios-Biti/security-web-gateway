@@ -24,6 +24,7 @@
   <label>Method<select name="method"><option value="">All methods</option>{% for m in ['CONNECT','GET','POST','PUT','HEAD','OPTIONS','DELETE','PATCH'] %}<option value="{{ m }}" {% if filters.method==m %}selected{% endif %}>{{ m }}</option>{% endfor %}</select></label>
   <label>Port<input name="port" value="{{ filters.port }}" placeholder="443" inputmode="numeric"></label>
   <label>Free search<input name="q" value="{{ filters.q }}" placeholder="IP, domain, app, result..."></label>
+  <label class="check system-traffic-filter"><input type="checkbox" name="include_system" value="1" {% if filters.include_system %}checked{% endif %}> Include system traffic</label>
   <input type="hidden" name="page_size" value="{{ result.page_size }}">
   <div class="filter-actions"><button class="btn" type="submit">Apply filters</button><a class="btn ghost" href="{{ request.url.path }}">Clear</a></div>
 </form></section>
@@ -37,9 +38,9 @@
 <div class="table-wrap traffic-table-wrap"><table class="table traffic-table"><thead><tr><th>TIME</th><th>CLIENT</th><th>NETWORK / VLAN</th><th>ACTION</th><th>APPLICATION / PROFILE</th><th>METHOD</th><th>DESTINATION</th><th>DEST IP</th><th>PORT</th><th>RESULT</th><th>BYTES</th><th>DURATION</th><th>UPSTREAM</th><th>EXPLAIN</th></tr></thead><tbody>
 {% for l in result.rows %}<tr>
 <td class="muted nowrap">{{ l.event_time }}</td>
-<td><a class="table-link" href="/traffic/clients/{{ l.client_ip }}"><code class="strong">{{ l.client_ip }}</code></a></td>
-<td><b>{{ l.network_name or 'Unmapped' }}</b><small class="cell-sub">{% if l.vlan_id %}VLAN {{ l.vlan_id }}{% else %}No VLAN metadata{% endif %}</small></td>
-<td><span class="badge {% if l.decision=='ALLOW' %}ok{% elif l.decision=='DENY' %}danger{% else %}system{% endif %}">{{ l.decision }}</span><small class="cell-sub">{{ l.traffic_path }}</small></td>
+<td><a class="table-link" href="/traffic/clients/{{ l.client_ip }}"><code class="strong">{{ l.client_ip }}</code></a>{% if l.is_system %}<small class="cell-sub">Gateway appliance</small>{% endif %}</td>
+<td><b>{{ 'System appliance' if l.is_system else (l.network_name or 'Unmapped') }}</b><small class="cell-sub">{% if l.is_system %}Internal / diagnostic{% elif l.vlan_id %}VLAN {{ l.vlan_id }}{% else %}No VLAN metadata{% endif %}</small></td>
+<td><span class="badge {% if l.decision=='ALLOW' %}ok{% elif l.decision=='DENY' %}danger{% else %}system{% endif %}">{{ l.decision }}</span><small class="cell-sub">{{ 'SYSTEM' if l.is_system else l.traffic_path }}</small></td>
 <td>{% if l.application_names %}<b>{{ l.application_names }}</b>{% else %}<span class="muted">Unattributed</span>{% endif %}<small class="cell-sub">{{ l.access_profile_names or '—' }}</small></td>
 <td>{{ l.method }}</td>
 <td><code>{{ l.destination_host or l.destination }}</code><small class="cell-sub">{{ l.matched_rule_destination or 'No matched policy object' }}</small></td>

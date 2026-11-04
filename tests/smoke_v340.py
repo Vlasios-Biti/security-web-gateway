@@ -23,10 +23,13 @@ def main():
 
         from app.db import connect
         from app.services.policy_explain import explain_policy
+        from app.services import system as system_service
         from app.services.traffic import cleanup_telemetry,refresh_dependency_candidates,refresh_dashboard_cache,dashboard_payload,traffic_summary,list_events,is_system_client
 
         empty_cleanup=cleanup_telemetry()
         assert empty_cleanup['events_before']==0 and empty_cleanup['events_after']==0,empty_cleanup
+        import inspect
+        assert "create_connection" not in inspect.getsource(system_service.port_open)
 
         c=connect()
         try:

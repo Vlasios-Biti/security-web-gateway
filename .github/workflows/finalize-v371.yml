@@ -1,0 +1,27 @@
+name: Finalize Security Web Gateway v3.7.1
+
+on:
+  push:
+    branches:
+      - release/v3.7.1
+
+permissions:
+  contents: write
+
+jobs:
+  finalize-release:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_SHA: 5a70807387636fc74989370a1089b58cb5bcc154
+    steps:
+      - name: Create v3.7.1 tag and GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v3.7.1" >/dev/null 2>&1; then
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" -f ref='refs/tags/v3.7.1' -f sha="$RELEASE_SHA" >/dev/null
+          fi
+          if ! gh release view v3.7.1 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create v3.7.1 --repo "$GITHUB_REPOSITORY" --target "$RELEASE_SHA" --title 'Security Web Gateway v3.7.1' --notes 'UI activity hotfix: Application pages now poll discovery status automatically and refresh when discovery finishes or fails; Access Profile controls in Add Application now match the light theme. No schema or enforcement-policy changes from v3.7.0.'
+          fi

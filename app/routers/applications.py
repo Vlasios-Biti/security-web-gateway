@@ -11,6 +11,7 @@ from app.services.apply import save_apply_state,apply_saved_change,apply_message
 from app.services.system import cached_system_health
 from app.services.learning import latest_session, start_session, stop_session
 from app.services.tab_capture import create_capture_run, extension_package, MAX_CAPTURE_BYTES
+from app.config import DISCOVERY_MAX_HAR_BYTES
 router=APIRouter(prefix="/applications")
 
 def can_manage(r):return r.state.user and r.state.user["role"] in("admin","operator")
@@ -159,10 +160,11 @@ def discovery_approve(run_id:int,request:Request,candidate_ids:list[int]=Form(de
     if app and not can_modify_application(request,app):return HTMLResponse("Forbidden",403)
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
     try:
+        baseline_dirty=save_apply_state()['dirty'] or bool(run.get('baseline_dirty'))
         r=approve_run(run_id,candidate_ids,u["username"])
         audit(u["username"],"DISCOVERY_APPROVE","SUCCESS","discovery_run",run_id,auth.client_ip(request),json.dumps(r))
         run=get_run(run_id)
-        result,msg=_apply_after_save(request,u,f"Approve discovered dependencies for application {run['application_id']}",bool(run.get("baseline_dirty")))
+        result,msg=_apply_after_save(request,u,f"Approve discovered dependencies for application {run['application_id']}",baseline_dirty)
         key="msg" if result.get("ok") else "error"
         return RedirectResponse(f"/applications/{run['application_id']}?{key}="+quote_plus(msg),303)
     except Exception as exc:return RedirectResponse(f"/applications/discovery/{run_id}?error="+str(exc).replace(" ","+"),303)
@@ -208,6 +210,23 @@ async def upload_capture(application_id:int,request:Request,capture_file:UploadF
         raw=await capture_file.read(MAX_CAPTURE_BYTES+1)
         rid=create_capture_run(application_id,raw,user['username'],baseline_dirty=save_apply_state()['dirty'])
         audit(user['username'],'TAB_CAPTURE_IMPORT','REVIEW_REQUIRED','discovery_run',rid,auth.client_ip(request))
+        return RedirectResponse(f'/applications/discovery/{rid}',303)
+    except ValueError as exc:
+        return RedirectResponse(f'/applications/{application_id}?error='+quote_plus(str(exc)),303)
+
+
+@router.post('/{application_id}/capture/har')
+async def upload_application_har(application_id:int,request:Request,har_file:UploadFile=File(...),csrf_token:str=Form(...)):
+    user=request.state.user
+    app=get_application(application_id)
+    if not app:return HTMLResponse('Not found',404)
+    if not can_modify_application(request,app):return HTMLResponse('Forbidden',403)
+    if not auth.check_csrf(user,csrf_token):return HTMLResponse('Invalid request',403)
+    try:
+        if not app.get('seed_domain'):raise ValueError('Set the application seed domain before importing its HAR.')
+        raw=await har_file.read(DISCOVERY_MAX_HAR_BYTES+1)
+        rid=create_har_run(application_id,app['seed_domain'],raw,user['username'],auto_apply=False,baseline_dirty=save_apply_state()['dirty'])
+        audit(user['username'],'APPLICATION_HAR_IMPORT','REVIEW_REQUIRED','discovery_run',rid,auth.client_ip(request))
         return RedirectResponse(f'/applications/discovery/{rid}',303)
     except ValueError as exc:
         return RedirectResponse(f'/applications/{application_id}?error='+quote_plus(str(exc)),303)

@@ -59,7 +59,7 @@ Sizing should ultimately follow concurrent CONNECT sessions, requests/sec, WAN t
 
 - Refined desktop/mobile interface with clearer typography, quieter cards and fewer duplicate navigation entries.
 - **Connection** manages fail-open, direct domain/IP/CIDR bypasses and a configured Windows package with installation instructions.
-- **Applications → Capture the actual workflow** provides an optional selected-tab Chrome/Edge recorder with review-only import for authenticated/button-driven dependencies. IP-based automatic grants are disabled.
+- **Applications → Capture the actual workflow** provides an optional selected-tab Chrome/Edge recorder and a side-by-side HAR import for authenticated/button-driven dependencies. Both imports require review. IP-based automatic grants are disabled.
 - **Connection → Optional PC services** adds scoped, opt-in Windows Update, Defender security updates and connectivity checks.
 - Browser auto-approval honours candidate selection and excludes ignored analytics/background requests.
 - Schema migration `016` retains earlier session history. Legacy active IP-learning sessions are stopped; existing PAC is preserved during upgrade.

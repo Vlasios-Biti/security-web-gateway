@@ -36,11 +36,11 @@ The optional **SWG Selected Tab Capture** extension uses Chromium's webRequest t
 2. Sign in and exercise the relevant buttons in that same tab. Attempted requests triggered by those interactions are recorded, including requests that fail.
 3. Stop and export the JSON. Upload it using **Import & review domains** in that application.
 4. Review candidates and approve intended changes through the existing role-aware Save & Apply workflow. Import alone never publishes policy.
-5. Retry workflows blocked at an earlier dependency; subsequent domains may only become visible after that dependency is allowed. Capture again if needed. HAR import remains an alternative without an extension.
+5. Retry workflows blocked at an earlier dependency; subsequent domains may only become visible after that dependency is allowed. Capture again if needed. HAR import remains an alternative without an extension. Both controls appear side by side on the existing application detail page.
 
 Other tabs, native Windows services and requests with no tab ID are excluded. New popup windows/tabs need a separate capture. Some background/service-worker requests have no attributable tab. Subframes and embedded third-party resources are included; tab association does not prove every endpoint is essential. Navigating that tab to another website records its activity until Stop. This build excludes IP literals and non-standard ports.
 
-No cookies, headers, request/response bodies, full URLs or query strings are retained. Data stays in browser session storage until exported. Clear removes it; browser closure clears session storage. Capture stops after ten minutes, tab close or 500 destinations. The importer requires a matching seed, bounds input to 1 MiB/500 destinations and stores normalized host/protocol/count/type evidence only. The file is untrusted evidence, not cryptographic proof of provenance. No TLS interception or endpoint agent is introduced.
+No cookies, headers, request/response bodies, full URLs or query strings are retained. Data stays in browser session storage until exported. Clear removes it; browser closure clears session storage. Capture stops after ten minutes, tab close or 500 destinations. The importer requires a matching seed, bounds input to 1 MiB/500 destinations and stores normalized host/protocol/count/type evidence only. Both imported formats are untrusted evidence, not cryptographic proof of provenance. HAR imports retain only host/protocol/method/count evidence, not paths, queries, headers or bodies; upload middleware may use temporary spooling while processing the file. No TLS interception or endpoint agent is introduced.
 
 Chrome reference: https://developer.chrome.com/docs/extensions/reference/api/webRequest
 

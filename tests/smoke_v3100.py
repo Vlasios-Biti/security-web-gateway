@@ -275,6 +275,42 @@ class Workflows(unittest.TestCase):
         create_application('Ordinary app','Test','','example.com','manual','pc-service:windows-update',False,'operator')
         self.assertFalse(any(item['enabled'] for item in service_profiles()))
 
+    def test_both_capture_methods_are_available_and_import_for_review(self):
+        from starlette.testclient import TestClient
+        from starlette.requests import Request
+        from app.main import app
+        from app.auth import create_session
+        from app.config import SESSION_COOKIE
+        from app.services.discovery import get_run
+        aid=self._app()
+        c=self.connect();uid=c.execute("SELECT id FROM users WHERE username='admin'").fetchone()['id'];c.close()
+        token=create_session(uid,Request({'type':'http','headers':[],'client':('127.0.0.1',1)}))
+        c=self.connect();csrf=c.execute('SELECT csrf_token FROM sessions ORDER BY id DESC LIMIT 1').fetchone()['csrf_token'];c.close()
+        tab={'format':'swg-tab-capture-v1','scope':'selected-tab','seed_host':'portal.example.com','destinations':[{'host':'api.vendor.example','protocol':'HTTPS','request_count':1,'resource_types':['xhr']}]}
+        har={'log':{'entries':[{'request':{'url':'https://api.vendor.example/private-secret?token=private-secret','method':'POST','headers':[{'name':'Authorization','value':'private-secret'}],'postData':{'text':'private-secret'}},'response':{'content':{'text':'private-secret'}}}]}}
+        with TestClient(app,base_url='https://localhost') as client:
+            client.cookies.set(SESSION_COOKIE,token)
+            page=client.get(f'/applications/{aid}')
+            self.assertIn('Option 1',page.text);self.assertIn('Option 2',page.text)
+            with patch('app.routers.applications._apply_after_save') as apply:
+                for suffix,field,payload in [('capture','capture_file',tab),('capture/har','har_file',har)]:
+                    response=client.post(f'/applications/{aid}/{suffix}',data={'csrf_token':csrf},files={field:('capture.json',json.dumps(payload),'application/json')},follow_redirects=False)
+                    self.assertEqual(response.status_code,303)
+                    self.assertIn('/applications/discovery/',response.headers['location'])
+                    rid=int(response.headers['location'].rsplit('/',1)[1]);run=get_run(rid)
+                    self.assertEqual(run['status'],'ready');self.assertEqual(run['auto_apply'],0)
+                    self.assertNotIn('private-secret',json.dumps(run))
+                apply.assert_not_called()
+            # Work queued since import must not be published by this approval.
+            selected=[x['id'] for x in run['candidates'] if x['selected']]
+            with patch('app.routers.applications.save_apply_state',return_value={'dirty':True}),patch('app.services.deployment.helper_request') as publish:
+                response=client.post(f'/applications/discovery/{rid}/approve',data={'csrf_token':csrf,'candidate_ids':selected},follow_redirects=False)
+                self.assertEqual(response.status_code,303)
+                publish.assert_not_called()
+            c=self.connect()
+            try:self.assertTrue(c.execute("SELECT 1 FROM audit_events WHERE action='SAVE_APPLY' AND result='BLOCKED_EXISTING_PENDING'").fetchone())
+            finally:c.close()
+
 
 if __name__ == '__main__':
     with tempfile.TemporaryDirectory(prefix='swg-v3100-') as td:

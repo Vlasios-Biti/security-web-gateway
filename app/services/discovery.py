@@ -416,15 +416,16 @@ def discover_har(raw_bytes,seed_domain=None):
         except Exception:continue
         if not host:continue
         scheme=urlparse(url).scheme.lower();proto="HTTPS" if scheme in ("https","wss") else "HTTP"
+        try:
+            if urlparse(url).port not in (None,443 if proto=='HTTPS' else 80):continue
+        except ValueError:continue
         key=("domain",host,proto)
         z=seen.setdefault(key,{"endpoint_type":"domain","destination":host,"protocol":proto,"required":False,"source":"har-session",
-            "confidence":"medium","selected":False,"metadata":{"hits":0,"methods":[],"sample_urls":[]}})
+            "confidence":"medium","selected":False,"metadata":{"hits":0,"methods":[]}})
         z["metadata"]["hits"]+=1
         method=str(req.get("method") or "GET").upper()
+        if method not in ('GET','HEAD','POST','PUT','PATCH','DELETE','OPTIONS','CONNECT','TRACE'):method='OTHER'
         if method not in z["metadata"]["methods"]:z["metadata"]["methods"].append(method)
-        if len(z["metadata"]["sample_urls"])<3:
-            clean=url.split("?",1)[0][:512]
-            if clean not in z["metadata"]["sample_urls"]:z["metadata"]["sample_urls"].append(clean)
     items=[]
     for z in seen.values():
         cls,rec=_classify_endpoint(z["destination"],None,seed)

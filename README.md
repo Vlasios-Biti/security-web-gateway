@@ -55,13 +55,14 @@ Sizing should ultimately follow concurrent CONNECT sessions, requests/sec, WAN t
 - Browser discovery rejects private/reserved targets and DNS-rebinding/SSRF-style pivots.
 - PAC supports explicit DIRECT bypasses plus fail-open `PROXY ...; DIRECT` behavior.
 
-## v3.10.0 — simpler console, connection policy and learning
+## v3.10.0 — simpler console, connection policy and workflow capture
 
 - Refined desktop/mobile interface with clearer typography, quieter cards and fewer duplicate navigation entries.
 - **Connection** manages fail-open, direct domain/IP/CIDR bypasses and a configured Windows package with installation instructions.
-- **Applications → Learn during use** provides explicit 10-minute, single-device dependency learning for authenticated workflows, with bounded correlation and batched Save & Apply.
+- **Applications → Capture the actual workflow** provides an optional selected-tab Chrome/Edge recorder with review-only import for authenticated/button-driven dependencies. IP-based automatic grants are disabled.
+- **Connection → Optional PC services** adds scoped, opt-in Windows Update, Defender security updates and connectivity checks.
 - Browser auto-approval honours candidate selection and excludes ignored analytics/background requests.
-- Schema migration `016` stores learning sessions and destination provenance. Existing PAC is preserved during upgrade.
+- Schema migration `016` retains earlier session history. Legacy active IP-learning sessions are stopped; existing PAC is preserved during upgrade.
 
 Read [Connection and application learning](docs/CONNECTION_AND_LEARNING.md) for workflow, limits and production verification.
 

@@ -6,7 +6,8 @@
 - Added Administrator-only Connection settings for fail-open, local routing and exact/wildcard domain plus IPv4/CIDR DIRECT bypasses.
 - Added structured, validated, atomic static PAC publishing with backup through the restricted helper. Fresh installs omit legacy customer-specific bypass IPs; upgrades preserve existing PAC.
 - Added gateway-configured Windows source/controller packages with setup instructions and an optional GUI build helper.
-- Added explicit 10-minute, single-device application learning with recent-application correlation, public destination validation, a 50-destination cap, audit provenance and one validated apply per batch.
+- Replaced IP-based automatic grants with an optional selected-tab Chrome/Edge recorder and privacy-preserving, review-only import. Legacy active sessions are stopped without changing policy.
+- Added optional Windows Update, Defender security updates and connectivity-check presets, scoped to Access Profiles with source guidance and shared-rule safeguards.
 - Browser auto-approval now honours selected/ignored candidates; classified analytics are excluded.
 - Added schema migration 016, regression tests and deployment acceptance checks. Policy rollback and cross-host restore stop learning; cross-host restore retains target PAC settings.
 

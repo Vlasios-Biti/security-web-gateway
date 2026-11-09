@@ -18,4 +18,17 @@
     <details class="settings-card setup-guide"><summary>How fallback works</summary><p>DIRECT fallback applies when the proxy cannot be reached. Client timeout and PAC caching affect recovery time. Applications with their own proxy settings need separate configuration. Router rules must permit direct access for fallback and bypasses to work.</p></details>
   </aside>
 </section>
+<section class="pc-services-section space-top" id="pc-services">
+  <div class="page-head"><div><span class="section-kicker">Optional PC services</span><h2>Let the essentials through</h2><p>Enable only what your devices need, for selected Access Profiles. These are proxy ALLOW policies, separate from DIRECT bypasses.</p></div></div>
+  <div class="pc-services-grid">{% for service in pc_services %}
+    <form class="settings-card" method="post" action="/connection/services/{{ service.key }}">
+      <input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}">
+      <label class="setting-switch"><span><strong>{{ service.name }}</strong><small>{{ service.description }}</small></span><input type="checkbox" name="enabled" value="true" {% if service.enabled %}checked{% endif %}><span class="switch-track" aria-hidden="true"></span></label>
+      <span class="label">Access Profiles</span><div class="checks">{% for group in groups if group.status=='active' %}<label class="check"><input type="checkbox" name="policy_group_ids" value="{{ group.id }}" {% if group.id in service.group_ids %}checked{% endif %}>{{ group.name }}</label>{% else %}<p class="field-help">Create an Access Profile before enabling this service.</p>{% endfor %}</div>
+      <p class="field-help">{{ service.note }}</p>
+      <details class="setup-guide"><summary>{{ service.endpoints|length }} endpoint patterns · Microsoft guidance</summary><ul>{% for host,protocol in service.endpoints %}<li><code>{{ host }}</code> · {{ protocol }}</li>{% endfor %}</ul><a class="text-link" href="{{ service.source }}" target="_blank" rel="noopener noreferrer">Official source ↗</a><p class="field-help">Reviewed {{ service.reviewed }}. Endpoint requirements can vary by Windows version and management configuration.</p></details>
+      <div class="settings-save"><span>{{ 'Pending apply' if service.pending else ('Enabled in desired policy' if service.enabled else 'Off by default') }}</span><button class="btn ghost">Save service</button></div>
+    </form>
+  {% endfor %}</div>
+</section>
 {% endblock %}

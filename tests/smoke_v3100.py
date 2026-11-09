@@ -115,6 +115,7 @@ class Workflows(unittest.TestCase):
                 self.assertEqual(client.get('/connection').status_code, expected)
                 self.assertEqual(client.get('/connection/windows.zip').status_code, expected)
                 self.assertEqual(client.post('/connection', data={'csrf_token': 'wrong'}).status_code, 403)
+                self.assertEqual(client.post('/connection/services/windows-update',data={'csrf_token':'wrong','enabled':'true'}).status_code,403)
             response = client.get('/connection')
             self.assertIn('One policy. Every device.', response.text)
             self.assertNotIn('Search traffic</a>', response.text)
@@ -138,82 +139,6 @@ class Workflows(unittest.TestCase):
             c.commit()
         finally:
             c.close()
-
-    def test_learning_is_scoped_and_stops(self):
-        from app.services.learning import start_session, process_learning_sessions, latest_session, stop_session
-        aid = self._app()
-        with patch('app.services.apply.save_apply_state', return_value={'dirty': False}):
-            sid = start_session(aid, '10.20.0.10', 'admin')
-            with self.assertRaises(ValueError):
-                start_session(aid, '10.20.0.10', 'admin')
-            with self.assertRaises(ValueError):
-                start_session(aid, '10.20.0.11', 'operator')
-        now = time.time()
-        self._event(now, 'portal.example.com', 'ALLOW', str(aid))
-        self._event(now + .001, 'api.vendor.example')
-        self._event(now + .002, 'www.google-analytics.com')
-        self._event(now + .003, 'other-device.example', client='10.20.0.99')
-        self._event(now + .004, 'private.example')
-        def public(host, port):
-            if host == 'private.example':
-                raise ValueError('private')
-            return ['93.184.215.14']
-        time.sleep(.01)
-        with patch('app.services.apply.save_apply_state', return_value={'dirty': False}), patch('app.services.apply.apply_saved_change', return_value={'ok': True, 'applied': True}), patch('app.services.discovery._public_addresses', side_effect=public):
-            result = process_learning_sessions()
-            self.assertEqual(result, [{'session': sid, 'learned': 1}])
-            self.assertEqual(process_learning_sessions(), [{'session': sid, 'learned': 0}])
-        self.assertEqual(latest_session(aid)['learned_count'], 1)
-        stop_session(aid, 'admin')
-        self.assertEqual(latest_session(aid)['status'], 'stopped')
-        self.assertEqual(process_learning_sessions(), [])
-
-    def test_learning_refuses_pending_and_expired(self):
-        from app.services.learning import start_session, process_learning_sessions, latest_session
-        aid = self._app()
-        with patch('app.services.apply.save_apply_state', return_value={'dirty': True}):
-            with self.assertRaisesRegex(ValueError, 'pending'):
-                start_session(aid, '10.20.0.10', 'admin')
-        with patch('app.services.apply.save_apply_state', return_value={'dirty': False}):
-            sid = start_session(aid, '10.20.0.10', 'admin')
-        with patch('app.services.apply.save_apply_state', return_value={'dirty': True}):
-            process_learning_sessions()
-        self.assertEqual(latest_session(aid)['status'], 'failed')
-        c = self.connect()
-        c.execute("UPDATE application_learning_sessions SET status='active',expires_epoch=? WHERE id=?", (time.time()-1, sid))
-        c.commit()
-        c.close()
-        self.assertEqual(process_learning_sessions(), [])
-        self.assertEqual(latest_session(aid)['status'], 'completed')
-
-    def test_learning_batches_through_real_save_apply(self):
-        from app.services.learning import start_session, process_learning_sessions
-        from app.services.deployment import generate_config, CANDIDATE_ROOT, LIVE_MANAGED_CONF
-        from app.services.apply import save_apply_state
-        aid = self._app()
-        c = self.connect()
-        c.execute('INSERT INTO application_networks(application_id,network_id) VALUES(?,1)', (aid,))
-        c.commit()
-        c.close()
-        LIVE_MANAGED_CONF.write_text(generate_config())
-        sid = start_session(aid, '10.20.0.10', 'admin')
-        now = time.time()
-        self._event(now, 'portal.example.com', 'ALLOW', str(aid))
-        self._event(now+.001, 'api.vendor.example')
-        self._event(now+.002, 'assets.vendor.example')
-        time.sleep(.01)
-        def helper(action, **payload):
-            self.assertEqual(action, 'deploy')
-            content = (CANDIDATE_ROOT/payload['candidate_id']/'security-web-gateway.conf').read_text()
-            LIVE_MANAGED_CONF.write_text(content)
-            return {'ok': True, 'message': 'Test transport applied candidate'}
-        with patch('app.services.discovery._public_addresses', return_value=['93.184.215.14']), patch('app.services.deployment.helper_request', side_effect=helper) as transport:
-            result = process_learning_sessions()
-        self.assertEqual(result, [{'session':sid, 'learned':2}])
-        self.assertEqual(transport.call_count, 1)
-        self.assertFalse(save_apply_state()['dirty'])
-        self.assertIn('api.vendor.example', LIVE_MANAGED_CONF.read_text())
-        self.assertIn('assets.vendor.example', LIVE_MANAGED_CONF.read_text())
 
     def test_browser_auto_approval_respects_selection(self):
         import app.services.discovery as discovery
@@ -244,8 +169,10 @@ class Workflows(unittest.TestCase):
             c = self.connect()
             baseline = c.execute('SELECT MAX(id) FROM deployments').fetchone()[0]
             c.close()
-            with patch('app.services.apply.save_apply_state', return_value={'dirty': False}):
-                sid = start_session(aid, '10.20.0.10', 'admin')
+            c = self.connect()
+            sid = c.execute("INSERT INTO application_learning_sessions(application_id,client_ip,started_by,started_epoch,expires_epoch) VALUES(?,'10.20.0.10','admin',?,?)", (aid,time.time(),time.time()+600)).lastrowid
+            c.commit()
+            c.close()
             rid = create_application_dependency(aid, 'domain', 'new.vendor.example', 'HTTPS', 'admin')
             c = self.connect()
             c.execute('INSERT INTO application_learning_destinations VALUES(?,?,?,?,?)', (sid,'new.vendor.example','HTTPS',123,rid))
@@ -259,6 +186,94 @@ class Workflows(unittest.TestCase):
             self.assertFalse(list(c.execute('PRAGMA foreign_key_check')))
         finally:
             c.close()
+
+    def test_ip_correlation_can_never_publish(self):
+        from app.services.learning import start_session, process_learning_sessions
+        aid=self._app()
+        with self.assertRaisesRegex(ValueError,'disabled'):
+            start_session(aid,'10.20.0.10','admin')
+        c=self.connect()
+        c.execute("INSERT INTO application_learning_sessions(application_id,client_ip,started_by,started_epoch,expires_epoch) VALUES(?,'10.20.0.10','admin',?,?)",(aid,time.time(),time.time()+600))
+        c.commit();c.close()
+        self._event(time.time(),'portal.example.com','ALLOW',str(aid))
+        self._event(time.time(),'unrelated-pc-traffic.example')
+        with patch('app.services.apply.apply_saved_change') as publish,patch('app.services.access_model.create_application_dependency') as add:
+            result=process_learning_sessions()
+            self.assertEqual(result[0]['status'],'stopped')
+            publish.assert_not_called();add.assert_not_called()
+
+    def test_tab_capture_is_review_only_and_discards_secrets(self):
+        from app.services.tab_capture import create_capture_run,parse_capture
+        from app.services.discovery import get_run
+        aid=self._app()
+        payload={'format':'swg-tab-capture-v1','scope':'selected-tab','seed_host':'portal.example.com','cookies':'private-secret',
+            'destinations':[{'host':'api.vendor.example','protocol':'HTTPS','request_count':3,'resource_types':['xhr'],'url':'https://api.vendor.example/path?token=private-secret'},
+            {'host':'google-analytics.com','protocol':'HTTPS','request_count':1,'resource_types':['script']}]}
+        raw=json.dumps(payload).encode()
+        with patch('app.services.apply.apply_saved_change') as publish:
+            rid=create_capture_run(aid,raw,'admin')
+            publish.assert_not_called()
+        run=get_run(rid)
+        self.assertEqual(run['status'],'ready')
+        self.assertEqual(run['auto_apply'],0)
+        self.assertNotIn('private-secret',json.dumps(run))
+        self.assertEqual([x['destination'] for x in run['candidates'] if x['selected']],['api.vendor.example'])
+        with self.assertRaisesRegex(ValueError,'another domain'):
+            parse_capture(raw,'different.example.com')
+        with self.assertRaises(ValueError):
+            parse_capture(json.dumps({**payload,'seed_host':42}).encode(),'portal.example.com')
+
+    def test_pc_services_are_optional_scoped_and_share_rules_safely(self):
+        from app.services.pc_services import save_service,service_profiles
+        from app.services.deployment import generate_config
+        self.assertFalse(any(x['enabled'] for x in service_profiles()))
+        c=self.connect()
+        gid=c.execute("INSERT INTO policy_groups(name,status,created_by) VALUES('Update PCs','active','admin')").lastrowid
+        c.execute('INSERT INTO policy_group_networks(group_id,network_id) VALUES(?,1)',(gid,));c.commit();c.close()
+        with self.assertRaises(ValueError):save_service('windows-update',True,[],'admin')
+        with self.assertRaises(ValueError):save_service('windows-update',True,[gid],'operator')
+        update_id=save_service('windows-update',True,[gid],'admin')
+        defender_id=save_service('defender-updates',True,[gid],'admin')
+        self.assertNotIn('dstdomain .microsoft.com\n',generate_config())
+        self.assertIn('.windowsupdate.com',generate_config())
+        save_service('windows-update',False,[gid],'admin')
+        self.assertIn('.windowsupdate.com',generate_config())
+        c=self.connect()
+        try:
+            self.assertEqual(c.execute("SELECT COUNT(*) FROM rules WHERE destination='*.windowsupdate.com' AND status='active'").fetchone()[0],1)
+            self.assertEqual(c.execute('SELECT status FROM applications WHERE id=?',(update_id,)).fetchone()[0],'disabled')
+            self.assertEqual(c.execute('SELECT status FROM applications WHERE id=?',(defender_id,)).fetchone()[0],'active')
+        finally:c.close()
+        save_service('defender-updates',False,[gid],'admin')
+        self.assertNotIn('.windowsupdate.com',generate_config())
+
+    def test_service_protocol_conflict_is_transactional(self):
+        from app.services.pc_services import save_service
+        from app.services.access_model import create_application_dependency
+        aid=self._app()
+        create_application_dependency(aid,'domain','*.windowsupdate.com','HTTPS','admin')
+        c=self.connect()
+        gid=c.execute("INSERT INTO policy_groups(name,status,created_by) VALUES('Conflict test','active','admin')").lastrowid
+        c.commit();c.close()
+        with self.assertRaisesRegex(ValueError,'conflict'):
+            save_service('windows-update',True,[gid],'admin')
+        c=self.connect()
+        try:
+            self.assertFalse(c.execute("SELECT id FROM applications WHERE source_ref='pc-service:windows-update'").fetchone())
+            self.assertEqual(c.execute("SELECT protocol FROM rules WHERE destination='*.windowsupdate.com'").fetchone()[0],'HTTPS')
+        finally:c.close()
+
+    def test_selected_tab_recorder_contract(self):
+        import shutil
+        node=shutil.which('node')
+        if not node:self.skipTest('Node is required for the selected-tab contract')
+        subprocess.run([node,str(ROOT/'tests/tab_capture_contract.cjs')],check=True)
+
+    def test_custom_source_reference_cannot_impersonate_pc_service(self):
+        from app.services.access_model import create_application
+        from app.services.pc_services import service_profiles
+        create_application('Ordinary app','Test','','example.com','manual','pc-service:windows-update',False,'operator')
+        self.assertFalse(any(item['enabled'] for item in service_profiles()))
 
 
 if __name__ == '__main__':

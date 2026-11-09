@@ -94,7 +94,7 @@ Availability is part of the security model. Resource starvation of the proxy can
 
 ## Telemetry boundary
 
-Administrator-started application learning is an explicit, bounded exception to review-only passive correlation. A session is limited to one source IPv4, ten minutes and fifty new public destinations; it requires recent traffic attributed to the selected application alone. Known analytics are excluded. Learning uses the normal Save & Apply path and stops on pending work, errors, revoked privileges or inactive applications. Attribution is probabilistic: administrators must use a dedicated test device and review learned domains. Ordinary passive dependency candidates remain review-only. See `docs/CONNECTION_AND_LEARNING.md`.
+IP-based automatic learning is disabled. Correlation candidates are review-only; legacy active sessions are stopped without applying policy. The optional selected-tab recorder uses Chromium tab IDs to exclude unrelated tabs/native PC traffic, retains hostname-level evidence locally and imports it for explicit review. Captures are untrusted evidence; embedded third-party resources may be unnecessary. Import alone never publishes ALLOW rules. Optional PC service profiles require Administrator access and selected Access Profiles and share atomic destination rules without globally disabling them when a service is turned off. See `docs/CONNECTION_AND_LEARNING.md`.
 
 Connection policy publishing accepts structured domain/IP/CIDR and boolean settings only. The privileged helper revalidates input and renders a fixed PAC program from root-owned release code; callers cannot supply arbitrary PAC JavaScript, shell commands or paths. Static PAC remains available through Nginx independently of the management process.
 

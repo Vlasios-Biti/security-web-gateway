@@ -152,22 +152,6 @@ function setupApplicationActivityPoll(){
  window.setTimeout(poll,1200);
 }
 
-function setupLearningPoll(){
- const el=document.querySelector('[data-learning-session]');if(!el)return;
- const poll=async()=>{
-  if(document.hidden){setTimeout(poll,5000);return}
-  try{
-   const r=await fetch(el.dataset.learningUrl,{credentials:'same-origin',headers:{Accept:'application/json'}});
-   if(r.status===401||r.status===403){location.reload();return}
-   if(!r.ok)throw new Error('Learning status unavailable');
-   const data=await r.json(),session=data.learning;
-   if(!session||session.status!=='active'||session.expires_epoch*1000<=Date.now()){location.reload();return}
-   const count=el.querySelector('[data-learned-count]');if(count)count.textContent=session.learned_count;
-  }catch(e){el.setAttribute('title','Status temporarily unavailable. Retrying…')}
-  setTimeout(poll,5000);
- };setTimeout(poll,3000);
-}
-
 document.addEventListener("DOMContentLoaded",()=>{
  document.querySelectorAll("[data-confirm]").forEach(el=>el.addEventListener("submit",e=>{if(!confirm(el.dataset.confirm))e.preventDefault()}));
  document.querySelectorAll("[data-filter-table]").forEach(i=>{const t=document.getElementById(i.dataset.filterTable);if(!t)return;i.addEventListener("input",()=>{const q=i.value.toLowerCase().trim();t.querySelectorAll("tbody tr").forEach(r=>r.style.display=r.textContent.toLowerCase().includes(q)?"":"none")})});
@@ -179,6 +163,6 @@ document.addEventListener("DOMContentLoaded",()=>{
    master.addEventListener("change",()=>{boxes.forEach(x=>x.checked=master.checked);sync()});
    boxes.forEach(x=>x.addEventListener("change",sync));sync();
  });
- setupNavigation();setupCommandPalette();setupCardFilters();setupLiveTrafficRefresh();setupApplicationActivityPoll();setupLearningPoll();refreshCharts();drawSystemPerformance();if(document.getElementById("traffic-chart"))setInterval(refreshCharts,15000);
+ setupNavigation();setupCommandPalette();setupCardFilters();setupLiveTrafficRefresh();setupApplicationActivityPoll();refreshCharts();drawSystemPerformance();if(document.getElementById("traffic-chart"))setInterval(refreshCharts,15000);
 });
 window.addEventListener("resize",()=>{clearTimeout(window.__pmResize);window.__pmResize=setTimeout(()=>{refreshCharts();drawSystemPerformance()},160)});

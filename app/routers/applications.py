@@ -1,7 +1,7 @@
 import json
 from urllib.parse import urlparse,quote_plus
 from fastapi import APIRouter,Request,Form,File,UploadFile
-from fastapi.responses import HTMLResponse,RedirectResponse
+from fastapi.responses import HTMLResponse,RedirectResponse,Response
 from app import auth
 from app.db import audit,connect
 from app.services.access_model import list_applications,get_application,create_application,update_application,set_application_status,delete_application,list_policy_groups,create_application_dependency,set_application_dependency_status
@@ -10,6 +10,7 @@ from app.services.rules import list_networks
 from app.services.apply import save_apply_state,apply_saved_change,apply_message
 from app.services.system import cached_system_health
 from app.services.learning import latest_session, start_session, stop_session
+from app.services.tab_capture import create_capture_run, extension_package, MAX_CAPTURE_BYTES
 router=APIRouter(prefix="/applications")
 
 def can_manage(r):return r.state.user and r.state.user["role"] in("admin","operator")
@@ -188,6 +189,28 @@ def application_activity(application_id:int,request:Request):
         "last_discovery_at": app.get("last_discovery_at"),
         "pending": bool(app.get("pending")),
     }
+
+
+@router.get('/capture/extension.zip')
+def capture_extension(request:Request):
+    if not can_manage(request):return HTMLResponse('Forbidden',403)
+    return Response(extension_package(),media_type='application/zip',headers={'Content-Disposition':'attachment; filename="SWG-Tab-Capture.zip"'})
+
+
+@router.post('/{application_id}/capture')
+async def upload_capture(application_id:int,request:Request,capture_file:UploadFile=File(...),csrf_token:str=Form(...)):
+    user=request.state.user
+    app=get_application(application_id)
+    if not app:return HTMLResponse('Not found',404)
+    if not can_modify_application(request,app):return HTMLResponse('Forbidden',403)
+    if not auth.check_csrf(user,csrf_token):return HTMLResponse('Invalid request',403)
+    try:
+        raw=await capture_file.read(MAX_CAPTURE_BYTES+1)
+        rid=create_capture_run(application_id,raw,user['username'],baseline_dirty=save_apply_state()['dirty'])
+        audit(user['username'],'TAB_CAPTURE_IMPORT','REVIEW_REQUIRED','discovery_run',rid,auth.client_ip(request))
+        return RedirectResponse(f'/applications/discovery/{rid}',303)
+    except ValueError as exc:
+        return RedirectResponse(f'/applications/{application_id}?error='+quote_plus(str(exc)),303)
 
 
 @router.get("/{application_id}",response_class=HTMLResponse)

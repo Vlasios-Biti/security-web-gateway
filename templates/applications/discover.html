@@ -1,5 +1,5 @@
 {% extends "base.html" %}{% block content %}
-<div class="page-head simple-page-head"><div><span class="section-kicker">Applications</span><h2>Add application</h2><p>Give SWG the website. It will discover runtime dependencies automatically, validate the policy and apply it when discovery completes.</p></div><a class="btn ghost" href="/applications">Cancel</a></div>
+<div class="page-head simple-page-head"><div><span class="section-kicker">Applications</span><h2>Add application</h2><p>Give SWG the website to discover its public-page dependencies. Use selected-tab capture or HAR for actions behind login.</p></div><a class="btn ghost" href="/applications">Cancel</a></div>
 
 <section class="onboarding-card">
 <form method="post" action="/applications/discover/custom">
@@ -12,7 +12,7 @@
 
   <div class="onboarding-copy">
     <div class="onboarding-step">1</div>
-    <div><h3>What do you want to allow?</h3><p>SWG opens the site in an isolated browser, discovers public runtime dependencies and applies the validated policy automatically for Admin-initiated changes.</p></div>
+    <div><h3>What do you want to allow?</h3><p>SWG opens the site in an isolated browser, discovers public-page runtime dependencies and applies the validated policy automatically for Admin-initiated changes.</p></div>
   </div>
 
   <div class="onboarding-fields">

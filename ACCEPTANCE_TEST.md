@@ -49,7 +49,9 @@
 42. Save & publish atomically replaces the static PAC and backs it up. Invalid input/failing publication does not overwrite stored settings. Test exact domain, wildcard boundary, IP and CIDR routing on Windows.
 43. Unreachable proxy falls back DIRECT when enabled; disabled fallback returns only PROXY. A policy-denied request remains denied. Measure actual client recovery time and confirm router/firewall permits intended fallback.
 44. Windows ZIP contains the target gateway's PAC address, installation guide, controller and optional GUI build helper. On a test PC, verify admin install, standard-user restrictions, PAC refresh, Stop/Start and initial-settings restore on uninstall.
-45. On a dedicated device, start an application learning session, log in and exercise the workflow. Confirm only selected-source correlated requests are learned, analytics/private destinations are excluded, and one batch uses one validated Squid apply.
-46. Confirm learning stops on manual Stop, expiry, the destination limit, failed apply, inactive application, revoked administrator and pending policy changes. Review attribution of learned domains.
+45. Load the optional recorder in a test Chrome/Edge profile. Start on the application seed domain, sign in and click actions in the same tab. Confirm a button-triggered destination is captured and traffic from another tab/PC service is excluded.
+46. Confirm recorder Stop, expiry, tab close and destination limit. Verify exports contain no URL paths/queries, headers, credentials or bodies. Import must create review candidates only; IP-based sessions must never grant access.
 47. Restore policy state to another VM: sessions are revoked, active learning is stopped, and target-host connection settings/PAC are preserved.
 48. Desktop and mobile navigation remain usable and Connection/Application pages do not overflow the viewport.
+49. PC services are off by default, Administrator-only and scoped to chosen Access Profiles. Test Windows Update/Defender in SYSTEM context with appropriate WinHTTP/BITS/DO configuration. Turning off one profile must not disable shared endpoints used elsewhere.
+50. Verify new-tab/pop-up and service-worker limitations on real business applications. Review candidates before applying; tab attribution does not prove endpoint necessity.

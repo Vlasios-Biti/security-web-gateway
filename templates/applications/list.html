@@ -1,6 +1,6 @@
 {% extends "base.html" %}{% block content %}
 <div class="ops-page-head">
-  <div><span class="ops-kicker">Access management</span><h2>Managed applications</h2><p>Add a service, discover its dependencies and learn more as you use it.</p></div>
+  <div><span class="ops-kicker">Access management</span><h2>Managed applications</h2><p>Discover public-page dependencies, then capture the actual browser workflow when needed.</p></div>
   {% if request.state.user.role in ['admin','operator'] %}<a class="btn primary" href="/applications/discover">+ Add application</a>{% endif %}
 </div>
 

@@ -1,5 +1,6 @@
 {% extends "base.html" %}{% block content %}
 {% set can_change = request.state.user.role == 'admin' or (request.state.user.role == 'operator' and not application.system_managed) %}
+{% set pc_service = application.source_ref and application.source_ref.startswith('pc-service:') %}
 <div class="page-head simple-page-head">
   <div><span class="section-kicker">Application</span><h2>{{ application.name }}</h2><p>{{ application.description or 'Managed web application' }}</p></div>
   <div class="head-actions">{% if can_change %}<a class="btn ghost" href="/applications/{{ application.id }}/edit">Edit</a>{% endif %}<a class="btn ghost" href="/applications">Back</a></div>
@@ -22,7 +23,9 @@
 <div class="flash warning-box space-top"><b>Approval required.</b> This change is saved but is not yet active in production.</div>
 {% endif %}
 
-{% if can_change %}
+{% if pc_service %}
+<section class="primary-action-card space-top"><div><span class="section-kicker">Optional PC service</span><h3>Managed in Connection</h3><p>Enable, disable and scope this curated service profile from the central connection settings.</p></div><a class="btn primary" href="/connection#pc-services">Open service settings</a></section>
+{% elif can_change %}
 <section class="primary-action-card space-top">
   <div><span class="section-kicker">Automatic dependency management</span><h3>Refresh application access</h3><p>SWG will revisit the website, discover current public dependencies, validate the resulting policy and apply it automatically.</p></div>
   {% if application.source_ref and application.source_ref.startswith('https://') or application.seed_domain %}
@@ -41,17 +44,12 @@
 </section>
 {% endif %}
 
-{% if request.state.user.role=='admin' %}
-<section class="settings-card learning-card space-top">
-  <div class="settings-heading"><span class="step-mark">↗</span><div><span class="section-kicker">Learn during use</span><h3>Find dependencies behind the login</h3><p>Use the application on one selected device. SWG finds correlated blocked domains and applies new dependencies during a 10-minute session.</p></div></div>
-  {% if learning and learning.status=='active' %}
-  <div class="learning-live" data-learning-session="{{ learning.id }}" data-learning-url="/applications/{{ application.id }}/activity"><span class="status-dot"></span><strong>Learning from {{ learning.client_ip }}</strong><span><b data-learned-count>{{ learning.learned_count }}</b> destinations learned</span></div>
-  <form method="post" action="/applications/{{ application.id }}/learning"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><input type="hidden" name="action" value="stop"><button class="btn ghost">Stop learning</button></form>
-  {% else %}
-  <form class="learning-start" method="post" action="/applications/{{ application.id }}/learning"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><input type="hidden" name="action" value="start"><label>Device IP<input name="client_ip" required placeholder="192.168.1.25" inputmode="decimal"></label><button class="btn primary">Start 10-minute learning</button></form>
-  {% if learning %}<p class="field-help">Last session: {{ learning.status }} · {{ learning.learned_count }} learned.{% if learning.error_text %} {{ learning.error_text }}{% endif %}</p>{% endif %}
-  {% endif %}
-  <details class="learning-guidance"><summary>Before you start</summary><p>First finish automatic discovery and apply the application to an access profile. On the selected device, close other tabs and background applications, then open this application and exercise its normal workflow. Reload a failed action after the worker adds its dependency. Learning uses recent traffic attributed to this application alone, excludes known analytics and private destinations, and stops after 10 minutes or 50 new destinations. Correlation can include unrelated traffic from the same device; use a dedicated test device. Stops on pending policy changes. Requests hidden inside an existing HTTPS tunnel cannot be identified by Squid; an authenticated HAR import remains available under Add application → Advanced.</p></details>
+{% if can_change and not pc_service %}
+<section class="settings-card space-top">
+  <div class="settings-heading"><span class="step-mark">↗</span><div><span class="section-kicker">Capture the actual workflow</span><h3>Find domains used after a click</h3><p>Record this application's browser tab while signing in and using its features. Review the captured destinations before allowing them.</p></div></div>
+  <div class="capture-actions"><a class="btn ghost" href="/applications/capture/extension.zip">Download Chrome / Edge recorder</a><span class="field-help">Optional local extension · selected tab only</span></div>
+  <form class="capture-import" method="post" action="/applications/{{ application.id }}/capture" enctype="multipart/form-data"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><label>Exported tab capture<input name="capture_file" type="file" accept=".json,application/json" required></label><button class="btn primary">Import &amp; review domains</button></form>
+  <details class="learning-guidance"><summary>How to capture</summary><ol><li>Extract the recorder and load its folder using Load unpacked in Chrome/Edge Extensions (Developer mode), subject to your organisation's policy.</li><li>Open this application's seed domain, start capture, then sign in and exercise its buttons in that same tab.</li><li>Stop and export the JSON. Upload it here, review the candidates and approve the intended dependencies. Retry blocked actions and capture again if they reveal more domains.</li></ol><p>The recorder excludes other tabs, native PC services and requests with no tab ID. New popup windows require a separate capture. Selected-tab traffic can still include analytics and embedded content; it is evidence, not proof that every domain is required. IP-based correlation never automatically grants access. HAR import remains available under Add application → Advanced.</p></details>
 </section>
 {% endif %}
 
@@ -75,7 +73,7 @@
     </section>
     <section class="advanced-section">
       <h3>Discovery history</h3>
-      <table class="table"><thead><tr><th>Started</th><th>Method</th><th>Status</th><th></th></tr></thead><tbody>{% for r in runs %}<tr><td>{{ r.started_at }}</td><td>{{ r.method|replace('_',' ')|title }}</td><td>{{ r.status|upper }}</td><td><a class="text-link" href="/applications/discovery/{{ r.id }}">Details</a></td></tr>{% else %}<tr><td colspan="4" class="empty">No history.</td></tr>{% endfor %}</tbody></table>
+      <table class="table"><thead><tr><th>Started</th><th>Method</th><th>Status</th><th></th></tr></thead><tbody>{% for r in runs %}<tr><td>{{ r.started_at }}</td><td>{{ 'Selected tab' if r.source_ref=='browser-selected-tab' else r.method|replace('_',' ')|title }}</td><td>{{ r.status|upper }}</td><td><a class="text-link" href="/applications/discovery/{{ r.id }}">Details</a></td></tr>{% else %}<tr><td colspan="4" class="empty">No history.</td></tr>{% endfor %}</tbody></table>
     </section>
   </div>
 </details>

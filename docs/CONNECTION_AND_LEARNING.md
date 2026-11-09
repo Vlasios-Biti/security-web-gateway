@@ -24,22 +24,44 @@ For a GUI installer, run the included `Build-For-This-Gateway.ps1` on Windows an
 
 Adding an application opens its public website in the isolated server browser. Requests observed while loading and traversing public pages provide first-party, API, authentication, CDN and other dependency evidence. Automatic approval now respects the selected candidates and excludes classified analytics/background endpoints. It does not grant ignored endpoints just because they were captured.
 
-A server browser cannot observe all requests behind a real user's login or guarantee discovery of every application workflow. Its discovery must finish and the application must be assigned to an access profile/network before learning can help a client.
+A server browser cannot observe all requests behind a real user's login or guarantee discovery of every application workflow. Use workflow capture for those interactions and assign the intended application access to a profile/network.
 
-## Learn during use
+## Capture the actual browser workflow
 
-1. Open the application in the console, enter the test device's source IPv4 address and start **10-minute learning** as an Administrator.
-2. On that device, close unrelated tabs and applications. Open the selected application and exercise the authenticated workflow.
-3. The discovery timer consumes that client's blocked requests. A candidate requires an allowed request attributed to this application alone within the previous 60 seconds. Known analytics and non-public destinations are excluded.
-4. The worker links new domains to this application, marks the evidence `live-learning` with medium confidence and performs one Save & Apply per batch. Retry a blocked action after the next worker cycle. Newly allowed requests can reveal further dependencies.
-5. Stop learning when finished. The session also ends after 10 minutes or at its 50-destination guardrail. Learned dependencies remain visible in the application and can be removed there. Pending policy changes, failed apply, inactive applications and revoked administrator access stop automatic learning.
+IP address and timing correlation do not prove which application initiated a request. IP-based automatic learning is disabled, including the legacy Start endpoint. The background worker stops active sessions left by earlier review builds without adding rules or applying policy. Ordinary correlated telemetry candidates remain suggestions for manual review.
 
-Only one session can be active per source IP. The worker processes at most ten active sessions and a bounded event batch each cycle. Sessions, learned destinations, source events and audit records retain provenance. A source IP shared by multiple users/NAT is not a suitable learning device identity.
+The optional **SWG Selected Tab Capture** extension uses Chromium's webRequest tab ID to retain destination hosts from the explicitly selected tab. Download it from the application detail page. Extract it and Load unpacked in Chrome/Edge Extensions, subject to your organisation's developer/extension policy. This source build is not a signed store distribution.
 
-Correlation is evidence, not a guarantee of application ownership. Unrelated traffic from the same test device can enter a learning session; use an isolated test device and review the resulting dependencies. Ordinary traffic outside an explicit learning session remains review-only. HTTPS CONNECT exposes destination hostnames, not URLs or encrypted application content; already-open multiplexed tunnels may hide later requests. HAR import remains available for workflows not observable through proxy telemetry. No TLS interception or user credentials are introduced by this feature.
+1. Open the application's seed domain and start capture from the extension popup.
+2. Sign in and exercise the relevant buttons in that same tab. Attempted requests triggered by those interactions are recorded, including requests that fail.
+3. Stop and export the JSON. Upload it using **Import & review domains** in that application.
+4. Review candidates and approve intended changes through the existing role-aware Save & Apply workflow. Import alone never publishes policy.
+5. Retry workflows blocked at an earlier dependency; subsequent domains may only become visible after that dependency is allowed. Capture again if needed. HAR import remains an alternative without an extension.
+
+Other tabs, native Windows services and requests with no tab ID are excluded. New popup windows/tabs need a separate capture. Some background/service-worker requests have no attributable tab. Subframes and embedded third-party resources are included; tab association does not prove every endpoint is essential. Navigating that tab to another website records its activity until Stop. This build excludes IP literals and non-standard ports.
+
+No cookies, headers, request/response bodies, full URLs or query strings are retained. Data stays in browser session storage until exported. Clear removes it; browser closure clears session storage. Capture stops after ten minutes, tab close or 500 destinations. The importer requires a matching seed, bounds input to 1 MiB/500 destinations and stores normalized host/protocol/count/type evidence only. The file is untrusted evidence, not cryptographic proof of provenance. No TLS interception or endpoint agent is introduced.
+
+Chrome reference: https://developer.chrome.com/docs/extensions/reference/api/webRequest
+
+## Optional PC services
+
+**Connection → Optional PC services** provides opt-in Windows Update, Defender security updates and Windows connectivity-check profiles. Each requires selected active Access Profiles; none is enabled by default. Saves use policy validation and Save & Apply. A pending/failed apply means desired settings are not yet effective.
+
+Profiles share atomic rules. Disabling one does not disable endpoints still needed by another active profile or manually allowed elsewhere. These are proxy ALLOW rules, separate from DIRECT bypasses, and not deny overrides. No profile grants all of *.microsoft.com. Some permitted update hosts also distribute Microsoft Store or other Microsoft downloads; hostname policy cannot distinguish URL paths or the process requesting them.
+
+Presets are reviewed starting sets, not exhaustive/self-updating Microsoft feeds. Requirements vary by Windows version, WSUS/Intune/Configuration Manager and update source. Source guidance and endpoint patterns are visible in each card (reviewed 2026-11-09). The Defender preset covers update downloads, not all Defender cloud protection or sample uploads.
+
+Windows services may use WinHTTP, BITS and Delivery Optimization settings rather than the browser PAC. Allowing destinations in Squid does not configure those components, the router or DNS. Validate SYSTEM-context proxy settings, HTTP range requests, downloads and P2P/firewall requirements on a test PC. Enabling a card changes no Windows system settings by itself.
+
+Microsoft sources:
+- https://learn.microsoft.com/windows/privacy/manage-windows-11-endpoints
+- https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+- https://learn.microsoft.com/en-us/troubleshoot/windows-client/networking/internet-explorer-edge-open-connect-corporate-public-network
+- https://learn.microsoft.com/en-us/troubleshoot/windows-client/installing-updates-features-roles/windows-update-issues-troubleshooting
 
 ## Verification and deployment boundary
 
-`tests/smoke_v3100.py` covers role/CSRF restrictions, structured PAC validation, source-package generation, failed publishing, atomic privileged publication, ignored discovery candidates, bounded learning and batch Save & Apply integration. Its transport test substitutes the privileged Squid transport; it does not start or validate a real Squid instance. `tests/pac_contract.cjs` executes generated JavaScript to verify destination routing and fallback.
+Python regressions cover roles/CSRF, PAC publication, review-only capture import, data minimization, retirement of IP-based grants, optional service scope, shared rules and transactional protocol conflicts. tests/tab_capture_contract.cjs verifies scoping, expiry and privacy. tests/browser_capture_e2e.py exercises a real extension with a button-triggered request and unrelated second-tab traffic, using synthetic hosts resolved to loopback and a disposable Chromium profile.
 
-Before upgrading production, use the VM acceptance checklist to validate actual Squid parsing/reload, Nginx PAC serving, Windows installation, firewall/direct routing, DNS, authenticated application workflows and browser failover timing. These behaviours require a real deployment and cannot be established from Python smoke tests alone.
+VM acceptance still requires actual Squid/Nginx behaviour, Windows installation, authenticated business workflows, firewall/DNS routing and failover timing. The extension test proves the synthetic workflow; it cannot establish complete coverage of every browser/application/network scenario.

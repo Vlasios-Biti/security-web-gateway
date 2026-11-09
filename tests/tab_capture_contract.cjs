@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict');
+const {recordRequest}=require('../tools/browser/swg-tab-capture/capture-core.js');
+const initial={active:true,tab_id:7,expires_at:2000,destinations:{}};
+const request={tabId:7,url:'https://api.vendor.example/button?password=secret',type:'xmlhttprequest'};
+let state=recordRequest(initial,request,1000);
+assert.equal(state.destinations['HTTPS:api.vendor.example'].request_count,1);
+assert.deepEqual(state.destinations['HTTPS:api.vendor.example'].resource_types,['xhr']);
+assert(!JSON.stringify(state).includes('secret'));
+assert.strictEqual(recordRequest(state,{...request,tabId:8},1000),state);
+assert.strictEqual(recordRequest(state,{...request,tabId:-1},1000),state);
+assert.strictEqual(recordRequest(state,{...request,url:'https://10.0.0.5/'},1000),state);
+assert.strictEqual(recordRequest(state,{...request,url:'https://api.vendor.example:8443/'},1000),state);
+assert.equal(recordRequest(state,request,2001).active,false);
+assert.strictEqual(recordRequest({...state,active:false},request,1000).active,false);
+state=recordRequest(state,request,1001);
+assert.equal(state.destinations['HTTPS:api.vendor.example'].request_count,2);
+console.log('Selected-tab scope, privacy, ports and expiry: PASS');

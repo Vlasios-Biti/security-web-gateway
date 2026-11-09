@@ -390,7 +390,7 @@ def discover_browser(target_url,max_pages=None):
         row["classification"]=cls;row["recommendation"]=rec;row["request_count"]=hits
         row["first_seen_context"]=(row["metadata"].get("contexts") or [None])[0]
         row["required"] = row["destination"]==seed_host or cls in ("authentication","api","realtime")
-        row["selected"] = rec=="allow" or row["required"]
+        row["selected"] = rec!="ignore"
         row["confidence"] = "high" if row["required"] or hits>=2 else "medium"
         items.append(row)
     if seed_host not in {x["destination"] for x in items}:
@@ -505,7 +505,7 @@ def process_browser_queue(max_runs=1):
 
             if bool(run.get('auto_approve')):
                 ready=get_run(run['id'])
-                ids=[x['id'] for x in ready.get('candidates',[])] if ready else []
+                ids=[x['id'] for x in ready.get('candidates',[]) if x.get('selected') and x.get('recommendation')!='ignore'] if ready else []
                 if ids:
                     actor=run.get('started_by') or 'system'
                     approve_run(run['id'],ids,actor)

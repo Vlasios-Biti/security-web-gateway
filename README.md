@@ -1,6 +1,7 @@
 # Security Web Gateway
 
-**Version:** 3.9.0  
+**Version:** 3.10.0
+
 **Target:** single-VM, on-prem enterprise appliance  
 **Target OS:** Ubuntu Server 24.04 LTS / 26.04 LTS  
 **Architecture:** Squid explicit proxy + FastAPI management plane + Nginx TLS + SQLite/WAL policy and telemetry store + isolated background workers + restricted privileged deployment helper.
@@ -53,6 +54,16 @@ Sizing should ultimately follow concurrent CONNECT sessions, requests/sec, WAN t
 - Operator changes remain pending for Admin approval. Advanced manual/HAR discovery remains available for authenticated or unusual workflows.
 - Browser discovery rejects private/reserved targets and DNS-rebinding/SSRF-style pivots.
 - PAC supports explicit DIRECT bypasses plus fail-open `PROXY ...; DIRECT` behavior.
+
+## v3.10.0 — simpler console, connection policy and learning
+
+- Refined desktop/mobile interface with clearer typography, quieter cards and fewer duplicate navigation entries.
+- **Connection** manages fail-open, direct domain/IP/CIDR bypasses and a configured Windows package with installation instructions.
+- **Applications → Learn during use** provides explicit 10-minute, single-device dependency learning for authenticated workflows, with bounded correlation and batched Save & Apply.
+- Browser auto-approval honours candidate selection and excludes ignored analytics/background requests.
+- Schema migration `016` stores learning sessions and destination provenance. Existing PAC is preserved during upgrade.
+
+Read [Connection and application learning](docs/CONNECTION_AND_LEARNING.md) for workflow, limits and production verification.
 
 ## v3.9.0 — enterprise operations console
 
@@ -199,13 +210,7 @@ PROXY:  <server-ip>:3128
 FAIL:   DIRECT fallback
 ```
 
-Explicit DIRECT business destinations retained in `pac/proxy.pac.tpl`:
-
-```text
-49.12.132.214
-65.108.9.79
-178.63.88.53
-```
+Manage exact domains, wildcard domains, IPv4 addresses and IPv4 CIDRs under **Connection → Always go direct**. Existing business bypasses are imported from legacy PAC on upgrade; fresh installations have none.
 
 Proxy return path:
 
@@ -223,11 +228,11 @@ Keep the repository private unless publication is intentional.
 git add -A
 git status
 git diff --cached
-git commit -m "Security Web Gateway v3.9.0"
+git commit -m "Security Web Gateway v3.10.0"
 git push
 
-git tag -a v3.9.0 -m "Security Web Gateway v3.9.0"
-git push origin v3.9.0
+git tag -a v3.10.0 -m "Security Web Gateway v3.10.0"
+git push origin v3.10.0
 ```
 
 Never stage `.db`, `.sqlite*`, `.env`, TLS/private-key material, HAR files, logs or backups.
@@ -241,6 +246,7 @@ python3 tools/migrate.py --db /tmp/swg-test.db --root .
 python3 tests/smoke_v340.py
 python3 tests/smoke_v370.py
 python3 tests/smoke_v380.py
+python3 tests/smoke_v3100.py
 ```
 
 See `docs/ARCHITECTURE.md`, `docs/DEPLOYMENT.md`, `docs/PERFORMANCE.md`, `docs/OPERATIONS.md`, and `SECURITY_MODEL.md`.

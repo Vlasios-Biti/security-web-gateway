@@ -1,0 +1,21 @@
+{% extends "base.html" %}{% block content %}
+<div class="page-head"><div><span class="section-kicker">Endpoint &amp; routing</span><h2>One policy. Every device.</h2><p>Choose how managed devices connect, handle outages and reach direct destinations.</p></div><a class="btn ghost" href="/connection/preview.pac">View PAC</a></div>
+<section class="connection-layout">
+  <form class="connection-form" method="post" action="/connection">
+    <input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}">
+    <article class="settings-card"><div class="settings-heading"><span class="step-mark">01</span><div><h3>Connection behaviour</h3><p>Proxy endpoint <code>{{ proxy_endpoint }}</code></p></div></div>
+      <label class="setting-switch"><span><strong>Continue if the proxy is unavailable</strong><small>Allow a DIRECT fallback using the device’s existing router and DNS. A blocked request stays blocked.</small></span><input type="checkbox" name="fail_open" value="true" {% if policy.fail_open %}checked{% endif %}><span class="switch-track" aria-hidden="true"></span></label>
+      <label class="setting-switch"><span><strong>Keep local traffic direct</strong><small>Single-label names, private IPv4 addresses and loopback bypass the proxy. Add internal domain suffixes below.</small></span><input type="checkbox" name="internal_direct" value="true" {% if policy.internal_direct %}checked{% endif %}><span class="switch-track" aria-hidden="true"></span></label>
+    </article>
+    <article class="settings-card"><div class="settings-heading"><span class="step-mark">02</span><div><h3>Always go direct</h3><p>These destinations never use the proxy, including while it is healthy.</p></div></div>
+      <label>Domains, IPs &amp; networks<textarea class="bypass-editor" name="bypass" rows="7" spellcheck="false" placeholder="portal.example.com&#10;*.office.internal&#10;192.0.2.25&#10;198.51.100.0/24">{{ policy.bypass|join('\n') }}</textarea></label>
+      <p class="field-help">One destination per line. A wildcard includes the parent domain and its subdomains. DIRECT traffic follows the device’s configured routing and DNS and does not appear in proxy logs.</p>
+    </article>
+    <div class="settings-save"><span>Clients receive updates when their PAC refreshes.</span><button class="btn primary">{{ 'Save & publish' if mode=='production' else 'Save preview' }}</button></div>
+  </form>
+  <aside class="connection-aside"><article class="endpoint-card"><span class="section-kicker">Windows 10 / 11</span><div class="endpoint-symbol" aria-hidden="true">▦</div><h3>Connect your devices</h3><p>Download the package configured for this gateway. Install once, then manage routing here.</p><a class="btn primary" href="/connection/windows.zip">Download Windows package <span aria-hidden="true">↓</span></a><div class="endpoint-address"><span>PAC address</span><code>{{ pac_url }}</code></div></article>
+    <details class="settings-card setup-guide" open><summary>Installation guide</summary><ol><li>Extract the complete package.</li><li>Open Windows PowerShell as Administrator.</li><li>Run <code>.\Install-Managed-Proxy.ps1</code>.</li><li>Verify with <code>.\payload\Proxy-Control-Endpoint.ps1 -Mode Status</code>.</li></ol><p>The optional desktop GUI installer can be built using <code>.\Build-For-This-Gateway.ps1</code>. Standard users can view status; changing or removing the policy requires administrator privileges.</p></details>
+    <details class="settings-card setup-guide"><summary>How fallback works</summary><p>DIRECT fallback applies when the proxy cannot be reached. Client timeout and PAC caching affect recovery time. Applications with their own proxy settings need separate configuration. Router rules must permit direct access for fallback and bypasses to work.</p></details>
+  </aside>
+</section>
+{% endblock %}

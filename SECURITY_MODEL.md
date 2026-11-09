@@ -94,6 +94,10 @@ Availability is part of the security model. Resource starvation of the proxy can
 
 ## Telemetry boundary
 
+Administrator-started application learning is an explicit, bounded exception to review-only passive correlation. A session is limited to one source IPv4, ten minutes and fifty new public destinations; it requires recent traffic attributed to the selected application alone. Known analytics are excluded. Learning uses the normal Save & Apply path and stops on pending work, errors, revoked privileges or inactive applications. Attribution is probabilistic: administrators must use a dedicated test device and review learned domains. Ordinary passive dependency candidates remain review-only. See `docs/CONNECTION_AND_LEARNING.md`.
+
+Connection policy publishing accepts structured domain/IP/CIDR and boolean settings only. The privileged helper revalidates input and renders a fixed PAC program from root-owned release code; callers cannot supply arbitrary PAC JavaScript, shell commands or paths. Static PAC remains available through Nginx independently of the management process.
+
 Telemetry indexes only requests that traverse Squid. PAC `DIRECT` traffic never reaches Squid and must not be inferred. Whole-network direct-path visibility requires an independent router source such as Traffic Flow/IPFIX.
 
 Telemetry ingestion runs unprivileged with read-only Squid log visibility, uses bounded batches, persists rotation-aware checkpoints and writes only to the managed data root.

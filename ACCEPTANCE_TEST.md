@@ -1,14 +1,14 @@
-# Security Web Gateway v3.9.0 Acceptance Test
+# Security Web Gateway v3.10.0 Acceptance Test
 
-1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.9.0`.
-2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.9.0`, mode `production`.
-3. `SELECT MAX(version) FROM schema_migrations` returns `015`; `PRAGMA integrity_check` returns `ok`; `PRAGMA foreign_key_check` returns no rows.
+1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.10.0`.
+2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.10.0`, mode `production`.
+3. `SELECT MAX(version) FROM schema_migrations` returns `016`; `PRAGMA integrity_check` returns `ok`; `PRAGMA foreign_key_check` returns no rows.
 4. `squid -k parse` and `nginx -t` succeed.
 5. `security-web-gateway.service`, `squid.service`, `nginx.service`, and `security-web-gateway-deploy-helper.socket` are active.
 6. Telemetry, storage-maintenance, discovery, source-sync and **performance** timers are enabled/active.
 7. Squid priority drop-in exists and background workers use lower CPU/I/O priority.
 8. PAC is reachable on `http://<SWG-IP>:8081/proxy.pac` and contains `PROXY <SWG-IP>:3128; DIRECT`.
-9. DIRECT bypass IPs remain present: `49.12.132.214`, `65.108.9.79`, `178.63.88.53`.
+9. Existing DIRECT bypasses remain effective after upgrade and are visible in Connection. Fresh installations contain no customer-specific bypass IPs.
 10. A standard Windows user with Proxy Control installed cannot change proxy/PAC settings without administrator credentials.
 11. Traffic Explorer updates via the telemetry timer; GUI requests do not parse `access.log` synchronously.
 12. Overview uses cached health/traffic data and does not synchronously call systemd/DNS probes.
@@ -44,3 +44,12 @@
 38. Overview policy coverage reports actual Application objects rather than system-domain rule count.
 39. Applications provides summary metrics, card search and recent dependency health.
 40. Activity provides approvals, drift, apply failures, backups, audit timeline and rollback readiness.
+
+41. Connection is Administrator-only; Operators/viewers cannot change connection policy or download the Windows package. POSTs require valid CSRF.
+42. Save & publish atomically replaces the static PAC and backs it up. Invalid input/failing publication does not overwrite stored settings. Test exact domain, wildcard boundary, IP and CIDR routing on Windows.
+43. Unreachable proxy falls back DIRECT when enabled; disabled fallback returns only PROXY. A policy-denied request remains denied. Measure actual client recovery time and confirm router/firewall permits intended fallback.
+44. Windows ZIP contains the target gateway's PAC address, installation guide, controller and optional GUI build helper. On a test PC, verify admin install, standard-user restrictions, PAC refresh, Stop/Start and initial-settings restore on uninstall.
+45. On a dedicated device, start an application learning session, log in and exercise the workflow. Confirm only selected-source correlated requests are learned, analytics/private destinations are excluded, and one batch uses one validated Squid apply.
+46. Confirm learning stops on manual Stop, expiry, the destination limit, failed apply, inactive application, revoked administrator and pending policy changes. Review attribution of learned domains.
+47. Restore policy state to another VM: sessions are revoked, active learning is stopped, and target-host connection settings/PAC are preserved.
+48. Desktop and mobile navigation remain usable and Connection/Application pages do not overflow the viewport.

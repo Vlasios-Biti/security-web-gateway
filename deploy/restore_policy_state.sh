@@ -28,9 +28,18 @@ chown proxy-mgmt:proxy-mgmt /var/lib/security-web-gateway/prod/swg.db; chmod 064
 runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH=/opt/security-web-gateway/current \
   /opt/security-web-gateway/venv/bin/python /opt/security-web-gateway/current/tools/migrate.py --db /var/lib/security-web-gateway/prod/swg.db --root /opt/security-web-gateway/current
 # Never carry active sessions to a different server.
-python3 - <<'PY'
-import sqlite3
-p='/var/lib/security-web-gateway/prod/swg.db';c=sqlite3.connect(p);c.execute('DELETE FROM sessions');c.commit();c.close()
+python3 - "/var/lib/security-web-gateway/backups/state-restore-$STAMP/pre-restore.db" <<'PY'
+import sqlite3,sys,os
+p='/var/lib/security-web-gateway/prod/swg.db';c=sqlite3.connect(p);c.execute('DELETE FROM sessions')
+c.execute("UPDATE application_learning_sessions SET status='stopped' WHERE status='active'")
+# The connection policy/PAC belongs to the target host, just like its TLS/IP.
+c.execute("DELETE FROM settings WHERE key='connection_policy'")
+if os.path.exists(sys.argv[1]):
+ previous=sqlite3.connect(sys.argv[1])
+ try: row=previous.execute("SELECT value FROM settings WHERE key='connection_policy'").fetchone()
+ finally: previous.close()
+ if row:c.execute("INSERT INTO settings(key,value) VALUES('connection_policy',?)",row)
+c.commit();c.close()
 PY
 chown proxy-mgmt:proxy-mgmt /var/lib/security-web-gateway/prod/swg.db
 systemctl start security-web-gateway.service

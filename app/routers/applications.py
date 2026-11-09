@@ -9,6 +9,7 @@ from app.services.discovery import catalog_search,create_run,create_har_run,get_
 from app.services.rules import list_networks
 from app.services.apply import save_apply_state,apply_saved_change,apply_message
 from app.services.system import cached_system_health
+from app.services.learning import latest_session, start_session, stop_session
 router=APIRouter(prefix="/applications")
 
 def can_manage(r):return r.state.user and r.state.user["role"] in("admin","operator")
@@ -176,7 +177,9 @@ def application_activity(application_id:int,request:Request):
     finally:
         c.close()
     active_dependencies=sum(1 for x in app.get("dependencies",[]) if x.get("dependency_enabled")==1 and x.get("status")=="active")
+    learning=latest_session(application_id)
     return {
+        "learning": learning,
         "status": run["status"] if run else "idle",
         "error": run["error_text"] if run else None,
         "started_at": run["started_at"] if run else None,
@@ -194,7 +197,25 @@ def detail(application_id:int,request:Request):
     c=connect()
     try:runs=[dict(x) for x in c.execute("SELECT * FROM discovery_runs WHERE application_id=? ORDER BY id DESC LIMIT 15",(application_id,))]
     finally:c.close()
-    return request.app.state.templates.TemplateResponse(request=request,name="applications/detail.html",context={"request":request,"page_title":app["name"],"application":app,"runs":runs})
+    return request.app.state.templates.TemplateResponse(request=request,name="applications/detail.html",context={"request":request,"page_title":app["name"],"application":app,"runs":runs,"learning":latest_session(application_id)})
+
+
+@router.post("/{application_id}/learning")
+def learning_action(application_id:int,request:Request,csrf_token:str=Form(...),action:str=Form(...),client_ip:str=Form("")):
+    user=request.state.user
+    if not admin(request):return HTMLResponse("Forbidden",403)
+    if not auth.check_csrf(user,csrf_token):return HTMLResponse("Invalid request",403)
+    try:
+        if action=="start":
+            start_session(application_id,client_ip,user["username"])
+            message="Learning started for 10 minutes. Use only this application on the selected device"
+        elif action=="stop":
+            stop_session(application_id,user["username"])
+            message="Learning stopped. Learned dependencies remain in the application"
+        else:raise ValueError("Unsupported learning action.")
+        return RedirectResponse(f"/applications/{application_id}?msg="+quote_plus(message),303)
+    except ValueError as exc:
+        return RedirectResponse(f"/applications/{application_id}?error="+quote_plus(str(exc)),303)
 
 @router.get("/{application_id}/edit",response_class=HTMLResponse)
 def edit_page(application_id:int,request:Request):

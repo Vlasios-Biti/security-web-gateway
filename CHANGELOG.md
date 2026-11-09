@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.10.0
+
+- Refined console spacing, typography, cards and responsive layouts; combined live/search traffic navigation and kept audit access under Activity.
+- Added Administrator-only Connection settings for fail-open, local routing and exact/wildcard domain plus IPv4/CIDR DIRECT bypasses.
+- Added structured, validated, atomic static PAC publishing with backup through the restricted helper. Fresh installs omit legacy customer-specific bypass IPs; upgrades preserve existing PAC.
+- Added gateway-configured Windows source/controller packages with setup instructions and an optional GUI build helper.
+- Added explicit 10-minute, single-device application learning with recent-application correlation, public destination validation, a 50-destination cap, audit provenance and one validated apply per batch.
+- Browser auto-approval now honours selected/ignored candidates; classified analytics are excluded.
+- Added schema migration 016, regression tests and deployment acceptance checks. Policy rollback and cross-host restore stop learning; cross-host restore retains target PAC settings.
+
 ## 3.9.0
 
 - Rebuilt the management experience around a professional enterprise operations-console design created in Figma.

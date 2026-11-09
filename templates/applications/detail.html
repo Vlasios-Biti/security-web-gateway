@@ -41,6 +41,20 @@
 </section>
 {% endif %}
 
+{% if request.state.user.role=='admin' %}
+<section class="settings-card learning-card space-top">
+  <div class="settings-heading"><span class="step-mark">↗</span><div><span class="section-kicker">Learn during use</span><h3>Find dependencies behind the login</h3><p>Use the application on one selected device. SWG finds correlated blocked domains and applies new dependencies during a 10-minute session.</p></div></div>
+  {% if learning and learning.status=='active' %}
+  <div class="learning-live" data-learning-session="{{ learning.id }}" data-learning-url="/applications/{{ application.id }}/activity"><span class="status-dot"></span><strong>Learning from {{ learning.client_ip }}</strong><span><b data-learned-count>{{ learning.learned_count }}</b> destinations learned</span></div>
+  <form method="post" action="/applications/{{ application.id }}/learning"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><input type="hidden" name="action" value="stop"><button class="btn ghost">Stop learning</button></form>
+  {% else %}
+  <form class="learning-start" method="post" action="/applications/{{ application.id }}/learning"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><input type="hidden" name="action" value="start"><label>Device IP<input name="client_ip" required placeholder="192.168.1.25" inputmode="decimal"></label><button class="btn primary">Start 10-minute learning</button></form>
+  {% if learning %}<p class="field-help">Last session: {{ learning.status }} · {{ learning.learned_count }} learned.{% if learning.error_text %} {{ learning.error_text }}{% endif %}</p>{% endif %}
+  {% endif %}
+  <details class="learning-guidance"><summary>Before you start</summary><p>First finish automatic discovery and apply the application to an access profile. On the selected device, close other tabs and background applications, then open this application and exercise its normal workflow. Reload a failed action after the worker adds its dependency. Learning uses recent traffic attributed to this application alone, excludes known analytics and private destinations, and stops after 10 minutes or 50 new destinations. Correlation can include unrelated traffic from the same device; use a dedicated test device. Stops on pending policy changes. Requests hidden inside an existing HTTPS tunnel cannot be identified by Squid; an authenticated HAR import remains available under Add application → Advanced.</p></details>
+</section>
+{% endif %}
+
 <details class="advanced-card space-top" open>
   <summary>Dependencies <span>{{ application.dependencies|length }}</span></summary>
   <div class="advanced-body">

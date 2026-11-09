@@ -131,6 +131,7 @@ def rollback_to(deployment_id,actor,source_ip):
         state=json.loads(dep["state_json"])
         if "applications" not in state:raise ValueError("This legacy snapshot predates the application-policy model and cannot be rolled back automatically from this release.")
         c.execute("BEGIN IMMEDIATE")
+        c.execute("UPDATE application_learning_sessions SET status='stopped' WHERE status='active'")
         for t in("policy_group_networks","policy_group_rules","policy_group_applications","application_networks","application_rules","rule_networks","policy_groups","applications","rules","networks"):c.execute(f"DELETE FROM {t}")
         _insert_rows(c,"networks",state.get("networks",[]));_insert_rows(c,"rules",state.get("rules",[]));_insert_rows(c,"applications",state.get("applications",[]));_insert_rows(c,"policy_groups",state.get("policy_groups",[]))
         for t in("rule_networks","application_rules","application_networks","policy_group_applications","policy_group_rules","policy_group_networks"):_insert_rows(c,t,state.get(t,[]))

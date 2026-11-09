@@ -19,7 +19,7 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
       - name: Python compile
         run: python -m compileall -q app bin tools privileged tests
       - name: Template syntax
@@ -105,7 +105,7 @@ jobs:
           c=sqlite3.connect('/tmp/swg-ci.db')
           assert c.execute('pragma integrity_check').fetchone()[0]=='ok'
           assert not list(c.execute('pragma foreign_key_check'))
-          assert c.execute('select max(version) from schema_migrations').fetchone()[0]=='015'
+          assert c.execute('select max(version) from schema_migrations').fetchone()[0]=='016'
           assert c.execute('pragma journal_mode').fetchone()[0].lower()=='wal'
           PY
       - name: v3.3.1 to v3.4 migration
@@ -119,7 +119,7 @@ jobs:
           python - <<'PY'
           import sqlite3
           c=sqlite3.connect('/tmp/swg-v331.db')
-          assert c.execute('select max(version) from schema_migrations').fetchone()[0]=='015'
+          assert c.execute('select max(version) from schema_migrations').fetchone()[0]=='016'
           assert c.execute('pragma integrity_check').fetchone()[0]=='ok'
           assert not list(c.execute('pragma foreign_key_check'))
           PY
@@ -131,6 +131,8 @@ jobs:
         run: python tests/smoke_v370.py
       - name: v3.8 save and apply smoke tests
         run: python tests/smoke_v380.py
+      - name: Connection and learning workflows
+        run: python tests/smoke_v3100.py
       - name: App import
         env:
           SWG_DB_PATH: /tmp/swg-ci.db
@@ -158,7 +160,7 @@ jobs:
           python-version: '3.14'
           cache: 'pip'
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
       - name: Python 3.14 compile
         run: python -m compileall -q app bin tools privileged tests
       - name: Python 3.14 app import
@@ -176,3 +178,4 @@ jobs:
           python tests/smoke_v340.py
           python tests/smoke_v370.py
           python tests/smoke_v380.py
+          python tests/smoke_v3100.py

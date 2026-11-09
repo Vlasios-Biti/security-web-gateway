@@ -25,6 +25,7 @@ telemetry/
 __pycache__/
 *.py[cod]
 .venv/
+.venv-linux/
 venv/
 .pytest_cache/
 .mypy_cache/

@@ -9,7 +9,7 @@ from app.db import verify_schema
 from app.config import MANAGEMENT_FQDN, PROXY_IP, APP_VERSION, MODE, APP_ROOT
 from app.routers import (
     auth_routes, overview, domains, ips, system_rules, traffic, policies,
-    deployments, audit, users, system, bulk, api, applications, groups, intelligence
+    deployments, audit, users, system, bulk, api, applications, groups, intelligence, connection
 )
 
 verify_schema()
@@ -62,6 +62,6 @@ def healthz():
 for r in (
     auth_routes.router, overview.router, domains.router, ips.router, system_rules.router,
     traffic.router, policies.router, deployments.router, audit.router, users.router,
-    system.router, bulk.router, api.router, applications.router, groups.router, intelligence.router,
+    system.router, bulk.router, api.router, applications.router, groups.router, intelligence.router, connection.router,
 ):
     app.include_router(r)

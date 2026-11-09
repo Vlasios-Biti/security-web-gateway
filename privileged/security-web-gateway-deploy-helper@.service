@@ -15,6 +15,7 @@ PrivateDevices=true
 ProtectHome=true
 ProtectSystem=strict
 ReadWritePaths=/etc/squid/managed
+ReadWritePaths=/etc/security-web-gateway
 ReadWritePaths=/var/lib/security-web-gateway/backups
 ProtectKernelTunables=true
 ProtectKernelModules=true

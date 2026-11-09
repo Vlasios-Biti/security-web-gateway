@@ -3,13 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="color-scheme" content="light dark">
+  <meta name="color-scheme" content="light">
   <title>{{ page_title }} | Security Web Gateway</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="stylesheet" href="/static/css/app.css">
   <link rel="stylesheet" href="/static/css/ui-v36.css">
   <link rel="stylesheet" href="/static/css/ui-v37.css">
   <link rel="stylesheet" href="/static/css/ui-v39.css">
+  <link rel="stylesheet" href="/static/css/premium.css">
   <script defer src="/static/js/app.js"></script>
 </head>
 <body>
@@ -33,13 +34,16 @@
       <details class="nav-group" {% if '/traffic/' in request.url.path %}open{% endif %}>
         <summary><span class="nav-summary-main"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17h2.5l3-7 4 10 3-7 2 4H21"/></svg><span>Traffic</span></span><span class="nav-chevron">›</span></summary>
         <div class="nav-children">
-          <a href="/traffic/live" class="{% if request.url.path=='/traffic/live' %}active{% endif %}">Live traffic</a>
-          <a href="/traffic/explorer" class="{% if request.url.path=='/traffic/explorer' %}active{% endif %}">Search traffic</a>
+          <a href="/traffic/live" class="{% if request.url.path in ('/traffic/live','/traffic/explorer') %}active{% endif %}">Live traffic &amp; search</a>
           <a href="/traffic/clients" class="{% if request.url.path.startswith('/traffic/clients') %}active{% endif %}">Clients</a>
         </div>
       </details>
 
-      <a href="/changes/review" class="nav-primary {% if '/changes/' in request.url.path and request.url.path!='/changes/audit' %}active{% endif %}">
+      {% if request.state.user.role=='admin' %}
+      <a href="/connection" class="nav-primary {% if request.url.path.startswith('/connection') %}active{% endif %}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v5M17 3v5M5 8h14v3a7 7 0 0 1-14 0V8ZM12 18v3"/></svg><span>Connection</span></a>
+      {% endif %}
+
+      <a href="/changes/review" class="nav-primary {% if '/changes/' in request.url.path %}active{% endif %}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg><span>Activity</span>
         {% if request.state.user.role in ('admin','operator') %}<span class="nav-count" data-pending-count></span>{% endif %}
       </a>
@@ -56,7 +60,7 @@
         </div>
       </details>
 
-      <details class="nav-group nav-advanced" {% if '/policies/' in request.url.path or '/rules/' in request.url.path or '/bulk/' in request.url.path or '/intelligence/' in request.url.path or request.url.path=='/changes/audit' %}open{% endif %}>
+      <details class="nav-group nav-advanced" {% if '/policies/' in request.url.path or '/rules/' in request.url.path or '/bulk/' in request.url.path or '/intelligence/' in request.url.path %}open{% endif %}>
         <summary><span class="nav-summary-main"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18"/></svg><span>Policy &amp; tools</span></span><span class="nav-chevron">›</span></summary>
         <div class="nav-children">
           <a href="/policies/groups" class="{% if request.url.path.startswith('/policies/groups') %}active{% endif %}">Access profiles</a>
@@ -66,7 +70,7 @@
           <a href="/intelligence/simulator" class="{% if request.url.path=='/intelligence/simulator' %}active{% endif %}">Policy simulator</a>
           <a href="/intelligence/dependency-candidates" class="{% if request.url.path=='/intelligence/dependency-candidates' %}active{% endif %}">Dependency review</a>
           <a href="/bulk/import" class="{% if request.url.path.startswith('/bulk/') %}active{% endif %}">Import / export</a>
-          <a href="/changes/audit" class="{% if request.url.path=='/changes/audit' %}active{% endif %}">Audit log</a>
+
         </div>
       </details>
     </nav>

@@ -53,6 +53,7 @@
         <div class="nav-children">
           <a href="/system/health" class="{% if request.url.path=='/system/health' or request.url.path=='/system/performance' %}active{% endif %}">Health &amp; performance</a>
           {% if request.state.user.role=='admin' %}
+          <a href="/system/notifications" class="{% if request.url.path=='/system/notifications' %}active{% endif %}">Health notifications</a>
           <a href="/system/storage" class="{% if request.url.path=='/system/storage' %}active{% endif %}">Storage</a>
           <a href="/system/backups" class="{% if request.url.path=='/system/backups' %}active{% endif %}">Backups</a>
           <a href="/security/users" class="{% if request.url.path.startswith('/security/users') %}active{% endif %}">Administrators</a>

@@ -1,8 +1,8 @@
-# Security Web Gateway v3.10.0 Acceptance Test
+# Security Web Gateway v3.11.0 Acceptance Test
 
-1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.10.0`.
-2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.10.0`, mode `production`.
-3. `SELECT MAX(version) FROM schema_migrations` returns `016`; `PRAGMA integrity_check` returns `ok`; `PRAGMA foreign_key_check` returns no rows.
+1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.11.0`.
+2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.11.0`, mode `production`.
+3. `SELECT MAX(version) FROM schema_migrations` returns `017`; `PRAGMA integrity_check` returns `ok`; `PRAGMA foreign_key_check` returns no rows.
 4. `squid -k parse` and `nginx -t` succeed.
 5. `security-web-gateway.service`, `squid.service`, `nginx.service`, and `security-web-gateway-deploy-helper.socket` are active.
 6. Telemetry, storage-maintenance, discovery, source-sync and **performance** timers are enabled/active.
@@ -55,3 +55,12 @@
 48. Desktop and mobile navigation remain usable and Connection/Application pages do not overflow the viewport.
 49. PC services are off by default, Administrator-only and scoped to chosen Access Profiles. Test Windows Update/Defender in SYSTEM context with appropriate WinHTTP/BITS/DO configuration. Turning off one profile must not disable shared endpoints used elsewhere.
 50. Verify new-tab/pop-up and service-worker limitations on real business applications. Review candidates before applying; tab attribution does not prove endpoint necessity.
+
+51. Health notifications are Administrator-only; password/webhook values never appear in HTML, polling, audit, delivery history or policy-state exports.
+52. Configure real SMTP TLS and Slack on the VM. Explicit tests must reach intended recipients/channel and show results without holding the GUI request open.
+53. Repeated failed checks produce one incident digest, confirmed recovery produces a recovery message, and email failure does not duplicate successful Slack alerts. Verify retry and optional repeat intervals.
+54. Turn global notifications off and verify no automatic messages. Confirm candidate mode sends no messages, including test requests.
+55. Expire a deployed test rule while an unrelated policy is pending. Verify new requests are denied for the expired destination and pending work remains unpublished; account for existing CONNECT tunnels.
+56. Exercise concurrent edits during a slow apply. The recorded snapshot must match the sent configuration and newer work must remain pending.
+57. Restore a portable/legacy export into a test VM of this release. Verify writer quiescence, archive/hash checks, migration, rollback-on-failure, target credentials/PAC preservation and queued-job revocation.
+58. Verify the new helper RuntimeDirectory and health-monitor timer permissions on Ubuntu. Confirm an external monitor covers full-VM/network/monitor outages.

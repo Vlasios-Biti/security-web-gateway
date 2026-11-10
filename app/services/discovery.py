@@ -342,9 +342,10 @@ def discover_browser(target_url,max_pages=None):
             if u not in m["sample_urls"]:m["sample_urls"].append(u)
         if context_name not in m["contexts"]:m["contexts"].append(context_name)
 
-    with sync_playwright() as pw:
-        browser=pw.chromium.launch(headless=True,args=["--disable-dev-shm-usage"])
-        context=browser.new_context(ignore_https_errors=False,service_workers="allow")
+    from app.services.discovery_proxy import discovery_egress_proxy
+    with discovery_egress_proxy() as proxy, sync_playwright() as pw:
+        browser=pw.chromium.launch(headless=True,args=["--disable-dev-shm-usage","--disable-quic","--proxy-bypass-list=<-loopback>","--force-webrtc-ip-handling-policy=disable_non_proxied_udp"])
+        context=browser.new_context(ignore_https_errors=False,service_workers="block",proxy=proxy)
         current_context={"name":"initial-page"}
         def route_handler(route,request):
             if request.url.startswith(("data:","about:","blob:")):
@@ -504,42 +505,46 @@ def process_browser_queue(max_runs=1):
             finally:
                 c.close()
 
-            if bool(run.get('auto_approve')):
-                ready=get_run(run['id'])
-                ids=[x['id'] for x in ready.get('candidates',[]) if x.get('selected') and x.get('recommendation')!='ignore'] if ready else []
-                if ids:
-                    actor=run.get('started_by') or 'system'
-                    approve_run(run['id'],ids,actor)
-                    apply_result=None
-                    if bool(run.get('auto_apply')):
-                        from app.services.apply import apply_saved_change
-                        apply_result=apply_saved_change(
-                            actor,
-                            None,
-                            f"Automatic application dependency update for application {run.get('application_id')}",
-                            preexisting_dirty=bool(run.get('baseline_dirty')),
-                        )
-                        if apply_result and not apply_result.get('ok'):
-                            c=connect()
-                            try:
-                                c.execute("UPDATE discovery_runs SET error_text=? WHERE id=?",(apply_result.get('error') or 'Production apply failed; previous policy remains active.',run['id']))
-                                c.commit()
-                            finally:
-                                c.close()
-                    processed.append({'id':run['id'],'status':'approved','auto_approved':len(ids),'apply':apply_result})
+            from app.services.policy_lock import policy_edit_lock
+            from app.services.deployment import effective_policy_changed
+            with policy_edit_lock():
+                dirty_before_approval=effective_policy_changed()
+                if bool(run.get('auto_approve')):
+                    ready=get_run(run['id'])
+                    ids=[x['id'] for x in ready.get('candidates',[]) if x.get('selected') and x.get('recommendation')!='ignore'] if ready else []
+                    if ids:
+                        actor=run.get('started_by') or 'system'
+                        approve_run(run['id'],ids,actor)
+                        apply_result=None
+                        if bool(run.get('auto_apply')):
+                            from app.services.apply import apply_saved_change
+                            apply_result=apply_saved_change(
+                                actor,
+                                None,
+                                f"Automatic application dependency update for application {run.get('application_id')}",
+                                preexisting_dirty=bool(run.get('baseline_dirty')) or dirty_before_approval,
+                            )
+                            if apply_result and not apply_result.get('ok'):
+                                c=connect()
+                                try:
+                                    c.execute("UPDATE discovery_runs SET error_text=? WHERE id=?",(apply_result.get('error') or 'Production apply failed; previous policy remains active.',run['id']))
+                                    c.commit()
+                                finally:
+                                    c.close()
+                        processed.append({'id':run['id'],'status':'approved','auto_approved':len(ids),'apply':apply_result})
+                    else:
+                        apply_result=None
+                        if bool(run.get('auto_apply')):
+                            from app.services.apply import apply_saved_change
+                            apply_result=apply_saved_change(
+                                run.get('started_by') or 'system',
+                                None,
+                                f"Save application {run.get('application_id')} after empty discovery",
+                                preexisting_dirty=bool(run.get('baseline_dirty')) or dirty_before_approval,
+                            )
+                        processed.append({'id':run['id'],'status':'ready','auto_approved':0,'apply':apply_result})
                 else:
-                    apply_result=None
-                    if bool(run.get('auto_apply')):
-                        from app.services.apply import apply_saved_change
-                        apply_result=apply_saved_change(
-                            run.get('started_by') or 'system',
-                            None,
-                            f"Save application {run.get('application_id')} after empty discovery",
-                            preexisting_dirty=bool(run.get('baseline_dirty')),
-                        )
-                    processed.append({'id':run['id'],'status':'ready','auto_approved':0,'apply':apply_result})
-            else:
-                processed.append({'id':run['id'],'status':'ready'})
+                    processed.append({'id':run['id'],'status':'ready'})
         except Exception as exc:
             c=connect()
             try:

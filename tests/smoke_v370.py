@@ -23,7 +23,7 @@ def main():
 
         c=connect()
         try:
-            assert c.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0]=="016"
+            assert c.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0]=="017"
             cols={r["name"] for r in c.execute("PRAGMA table_info(discovery_runs)")}
             assert "auto_approve" in cols
 

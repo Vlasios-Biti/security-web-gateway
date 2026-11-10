@@ -1,0 +1,42 @@
+{% extends "base.html" %}{% block content %}
+<div class="page-head"><div><span class="section-kicker">System monitoring</span><h2>Know when attention is needed.</h2><p>Receive health alerts by email, Slack, or both. Repeated failures are grouped and recovery is reported after confirmation.</p></div><span class="status-pill {{ 'healthy' if cfg.enabled else 'warning' }}">{{ 'Notifications enabled' if cfg.enabled else 'Notifications off' }}</span></div>
+<form method="post" action="/system/notifications" class="notification-form">
+  <input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}">
+  <article class="settings-card"><label class="setting-switch"><span><strong>Enable health notifications</strong><small>Monitor services, proxy listener, disk, memory, CPU, backup age, DNS, clock, certificate, telemetry, workers and configuration drift.</small></span><input type="checkbox" name="enabled" value="true" {% if cfg.enabled %}checked{% endif %}><span class="switch-track" aria-hidden="true"></span></label></article>
+  <div class="notification-channels">
+    <article class="settings-card"><label class="setting-switch"><span><strong>Email</strong><small>Use your organisation's SMTP server with verified TLS.</small></span><input type="checkbox" name="email_enabled" value="true" {% if cfg.email_enabled %}checked{% endif %}><span class="switch-track" aria-hidden="true"></span></label>
+      <div class="form-grid"><label>SMTP server<input name="smtp_host" value="{{ cfg.smtp_host }}" placeholder="smtp.example.com" autocomplete="off"></label><label>Port<input name="smtp_port" type="number" min="1" max="65535" value="{{ cfg.smtp_port }}"></label>
+      <label>Connection security<select name="smtp_tls"><option value="starttls" {% if cfg.smtp_tls=='starttls' %}selected{% endif %}>STARTTLS · usually 587</option><option value="ssl" {% if cfg.smtp_tls=='ssl' %}selected{% endif %}>TLS from connection · usually 465</option></select></label><label>Username<input name="smtp_username" value="{{ cfg.smtp_username }}" autocomplete="off" placeholder="Optional for a trusted TLS relay"></label>
+      <label class="full">SMTP password<input name="smtp_password" type="password" value="" autocomplete="new-password" placeholder="{{ 'Saved — leave blank to keep' if cfg.smtp_password_configured else 'Enter SMTP password if authentication is used' }}"></label>
+      <label class="full">Sender address<input name="sender" type="email" value="{{ cfg.sender }}" placeholder="gateway@example.com"></label><label class="full">Recipients<textarea name="recipients" rows="3" placeholder="it@example.com&#10;operations@example.com">{{ cfg.recipients|join('\n') }}</textarea></label></div>
+      <label class="check"><input type="checkbox" name="clear_smtp_password" value="true">Remove saved SMTP password</label>
+    </article>
+    <article class="settings-card"><label class="setting-switch"><span><strong>Slack</strong><small>Connect a channel using its Incoming Webhook URL.</small></span><input type="checkbox" name="slack_enabled" value="true" {% if cfg.slack_enabled %}checked{% endif %}><span class="switch-track" aria-hidden="true"></span></label>
+      <label>Incoming Webhook URL<input class="full-width" name="slack_webhook" type="password" value="" autocomplete="new-password" placeholder="{{ 'Saved — leave blank to keep' if cfg.slack_webhook_configured else 'https://hooks.slack.com/services/…' }}"></label>
+      <p class="field-help">Create an Incoming Webhook for the Slack channel you choose, then paste its secret URL here. The channel is selected in Slack when the webhook is authorised.</p>
+      <a class="text-link" href="https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks" target="_blank" rel="noopener noreferrer">Slack setup guide ↗</a>
+      <label class="check space-top"><input type="checkbox" name="clear_slack_webhook" value="true">Remove saved Slack webhook</label>
+      <div class="telemetry-note space-top">Credentials are stored in a protected configuration file on this VM. Existing passwords and webhook URLs are never returned in the form and are excluded from policy-state exports.</div>
+    </article>
+  </div>
+  <details class="settings-card notification-thresholds"><summary>Alert thresholds &amp; repeat control</summary><div class="form-grid space-top">
+    <label>Notify about<select name="minimum_severity"><option value="warning" {% if cfg.minimum_severity=='warning' %}selected{% endif %}>Warnings &amp; critical incidents</option><option value="critical" {% if cfg.minimum_severity=='critical' %}selected{% endif %}>Critical incidents only</option></select></label>
+    <label>Failed checks before alert<input name="confirmation_samples" type="number" min="1" max="10" value="{{ cfg.confirmation_samples }}"></label>
+    <label>Healthy checks before recovery<input name="recovery_samples" type="number" min="1" max="10" value="{{ cfg.recovery_samples }}"></label>
+    <label>Repeat unresolved alerts (minutes)<input name="repeat_minutes" type="number" min="0" max="1440" value="{{ cfg.repeat_minutes }}"><small>0 sends once until the condition changes.</small></label>
+    <label>Disk usage warning (%)<input name="disk_percent" type="number" min="50" max="99" value="{{ cfg.disk_percent }}"></label>
+    <label>Memory usage warning (%)<input name="memory_percent" type="number" min="50" max="99" value="{{ cfg.memory_percent }}"></label>
+    <label>CPU warning (%)<input name="cpu_percent" type="number" min="50" max="99" value="{{ cfg.cpu_percent }}"></label>
+    <label>Backup age warning (hours)<input name="backup_age_hours" type="number" min="0" max="720" value="{{ cfg.backup_age_hours }}"><small>0 disables backup-age alerts.</small></label>
+    <label>Certificate expiry warning (days)<input name="certificate_days" type="number" min="1" max="90" value="{{ cfg.certificate_days }}"></label>
+    <label>Telemetry lag warning (seconds)<input name="telemetry_lag_seconds" type="number" min="30" max="3600" value="{{ cfg.telemetry_lag_seconds }}"></label>
+  </div><p class="field-help">The monitor runs approximately once per minute after the previous run finishes. Failed deliveries retry with backoff independently for each channel. This VM cannot report its own total power or network loss; use an external uptime check for that.</p></details>
+  <div class="settings-save"><span>Save channel details before sending a test.</span><button class="btn primary">Save notification settings</button></div>
+</form>
+<section class="settings-card space-top" data-notification-status="/system/notifications/status"><div class="settings-heading"><span class="step-mark">✓</span><div><h3>Test &amp; delivery status</h3><p>Last monitor check: <span data-last-monitor>{{ last_run }}</span></p></div></div><div class="capture-actions">
+  {% for channel,label,ready in [('email','Send test email',cfg.email_enabled),('slack','Send test to Slack',cfg.slack_enabled)] %}<form method="post" action="/system/notifications/test/{{ channel }}"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><button class="btn ghost" {% if not ready or mode!='production' %}disabled{% endif %}>{{ label }}</button></form>{% endfor %}
+  <span class="field-help">Tests run from the worker and appear below. Results update automatically.</span>
+</div>
+<div class="table-wrap"><table class="table"><thead><tr><th>Time</th><th>Channel</th><th>Type</th><th>Result</th><th>Events</th><th>Detail</th></tr></thead><tbody data-delivery-body>{% for row in deliveries %}<tr><td>{{ row.created_at }}</td><td>{{ row.channel|capitalize }}</td><td>{{ row.kind }}</td><td><span class="status-pill {{ 'healthy' if row.result=='SENT' else 'warning' }}">{{ row.result }}</span></td><td>{{ row.event_count }}</td><td>{{ row.error_code or '—' }}</td></tr>{% else %}<tr><td colspan="6" class="empty">No notifications sent yet.</td></tr>{% endfor %}</tbody></table></div></section>
+{% if incidents %}<section class="settings-card space-top"><h3>Confirmed health incidents</h3>{% for incident in incidents %}<div class="activity-event"><span class="status-pill {{ 'danger' if incident.severity=='critical' else 'warning' }}">{{ incident.severity }}</span><div><strong>{{ incident.title }}</strong><p class="field-help">{{ incident.detail }}</p></div></div>{% endfor %}</section>{% endif %}
+{% endblock %}

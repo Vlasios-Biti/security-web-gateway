@@ -1,3 +1,5 @@
+from fastapi import Depends
+from app.services.policy_lock import policy_guard
 import json
 from urllib.parse import quote_plus
 from fastapi import APIRouter, Request, Form
@@ -7,7 +9,7 @@ from app.db import audit
 from app.services.rules import list_rules, list_networks, list_categories, get_rule, create_rule, update_rule, set_status
 from app.services.apply import save_apply_state,apply_saved_change,apply_message
 
-router = APIRouter(prefix="/rules")
+router=APIRouter(dependencies=[Depends(policy_guard)],prefix="/rules")
 BASE = "/rules/system"
 
 

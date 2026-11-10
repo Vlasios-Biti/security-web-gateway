@@ -1,3 +1,5 @@
+from fastapi import Depends
+from app.services.policy_lock import policy_guard
 from fastapi import APIRouter,Request,Form
 from fastapi.responses import HTMLResponse,RedirectResponse
 from app import auth
@@ -6,7 +8,7 @@ from app.services.rules import pending_count
 from app.services.deployment import preview_diff,rollback_to,drift_status,current_live,reconcile_pending_if_no_diff
 from app.services.apply import apply_saved_change,apply_message
 from app.config import MODE
-router=APIRouter(prefix="/changes")
+router=APIRouter(dependencies=[Depends(policy_guard)],prefix="/changes")
 @router.get("/deployments",response_class=HTMLResponse)
 def index(request:Request):
     c=connect()

@@ -52,7 +52,7 @@ def explain_policy(client_ip, destination, port=443, method='CONNECT', destinati
                 JOIN policy_group_networks pgn ON pgn.group_id=pg.id
                 WHERE pgn.network_id=? AND pg.status='active' ORDER BY pg.name""",(network['id'],))]
         candidates=[]
-        for r in c.execute("SELECT * FROM rules WHERE action='ALLOW' AND status='active' ORDER BY management_type,rule_type,destination"):
+        for r in c.execute("SELECT * FROM rules WHERE action='ALLOW' AND status='active' AND (expires_at IS NULL OR expires_at='' OR julianday(expires_at)>julianday('now')) ORDER BY management_type,rule_type,destination"):
             rule=dict(r)
             if not _protocol_ok(rule['protocol'],port,method): continue
             if not _rule_match(rule,destination,destination_ip): continue

@@ -1,0 +1,76 @@
+"""Structured health-channel configuration, shared with the privileged helper."""
+import json
+import re
+from pathlib import Path
+from urllib.parse import urlsplit
+
+PATH=Path('/etc/security-web-gateway/notifications.json')
+DEFAULTS={'enabled':False,'email_enabled':False,'slack_enabled':False,'smtp_host':'','smtp_port':587,'smtp_tls':'starttls',
+ 'smtp_username':'','smtp_password':'','sender':'','recipients':[],'slack_webhook':'','minimum_severity':'warning',
+ 'confirmation_samples':2,'recovery_samples':2,'repeat_minutes':60,'disk_percent':85,'memory_percent':90,
+ 'certificate_days':30,'telemetry_lag_seconds':120,'cpu_percent':90,'backup_age_hours':72,'revision':0}
+
+
+def _email(value):
+    if not isinstance(value,str) or len(value)>254 or not re.fullmatch(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,63}",value):
+        raise ValueError('Use plain valid email addresses, without names or line breaks.')
+    return value
+
+
+def validate_settings(value,previous=None):
+    if not isinstance(value,dict):raise ValueError('Invalid notification settings.')
+    old={**DEFAULTS,**(previous or {})};result={**DEFAULTS}
+    for key in ('enabled','email_enabled','slack_enabled'):
+        if type(value.get(key,False)) is not bool:raise ValueError('Invalid channel switch.')
+        result[key]=value.get(key,False)
+    for key in ('smtp_host','smtp_username','sender'):
+        item=value.get(key,'')
+        if not isinstance(item,str) or len(item)>254 or any(ord(x)<32 for x in item):raise ValueError('Invalid SMTP field.')
+        result[key]=item.strip()
+    if result['smtp_host'] and not re.fullmatch(r'[a-zA-Z0-9._:-]+',result['smtp_host']):raise ValueError('Use an SMTP hostname or IP without a URL or port.')
+    for key,low,high in [('smtp_port',1,65535),('confirmation_samples',1,10),('recovery_samples',1,10),('repeat_minutes',0,1440),('disk_percent',50,99),('memory_percent',50,99),('certificate_days',1,90),('telemetry_lag_seconds',30,3600),('cpu_percent',50,99),('backup_age_hours',0,720)]:
+        item=value.get(key,DEFAULTS[key])
+        if type(item) is not int or not low<=item<=high:raise ValueError('Invalid setting: '+key)
+        result[key]=item
+    result['smtp_tls']=value.get('smtp_tls','starttls')
+    if result['smtp_tls'] not in ('starttls','ssl'):raise ValueError('Choose STARTTLS or implicit TLS.')
+    result['minimum_severity']=value.get('minimum_severity','warning')
+    if result['minimum_severity'] not in ('warning','critical'):raise ValueError('Invalid minimum severity.')
+    recipients=value.get('recipients',[])
+    if not isinstance(recipients,list) or len(recipients)>20:raise ValueError('Use up to twenty recipients.')
+    if any(not isinstance(x,str) for x in recipients):raise ValueError('Invalid recipient.')
+    result['recipients']=list(dict.fromkeys(_email(x.strip()) for x in recipients if isinstance(x,str) and x.strip()))
+    if result['sender']:_email(result['sender'])
+    for key,clear in [('smtp_password','clear_smtp_password'),('slack_webhook','clear_slack_webhook')]:
+        item=value.get(key,'')
+        if not isinstance(item,str) or len(item)>2048 or any(ord(x)<32 for x in item):raise ValueError('Invalid credential field.')
+        result[key]='' if value.get(clear) is True else (item or old.get(key,''))
+    if result['slack_webhook']:
+        try:
+            u=urlsplit(result['slack_webhook']);port=u.port
+        except ValueError as exc:raise ValueError('Invalid Slack webhook URL.') from None
+        if u.scheme!='https' or u.hostname not in ('hooks.slack.com','hooks.slack-gov.com') or port not in (None,443) or u.username or u.password or u.query or u.fragment or not re.fullmatch(r'/services/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+',u.path):
+            raise ValueError('Use a Slack Incoming Webhook HTTPS URL from hooks.slack.com or hooks.slack-gov.com.')
+    identity_changed=result['smtp_host'].lower()!=str(old.get('smtp_host','')).lower() or result['smtp_username']!=old.get('smtp_username','')
+    if identity_changed and old.get('smtp_password') and not value.get('smtp_password') and value.get('clear_smtp_password') is not True:
+        raise ValueError('SMTP server or username changed. Re-enter or clear the password before saving.')
+    if result['email_enabled'] and not (result['smtp_host'] and result['sender'] and result['recipients']):raise ValueError('Email requires SMTP host, sender and recipients.')
+    if result['smtp_username'] and result['email_enabled'] and not result['smtp_password']:raise ValueError('SMTP authentication requires a password.')
+    if result['slack_enabled'] and not result['slack_webhook']:raise ValueError('Configure a Slack webhook before enabling Slack.')
+    result['revision']=int(old.get('revision',0))+1
+    return result
+
+
+def read_settings(path=None):
+    p=Path(path) if path else PATH
+    if not p.is_file():return {**DEFAULTS}
+    if p.stat().st_size>32768:raise ValueError('Notification configuration is oversized.')
+    value=json.loads(p.read_text(encoding='utf-8'))
+    return {**DEFAULTS,**value}
+
+
+def public_settings(value):
+    result={**value}
+    result['smtp_password_configured']=bool(result.pop('smtp_password',''))
+    result['slack_webhook_configured']=bool(result.pop('slack_webhook',''))
+    return result

@@ -1,4 +1,6 @@
-import difflib,hashlib,json,socket,uuid
+import difflib,hashlib,json,socket,uuid,sqlite3,copy
+from contextlib import contextmanager
+import fcntl
 from app.config import CANDIDATE_ROOT,LIVE_MANAGED_CONF,DEPLOY_SOCKET,MODE,PROXY_IP,APP_VERSION
 from app.db import connect,audit
 from app.security import squid_domain_token
@@ -8,14 +10,16 @@ from app.services.access_model import effective_network_ids_for_rule
 def _acl(prefix,nid):return f"swg_{prefix}_n{int(nid)}"
 
 
-def generate_config():
-    c=connect()
+def generate_config(c=None):
+    own=c is None
+    c=c or connect()
     try:
         nets=[dict(r) for r in c.execute("SELECT * FROM networks WHERE enabled=1 AND proxy_enabled=1 ORDER BY COALESCE(vlan_id,99999),id")]
         active_net_ids={n["id"] for n in nets}
-        rules=[dict(r) for r in c.execute("SELECT * FROM rules WHERE action='ALLOW' AND status='active' ORDER BY management_type,rule_type,destination")]
+        rules=[dict(r) for r in c.execute("SELECT * FROM rules WHERE action='ALLOW' AND status='active' AND (expires_at IS NULL OR expires_at='' OR julianday(expires_at)>julianday('now')) ORDER BY management_type,rule_type,destination")]
         scopes={r["id"]:sorted(effective_network_ids_for_rule(c,r["id"],r.get("scope_mode") or "selected") & active_net_ids) for r in rules}
-    finally:c.close()
+    finally:
+        if own:c.close()
     buckets={n["id"]:{"dh":[],"ds":[],"ih":[],"is":[]} for n in nets}
     for r in rules:
         val=squid_domain_token(r["destination"]) if r["rule_type"]=="domain" else r["destination"]
@@ -76,8 +80,9 @@ def effective_policy_changed():
 def _rows(c,table):return [dict(r) for r in c.execute(f"SELECT * FROM {table} ORDER BY 1")]
 
 
-def state_snapshot():
-    c=connect()
+def state_snapshot(c=None):
+    own=c is None
+    c=c or connect()
     try:
         state={
             "rules":_rows(c,"rules"),"networks":_rows(c,"networks"),"applications":_rows(c,"applications"),"policy_groups":_rows(c,"policy_groups"),
@@ -85,7 +90,8 @@ def state_snapshot():
             "policy_group_applications":_rows(c,"policy_group_applications"),"policy_group_rules":_rows(c,"policy_group_rules"),"policy_group_networks":_rows(c,"policy_group_networks")
         }
         return json.dumps(state,separators=(",",":"))
-    finally:c.close()
+    finally:
+        if own:c.close()
 
 
 def helper_request(action,**payload):
@@ -102,19 +108,63 @@ def helper_request(action,**payload):
     finally:s.close()
 
 
-def deploy(actor,source_ip,description=""):
-    if MODE!="production":raise RuntimeError("Deployment is disabled in candidate preview mode.")
-    content=generate_config();diff=preview_diff();cid=str(uuid.uuid4());d=CANDIDATE_ROOT/cid;d.mkdir(parents=True,exist_ok=False);(d/"security-web-gateway.conf").write_text(content,encoding="utf-8");digest=hashlib.sha256(content.encode()).hexdigest();(d/"manifest.json").write_text(json.dumps({"sha256":digest}),encoding="utf-8")
-    result=helper_request("deploy",candidate_id=cid);c=connect()
+@contextmanager
+def deployment_lock():
+    CANDIDATE_ROOT.parent.mkdir(parents=True,exist_ok=True)
+    with (CANDIDATE_ROOT.parent/'deployment.lock').open('a+') as stream:
+        fcntl.flock(stream.fileno(),fcntl.LOCK_EX)
+        try:yield
+        finally:fcntl.flock(stream.fileno(),fcntl.LOCK_UN)
+
+
+def _publish_snapshot(content,state,actor,source_ip,description,expected_base=None):
+    live=current_live()
+    diff=''.join(difflib.unified_diff(live.splitlines(True),content.splitlines(True),fromfile='production',tofile='candidate'))
+    cid=str(uuid.uuid4());d=CANDIDATE_ROOT/cid;d.mkdir(parents=True,exist_ok=False)
+    (d/'security-web-gateway.conf').write_text(content,encoding='utf-8')
+    digest=hashlib.sha256(content.encode()).hexdigest()
+    (d/'manifest.json').write_text(json.dumps({'sha256':digest,'base_sha256':expected_base if expected_base is not None else hashlib.sha256(live.encode()).hexdigest()}))
+    result=helper_request('deploy',candidate_id=cid)
+    c=connect()
     try:
-        prev=c.execute("SELECT id FROM deployments WHERE status='deployed' ORDER BY id DESC LIMIT 1").fetchone();version=f"v{c.execute('SELECT COUNT(*) c FROM deployments').fetchone()['c']+1:04d}";status="deployed" if result.get("ok") else "failed"
+        c.execute('BEGIN IMMEDIATE')
+        previous=c.execute("SELECT id FROM deployments WHERE status='deployed' ORDER BY id DESC LIMIT 1").fetchone()
+        number=c.execute('SELECT COUNT(*) FROM deployments').fetchone()[0]+1
+        status='deployed' if result.get('ok') else 'failed'
+        recorded=copy.deepcopy(state)
+        if result.get('ok'):
+            unchanged=json.loads(state_snapshot(c))==state
+            # Include relationship tables: linking an existing shared rule can
+            # change policy without changing the parent's second-resolution timestamp.
+            if unchanged:
+                for table in ('rules','networks','applications','policy_groups'):
+                    for row in state.get(table,[]):
+                        c.execute(f'UPDATE {table} SET pending=0 WHERE id=?',(row['id'],))
+            else:result={**result,'pending_changes_retained':True}
+            for table in ('rules','networks','applications','policy_groups'):
+                for row in recorded.get(table,[]):row['pending']=0
         cur=c.execute("""INSERT INTO deployments(version,status,created_by,description,config_sha256,config_content,diff_text,state_json,previous_deployment_id,deployed_at)
-          VALUES(?,?,?,?,?,?,?,?,?,CASE WHEN ?='deployed' THEN CURRENT_TIMESTAMP ELSE NULL END)""",(version,status,actor,description,digest,content,diff,state_snapshot(),prev["id"] if prev else None,status))
-        if result.get("ok"):
-            c.execute("UPDATE rules SET pending=0");c.execute("UPDATE networks SET pending=0");c.execute("UPDATE applications SET pending=0");c.execute("UPDATE policy_groups SET pending=0")
-        c.commit();audit(actor,"DEPLOY","SUCCESS" if result.get("ok") else "FAILED","deployment",cur.lastrowid,source_ip,json.dumps(result))
+          VALUES(?,?,?,?,?,?,?,?,?,CASE WHEN ?='deployed' THEN CURRENT_TIMESTAMP ELSE NULL END)""",
+          (f'v{number:04d}',status,actor,description,digest,content,diff,json.dumps(recorded,separators=(',',':')),previous['id'] if previous else None,status))
+        c.commit()
+        audit(actor,'DEPLOY','SUCCESS' if result.get('ok') else 'FAILED','deployment',cur.lastrowid,source_ip,json.dumps(result))
+    except Exception:c.rollback();raise
     finally:c.close()
     return result
+
+
+def deploy(actor,source_ip,description=''):
+    if MODE!='production':raise RuntimeError('Deployment is disabled in candidate preview mode.')
+    with deployment_lock():
+        c=connect()
+        try:
+            c.execute('BEGIN')
+            expected_base=hashlib.sha256(current_live().encode()).hexdigest()
+            content=generate_config(c)
+            state=json.loads(state_snapshot(c))
+            c.commit()
+        finally:c.close()
+        return _publish_snapshot(content,state,actor,source_ip,description,expected_base)
 
 
 def _insert_rows(c,table,rows):

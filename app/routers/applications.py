@@ -1,3 +1,5 @@
+from fastapi import Depends
+from app.services.policy_lock import policy_guard
 import json
 from urllib.parse import urlparse,quote_plus
 from fastapi import APIRouter,Request,Form,File,UploadFile
@@ -12,7 +14,7 @@ from app.services.system import cached_system_health
 from app.services.learning import latest_session, start_session, stop_session
 from app.services.tab_capture import create_capture_run, extension_package, MAX_CAPTURE_BYTES
 from app.config import DISCOVERY_MAX_HAR_BYTES
-router=APIRouter(prefix="/applications")
+router=APIRouter(dependencies=[Depends(policy_guard)],prefix="/applications")
 
 def can_manage(r):return r.state.user and r.state.user["role"] in("admin","operator")
 

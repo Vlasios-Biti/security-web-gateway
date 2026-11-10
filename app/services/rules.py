@@ -1,7 +1,7 @@
 import hashlib
 import ipaddress
 from app.db import connect
-from app.security import normalize_domain, normalize_ip, resolve_domain
+from app.security import normalize_domain, normalize_ip, resolve_domain, normalize_expiration
 
 
 def list_networks(enabled_only=True):
@@ -32,6 +32,7 @@ def get_network(network_id):
 def _validate_network(name,cidr,vlan_id=None):
     name=name.strip()
     if len(name)<2:raise ValueError("Network name is required.")
+    if any(ord(ch)<32 or ord(ch)==127 for ch in name):raise ValueError("Network name cannot contain control characters.")
     try:net=ipaddress.ip_network(cidr.strip(),strict=False)
     except ValueError as exc:raise ValueError("Invalid IPv4 network/CIDR.") from exc
     if net.version!=4:raise ValueError("Only IPv4 network scopes are supported.")
@@ -164,6 +165,7 @@ def _fingerprint(kind,destination,protocol,management,category_id):return hashli
 
 
 def create_rule(kind,destination,protocol,network_ids,actor,reason,change_reference="",expires_at="",management_type="custom",category_slug=None,scope_mode="selected",policy_group_ids=None):
+    expires_at=normalize_expiration(expires_at)
     destination=normalize_domain(destination) if kind=="domain" else normalize_ip(destination);resolved=resolve_domain(destination) if kind=="domain" else []
     protocol=protocol.upper()
     if protocol not in("HTTP","HTTPS","BOTH"):raise ValueError("Invalid protocol.")
@@ -185,6 +187,7 @@ def create_rule(kind,destination,protocol,network_ids,actor,reason,change_refere
 
 
 def update_rule(rule_id,destination,protocol,network_ids,actor,reason,change_reference="",expires_at="",allow_system=False,category_slug=None,scope_mode="selected",policy_group_ids=None):
+    expires_at=normalize_expiration(expires_at)
     c=connect()
     try:
         r=c.execute("SELECT * FROM rules WHERE id=?",(rule_id,)).fetchone()

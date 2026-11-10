@@ -3,7 +3,7 @@ import sqlite3
 from pathlib import Path
 from app.config import DB_PATH
 
-EXPECTED_MIGRATION = "016"
+EXPECTED_MIGRATION = "017"
 
 
 def connect(path=None):

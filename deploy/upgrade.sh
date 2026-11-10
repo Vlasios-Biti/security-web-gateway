@@ -22,8 +22,8 @@ rollback(){
   rc=$?; trap - ERR EXIT
   if [[ $SUCCESS -eq 1 || $CUTOVER -eq 0 ]]; then exit "$rc"; fi
   echo "ERROR: upgrade failed; rolling back..." >&2
-  systemctl stop security-web-gateway.service 2>/dev/null || true
-  systemctl stop security-web-gateway-telemetry.timer security-web-gateway-source-sync.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer security-web-gateway-performance.timer 2>/dev/null || true
+  systemctl stop security-web-gateway.service security-web-gateway-health-monitor.service security-web-gateway-discovery.service security-web-gateway-telemetry.service security-web-gateway-performance.service security-web-gateway-source-sync.service security-web-gateway-storage-maintenance.service 2>/dev/null || true
+  systemctl stop security-web-gateway-telemetry.timer security-web-gateway-source-sync.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer security-web-gateway-performance.timer security-web-gateway-health-monitor.timer 2>/dev/null || true
   if [[ -f "$BACKUP/swg.db" ]]; then
     rm -f "$PDB" "$PDB-wal" "$PDB-shm"; cp -a "$BACKUP/swg.db" "$PDB"; chown proxy-mgmt:proxy-mgmt "$PDB"; chmod 0640 "$PDB"
   fi
@@ -38,6 +38,10 @@ rollback(){
   else
     rm -f /etc/systemd/system/squid.service.d/10-security-web-gateway-priority.conf
   fi
+  if [[ ! -f "$BACKUP/security-web-gateway-health-monitor.service" ]]; then
+    systemctl disable security-web-gateway-health-monitor.timer 2>/dev/null || true
+    rm -f /etc/systemd/system/security-web-gateway-health-monitor.service /etc/systemd/system/security-web-gateway-health-monitor.timer
+  fi
   systemctl daemon-reload
   systemctl restart security-web-gateway-deploy-helper.socket 2>/dev/null || true
   systemctl start security-web-gateway.service 2>/dev/null || true
@@ -46,6 +50,7 @@ rollback(){
     security-web-gateway-storage-maintenance.timer \
     security-web-gateway-discovery.timer \
     security-web-gateway-performance.timer 2>/dev/null || true
+  if [[ -f "$BACKUP/security-web-gateway-health-monitor.timer" ]]; then systemctl start security-web-gateway-health-monitor.timer 2>/dev/null || true; fi
   echo "Rollback source: $BACKUP" >&2
   exit "$rc"
 }
@@ -57,6 +62,7 @@ echo "===== 1. PRE-CHECK ====="
 [[ -f /etc/security-web-gateway/production.env ]] || { echo "Missing production.env"; exit 1; }
 OLD_REL="$(readlink -f /opt/security-web-gateway/current || true)"
 [[ -n "$OLD_REL" && -d "$OLD_REL" ]] || { echo "Invalid current release"; exit 1; }
+[[ "$OLD_REL" != "$REL" ]] || { echo "This version is already active; use a new release version for upgrades."; exit 1; }
 systemctl is-active --quiet security-web-gateway.service
 curl -fsS http://127.0.0.1:8200/healthz
 
@@ -101,12 +107,12 @@ runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production
 
 echo "===== 5. TRANSACTIONAL CUTOVER ====="
 CUTOVER=1
-systemctl stop security-web-gateway-telemetry.timer security-web-gateway-source-sync.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer security-web-gateway-performance.timer 2>/dev/null || true
-systemctl stop security-web-gateway.service
+systemctl stop security-web-gateway-telemetry.timer security-web-gateway-source-sync.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer security-web-gateway-performance.timer security-web-gateway-health-monitor.timer 2>/dev/null || true
+systemctl stop security-web-gateway.service security-web-gateway-health-monitor.service security-web-gateway-discovery.service security-web-gateway-telemetry.service security-web-gateway-performance.service security-web-gateway-source-sync.service security-web-gateway-storage-maintenance.service
 runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH="$REL" \
   "$VENV/bin/python" "$REL/tools/migrate.py" --db "$PDB" --root "$REL"
 ln -sfn "$REL" /opt/security-web-gateway/current
-for f in security-web-gateway.service security-web-gateway-source-sync.service security-web-gateway-source-sync.timer security-web-gateway-telemetry.service security-web-gateway-telemetry.timer security-web-gateway-storage-maintenance.service security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.service security-web-gateway-discovery.timer security-web-gateway-performance.service security-web-gateway-performance.timer; do
+for f in security-web-gateway.service security-web-gateway-source-sync.service security-web-gateway-source-sync.timer security-web-gateway-telemetry.service security-web-gateway-telemetry.timer security-web-gateway-storage-maintenance.service security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.service security-web-gateway-discovery.timer security-web-gateway-performance.service security-web-gateway-performance.timer security-web-gateway-health-monitor.service security-web-gateway-health-monitor.timer; do
   install -o root -g root -m 0644 "$ROOT/systemd/$f" "/etc/systemd/system/$f"
 done
 install -o root -g root -m 0750 "$ROOT/privileged/security-web-gateway-deploy-helper.py" /usr/local/sbin/security-web-gateway-deploy-helper
@@ -118,7 +124,7 @@ systemctl daemon-reload
 systemctl restart security-web-gateway-deploy-helper.socket
 systemctl restart squid
 systemctl start security-web-gateway.service
-systemctl enable --now security-web-gateway-source-sync.timer security-web-gateway-telemetry.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer security-web-gateway-performance.timer
+systemctl enable --now security-web-gateway-source-sync.timer security-web-gateway-telemetry.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer security-web-gateway-performance.timer security-web-gateway-health-monitor.timer
 
 for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8200/healthz >/tmp/security-web-gateway-upgrade-health.json 2>/dev/null && break; sleep 1; done
 cat /tmp/security-web-gateway-upgrade-health.json

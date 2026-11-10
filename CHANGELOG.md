@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.11.0
+
+- Added Administrator-only GUI configuration for health email/Slack notifications, protected credential storage, explicit channel tests and live delivery status.
+- Added an independent monitor with incident confirmation/recovery, digesting, repeat control, per-channel retry/backoff and resource/service/backup-age checks.
+- Enforced expired grants in generation/simulation and added deployed-snapshot expiry without publishing pending changes.
+- Serialized GUI/background policy editing, froze publication snapshots, retained concurrent pending work and added base-hash/managed-grammar validation in the privileged helper.
+- Hardened browser discovery with blocked Service Workers and an authenticated, public-IP-pinned loopback proxy.
+- Fixed portable backup manifests, added safe legacy archive staging, quiesced restore writers, atomic database cutover and rollback.
+- Added migration 017, health-monitor systemd units and regression tests.
+
 ## 3.10.0
 
 - Refined console spacing, typography, cards and responsive layouts; combined live/search traffic navigation and kept audit access under Activity.

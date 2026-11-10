@@ -1,3 +1,5 @@
+from fastapi import Depends
+from app.services.policy_lock import policy_guard
 import csv, io, json
 from urllib.parse import quote_plus
 from datetime import datetime, timezone, timedelta
@@ -10,7 +12,7 @@ from app.services.rules import create_rule, list_networks, list_rules
 from app.services.access_model import list_policy_groups
 from app.security import normalize_domain, normalize_ip
 from app.services.apply import save_apply_state,apply_saved_change,apply_message
-router=APIRouter(prefix="/bulk")
+router=APIRouter(dependencies=[Depends(policy_guard)],prefix="/bulk")
 def can_manage(u):return u and u["role"] in("admin","operator")
 def _parse(content):
     lines=[x for x in content.splitlines() if x.strip() and not x.lstrip().startswith("#")]

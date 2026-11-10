@@ -92,6 +92,7 @@ jobs:
               'bin/process_discovery_queue.py',
               'bin/sync_sources.py',
               'bin/maintain_storage.py',
+              'bin/monitor_health.py',
           ):
               runpy.run_path(path, run_name='swg_ci_import')
               print('IMPORT OK', path)
@@ -105,7 +106,7 @@ jobs:
           c=sqlite3.connect('/tmp/swg-ci.db')
           assert c.execute('pragma integrity_check').fetchone()[0]=='ok'
           assert not list(c.execute('pragma foreign_key_check'))
-          assert c.execute('select max(version) from schema_migrations').fetchone()[0]=='016'
+          assert c.execute('select max(version) from schema_migrations').fetchone()[0]=='017'
           assert c.execute('pragma journal_mode').fetchone()[0].lower()=='wal'
           PY
       - name: v3.3.1 to v3.4 migration
@@ -119,7 +120,7 @@ jobs:
           python - <<'PY'
           import sqlite3
           c=sqlite3.connect('/tmp/swg-v331.db')
-          assert c.execute('select max(version) from schema_migrations').fetchone()[0]=='016'
+          assert c.execute('select max(version) from schema_migrations').fetchone()[0]=='017'
           assert c.execute('pragma integrity_check').fetchone()[0]=='ok'
           assert not list(c.execute('pragma foreign_key_check'))
           PY
@@ -131,8 +132,8 @@ jobs:
         run: python tests/smoke_v370.py
       - name: v3.8 save and apply smoke tests
         run: python tests/smoke_v380.py
-      - name: Connection and learning workflows
-        run: python tests/smoke_v3100.py
+      - name: Connection, health notifications and publication safety
+        run: python tests/smoke_v3110.py
       - name: App import
         env:
           SWG_DB_PATH: /tmp/swg-ci.db
@@ -178,4 +179,4 @@ jobs:
           python tests/smoke_v340.py
           python tests/smoke_v370.py
           python tests/smoke_v380.py
-          python tests/smoke_v3100.py
+          python tests/smoke_v3110.py

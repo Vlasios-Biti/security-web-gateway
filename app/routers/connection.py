@@ -1,3 +1,5 @@
+from fastapi import Depends
+from app.services.policy_lock import policy_guard
 from urllib.parse import quote_plus
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -8,7 +10,7 @@ from app.services.pac_policy import render_pac
 from app.services.pc_services import service_profiles, save_service
 from app.services.access_model import list_policy_groups
 
-router = APIRouter(prefix="/connection")
+router=APIRouter(dependencies=[Depends(policy_guard)],prefix="/connection")
 
 
 def _admin(request):

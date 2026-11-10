@@ -1,4 +1,4 @@
-# Security Web Gateway — Security Model 3.8
+# Security Web Gateway — Security Model 3.11
 
 ## Operating model
 
@@ -109,3 +109,10 @@ No arbitrary terminal, shell, raw SQL console, arbitrary Python execution, unres
 ## Release safety
 
 Fresh installation and upgrades are deterministic and versioned. Generic in-place upgrade performs a shadow database migration/validation, creates rollback state, then cuts over application code transactionally. A failed cutover restores the previous database/release/unit state and worker timers. Pending Squid policy is never auto-deployed merely by an application upgrade.
+
+
+## Health channel credentials
+
+Health email and Slack settings are Administrator-only and CSRF-protected. Production credentials are written by the root helper to a mode-0640 VM-local file outside Git/policy exports. They are not encrypted by the application and require appropriate VM/root protection. Secrets are never rendered back to the client. SMTP uses verified TLS; Slack endpoints are restricted and redirects are rejected. Background delivery uses per-channel state/backoff and explicit test queues. Candidate mode disables outbound delivery. See docs/HEALTH_NOTIFICATIONS.md.
+
+Managed Squid candidates are constrained to a narrow ACL/access grammar and immutable validated bytes. Publications bind to an expected live hash and a frozen database snapshot; concurrent desired work is not marked applied. Browser discovery uses a public-IP-pinned authenticated egress proxy and blocked Service Workers rather than relying only on browser route interception.

@@ -16,7 +16,7 @@ hostname=$(hostname)
 source_release=$(readlink -f /opt/security-web-gateway/current || true)
 NOTE=Sensitive backup: contains user password hashes, policy data, audit data and telemetry. Never commit to Git.
 META
-sha256sum "$TMP/swg.db" > "$TMP/SHA256SUMS.txt"
+(cd "$TMP" && sha256sum swg.db > SHA256SUMS.txt)
 tar -C "$TMP" -czf "$OUT" swg.db metadata.txt SHA256SUMS.txt
 chmod 0600 "$OUT"
 echo "$OUT"

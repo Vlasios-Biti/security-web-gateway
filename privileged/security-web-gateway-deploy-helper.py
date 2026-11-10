@@ -9,10 +9,11 @@ LIVE=Path('/etc/squid/managed/security-web-gateway.conf')
 DB=Path('/var/lib/security-web-gateway/prod/swg.db')
 NGINX=Path('/etc/nginx/sites-available/security-web-gateway')
 SQUID=Path('/etc/squid/squid.conf')
-LOCK=Path('/run/security-web-gateway-policy-apply.lock')
+LOCK=Path('/run/security-web-gateway/policy-apply.lock')
 PAC=Path('/etc/security-web-gateway/proxy.pac')
 ENV_FILE=Path('/etc/security-web-gateway/production.env')
 PAC_RENDERER=Path('/opt/security-web-gateway/current/app/services/pac_policy.py')
+MANAGED_VALIDATOR=Path('/opt/security-web-gateway/current/app/services/managed_config.py')
 CID=re.compile(r'^[0-9a-f]{8}-[0-9a-f-]{27}$')
 
 def out(ok,msg,**kw):
@@ -74,8 +75,17 @@ def _deploy_locked(cid):
         raise ValueError('Candidate missing or unsafe.')
     if conf.stat().st_size>2*1024*1024 or man.stat().st_size>65536:
         raise ValueError('Candidate file too large.')
-    expected=json.loads(man.read_text()).get('sha256')
-    if expected!=sha(conf):raise ValueError('Checksum mismatch.')
+    manifest=json.loads(man.read_text())
+    fd=os.open(conf,os.O_RDONLY|os.O_NOFOLLOW)
+    with os.fdopen(fd,'rb') as stream:content=stream.read(2*1024*1024+1)
+    expected=manifest.get('sha256')
+    if len(content)>2*1024*1024 or expected!=hashlib.sha256(content).hexdigest():raise ValueError('Checksum mismatch or oversized content.')
+    spec=importlib.util.spec_from_file_location('swg_managed_validator',MANAGED_VALIDATOR)
+    validator=importlib.util.module_from_spec(spec);spec.loader.exec_module(validator)
+    validator.validate_managed_config(content.decode('utf-8'))
+    base=manifest.get('base_sha256')
+    live_sha=sha(LIVE) if LIVE.exists() else hashlib.sha256(b'').hexdigest()
+    if base is not None and base!=live_sha:raise ValueError('Live policy changed since candidate creation. Review drift before retrying.')
 
     BACKUPS.mkdir(parents=True,exist_ok=True)
     stamp=datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S-%f')
@@ -86,8 +96,7 @@ def _deploy_locked(cid):
 
     LIVE.parent.mkdir(parents=True,exist_ok=True)
     fd,tmp=tempfile.mkstemp(prefix='.security-web-gateway.',dir=str(LIVE.parent))
-    os.close(fd)
-    shutil.copy2(conf,tmp)
+    with os.fdopen(fd,'wb') as stream:stream.write(content);stream.flush();os.fsync(stream.fileno())
     perms(Path(tmp))
     os.replace(tmp,LIVE)
 
@@ -138,6 +147,30 @@ def publish_pac(policy):
     return {'ok':True,'message':'Connection policy published.','backup':str(previous) if previous else None}
 
 
+def _save_notifications_locked(value):
+    module=Path('/opt/security-web-gateway/current/app/services/notification_config.py')
+    spec=importlib.util.spec_from_file_location('swg_notification_config',module)
+    config=importlib.util.module_from_spec(spec);spec.loader.exec_module(config)
+    validated=config.validate_settings(value,config.read_settings())
+    fd,tmp=tempfile.mkstemp(prefix='.notifications-',dir=str(config.PATH.parent))
+    try:
+        with os.fdopen(fd,'w',encoding='utf-8') as stream:
+            json.dump(validated,stream);stream.flush();os.fsync(stream.fileno())
+        os.chown(tmp,0,grp.getgrnam('proxy-mgmt').gr_gid);os.chmod(tmp,0o640)
+        os.replace(tmp,config.PATH)
+    finally:
+        if os.path.exists(tmp):os.unlink(tmp)
+    return {'ok':True,'message':'Health notification settings saved.'}
+
+
+def save_notifications(value):
+    LOCK.parent.mkdir(parents=True,exist_ok=True)
+    with (LOCK.parent/'notifications.lock').open('a+') as stream:
+        fcntl.flock(stream.fileno(),fcntl.LOCK_EX)
+        try:return _save_notifications_locked(value)
+        finally:fcntl.flock(stream.fileno(),fcntl.LOCK_UN)
+
+
 def deploy(cid):
     LOCK.parent.mkdir(parents=True,exist_ok=True)
     with open(LOCK,'a+') as lockf:
@@ -150,7 +183,9 @@ def deploy(cid):
 
 def main():
     try:
-        req=json.loads(sys.stdin.readline())
+        raw=sys.stdin.readline(65537)
+        if len(raw)>65536:raise ValueError('Request too large.')
+        req=json.loads(raw)
         act=req.get('action')
         if act=='deploy':
             r=deploy(req.get('candidate_id',''))
@@ -167,6 +202,8 @@ def main():
             r=backup()
         elif act=='publish_pac':
             r=publish_pac(req.get('policy'))
+        elif act=='save_notifications':
+            r=save_notifications(req.get('settings'))
         else:
             raise ValueError('Unsupported action.')
         out(r.pop('ok',False),r.pop('message','Completed.'),**r)

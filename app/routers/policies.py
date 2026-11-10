@@ -1,3 +1,5 @@
+from fastapi import Depends
+from app.services.policy_lock import policy_guard
 import json
 from urllib.parse import quote_plus
 from fastapi import APIRouter,Request,Form
@@ -7,7 +9,7 @@ from app.db import audit,connect
 from app.services.rules import list_networks,get_network,create_network,update_network,set_network_enabled,delete_network
 from app.services.access_model import list_policy_groups,effective_network_ids_for_rule
 from app.services.apply import save_apply_state,apply_saved_change,apply_message
-router=APIRouter(prefix="/policies")
+router=APIRouter(dependencies=[Depends(policy_guard)],prefix="/policies")
 def admin(request):return request.state.user and request.state.user["role"]=="admin"
 def _apply_after_save(request,u,description,baseline_dirty):
     result=apply_saved_change(u["username"],auth.client_ip(request),description,preexisting_dirty=baseline_dirty,role=u["role"])

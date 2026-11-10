@@ -1,3 +1,5 @@
+from fastapi import Depends
+from app.services.policy_lock import policy_guard
 import json
 from urllib.parse import quote_plus
 from fastapi import APIRouter,Request,Form
@@ -7,7 +9,7 @@ from app.db import audit
 from app.services.rules import list_rules,list_networks,get_rule,create_rule,update_rule,set_status
 from app.services.access_model import list_policy_groups
 from app.services.apply import save_apply_state,apply_saved_change,apply_message
-KIND="domain";BASE="/rules/domains";router=APIRouter(prefix=BASE)
+KIND="domain";BASE="/rules/domains";router=APIRouter(dependencies=[Depends(policy_guard)],prefix=BASE)
 def can_manage(u):return u and u["role"] in("admin","operator")
 def _apply_after_save(request,u,description,baseline_dirty):
     result=apply_saved_change(u["username"],auth.client_ip(request),description,preexisting_dirty=baseline_dirty,role=u["role"])

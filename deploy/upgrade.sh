@@ -108,7 +108,8 @@ runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production
 echo "===== 5. TRANSACTIONAL CUTOVER ====="
 CUTOVER=1
 systemctl stop security-web-gateway-telemetry.timer security-web-gateway-source-sync.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer security-web-gateway-performance.timer security-web-gateway-health-monitor.timer 2>/dev/null || true
-systemctl stop security-web-gateway.service security-web-gateway-health-monitor.service security-web-gateway-discovery.service security-web-gateway-telemetry.service security-web-gateway-performance.service security-web-gateway-source-sync.service security-web-gateway-storage-maintenance.service
+systemctl stop security-web-gateway-health-monitor.service 2>/dev/null || true
+systemctl stop security-web-gateway.service security-web-gateway-discovery.service security-web-gateway-telemetry.service security-web-gateway-performance.service security-web-gateway-source-sync.service security-web-gateway-storage-maintenance.service
 runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH="$REL" \
   "$VENV/bin/python" "$REL/tools/migrate.py" --db "$PDB" --root "$REL"
 ln -sfn "$REL" /opt/security-web-gateway/current

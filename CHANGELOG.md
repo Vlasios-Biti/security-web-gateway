@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.11.1 — simpler administration and readable surfaces
+
+- Network creation needs only a name and subnet; VLAN ID and access profiles are optional. Proxy membership defaults to enabled. Optional notes/reference live under More options; audit notes are generated when omitted.
+- A Copy action prepares a network with the source profiles/direct application and rule scopes. New subnet/VLAN identifiers are required where applicable; the original is unchanged. Explicit profile deselection is respected, and failed network forms retain input.
+- Simplified profile/application/rule editors, shorter save feedback and dismissible success messages. Optional channel/service configuration expands on demand. Error and pending-approval feedback stays visible.
+- Unified legacy light surfaces, readable VLAN badges, checkbox sizing, secondary text/link contrast and responsive action layouts. Versioned UI asset URLs avoid stale stylesheet/script caches.
+- No database migration beyond 017; existing policy, credentials and audit history remain compatible.
+
+
 ## 3.11.0
 
 - Added Administrator-only GUI configuration for health email/Slack notifications, protected credential storage, explicit channel tests and live delivery status.

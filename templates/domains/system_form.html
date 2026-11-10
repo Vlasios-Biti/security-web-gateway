@@ -1,12 +1,15 @@
 {% extends "base.html" %}{% block content %}
 <div class="page-head"><div><h2>{{ page_title }}</h2><p>Protected policy editor for Google Search / Google Maps dependencies.</p></div><a class="btn ghost" href="/rules/system">Cancel</a></div>
-<div class="warning-box"><b>High-impact policy:</b> removing a required dependency can partially break Search or Maps. Admin Save validates the generated Squid policy and applies it transactionally with automatic rollback on failure.</div>
+<p class="field-help">Changes to these dependencies can affect Search or Maps.</p>
 <section class="form-panel">{% if error %}<div class="flash danger-box">{{ error }}</div>{% endif %}
 <form method="post" action="{{ '/rules/system/' ~ rule.id ~ '/edit' if rule else '/rules/system/add' }}"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}">
 <div class="form-grid"><label>Destination<input name="destination" value="{{ rule.destination if rule else '' }}" placeholder="maps.googleapis.com" required></label>
 <label>System group<select name="category_slug">{% for c in categories %}<option value="{{ c.slug }}" {% if rule and rule.category_slug==c.slug %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></label>
 <label>Protocol<select name="protocol"><option value="HTTPS" {% if rule and rule.protocol=='HTTPS' %}selected{% endif %}>HTTPS</option><option value="HTTP" {% if rule and rule.protocol=='HTTP' %}selected{% endif %}>HTTP</option><option value="BOTH" {% if not rule or rule.protocol=='BOTH' %}selected{% endif %}>HTTP + HTTPS</option></select></label>
 <div class="field full"><span class="label">VLAN / network scope</span><div class="checks">{% for n in networks %}<label class="check"><input type="checkbox" name="network_ids" value="{{ n.id }}" {% if not rule or n.id in rule.network_ids %}checked{% endif %}>{{ n.name }} <code>{{ n.cidr }}</code></label>{% endfor %}</div></div>
-<label class="full">Change reason<textarea name="reason" required placeholder="Why this system dependency is being added or modified">{{ rule.reason if rule else '' }}</textarea></label>
-<label>Change reference<input name="change_reference" value="{{ rule.change_reference if rule else '' }}" placeholder="CHG-2026-..."></label><label>Expiration (optional, UTC)<input type="datetime-local" name="expires_at" value="{{ (rule.expires_at if rule else '')|utc_input }}"></label></div>
+<details class="form-options full"><summary>More options</summary><div class="form-grid">
+<label class="full">Change note <span class="optional">optional</span><input name="reason" placeholder="Recorded automatically if blank"></label>
+<label>Ticket reference <span class="optional">optional</span><input name="change_reference" value="{{ rule.change_reference if rule and rule.change_reference else '' }}"></label>
+<label>Expires <span class="optional">UTC</span><input type="datetime-local" name="expires_at" value="{{ (rule.expires_at if rule else '')|utc_input }}"></label>
+</div></details></div>
 <div class="form-actions"><button class="btn primary">Save</button></div></form></section>{% endblock %}

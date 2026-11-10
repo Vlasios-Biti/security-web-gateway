@@ -1,5 +1,13 @@
 # Connection and application learning
 
+## Simple network and profile setup (3.11.1)
+
+Open **Policy & tools → Networks & VLANs → Add network**. Enter a name and IPv4 subnet (or `/32` for one computer). VLAN ID is an optional label; access is matched by the source IP/subnet. Choose access profiles if available and save. Proxy policy membership defaults to enabled. Notes, a ticket reference and the metadata-only mode remain under **More options**; routine changes receive an automatic audit note.
+
+Use **Copy** on an existing network to prepare another with the same access. Give it a new name/subnet and optional unique VLAN ID, adjust profiles if needed, then **Create copy**. Opening the copy screen changes nothing. Copying includes direct rule/application scopes as well as the selected profiles; it does not configure the physical router or Windows clients.
+
+Profile editors show applications and networks first. Application editors show identity and profiles first. Optional integration settings and custom exceptions remain in **More options** and retain their saved values. Email/Slack and optional Windows-service settings expand when enabled; disabling a channel does not erase its configuration. Success messages can be dismissed. Failure and pending-change messages remain visible; review them in **Activity**.
+
 ## Central connection policy
 
 Administrators use **Connection** for PAC behaviour, direct destinations, the Windows package and its installation guide. Operators and viewers cannot change or download endpoint policy packages.

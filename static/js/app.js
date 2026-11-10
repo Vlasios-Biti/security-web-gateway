@@ -184,6 +184,8 @@ document.addEventListener("DOMContentLoaded",()=>{
    master.addEventListener("change",()=>{boxes.forEach(x=>x.checked=master.checked);sync()});
    boxes.forEach(x=>x.addEventListener("change",sync));sync();
  });
+ document.querySelectorAll("[data-dismiss-message]").forEach(button=>button.addEventListener("click",()=>button.closest("[data-success-message]").remove()));
+ document.querySelectorAll("[data-channel-toggle]").forEach(input=>input.addEventListener("change",()=>{const details=input.closest(".settings-card").querySelector(".channel-settings");if(details&&input.checked)details.open=true}));
  setupNavigation();setupCommandPalette();setupCardFilters();setupLiveTrafficRefresh();setupApplicationActivityPoll();setupNotificationStatus();refreshCharts();drawSystemPerformance();if(document.getElementById("traffic-chart"))setInterval(refreshCharts,15000);
 });
 window.addEventListener("resize",()=>{clearTimeout(window.__pmResize);window.__pmResize=setTimeout(()=>{refreshCharts();drawSystemPerformance()},160)});

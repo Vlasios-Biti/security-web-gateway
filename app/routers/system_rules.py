@@ -56,7 +56,7 @@ def add_page(request: Request):
 
 @router.post("/system/add")
 def add_submit(request: Request, destination: str = Form(...), protocol: str = Form(...), category_slug: str = Form(...),
-               network_ids: list[int] = Form(...), reason: str = Form(...), change_reference: str = Form(""),
+               network_ids: list[int] = Form(...), reason: str = Form(""), change_reference: str = Form(""),
                expires_at: str = Form(""), csrf_token: str = Form(...)):
     u = request.state.user
     if not admin_only(request):
@@ -65,7 +65,7 @@ def add_submit(request: Request, destination: str = Form(...), protocol: str = F
         return HTMLResponse("Invalid request", 403)
     try:
         baseline_dirty=save_apply_state()["dirty"]
-        result = create_rule("domain", destination, protocol, network_ids, u["username"], reason,
+        result = create_rule("domain", destination, protocol, network_ids, u["username"], reason.strip() or "Updated access rule",
                              change_reference, expires_at, management_type="system", category_slug=category_slug)
         audit(u["username"], "SYSTEM_DOMAIN_CREATE", "SUCCESS", "rule", result["id"], auth.client_ip(request), json.dumps(result))
         applied,msg=_apply_after_save(request,u,"Save protected system rule "+destination,baseline_dirty)
@@ -98,7 +98,7 @@ def edit_page(rule_id: int, request: Request):
 
 @router.post("/system/{rule_id}/edit")
 def edit_submit(rule_id: int, request: Request, destination: str = Form(...), protocol: str = Form(...),
-                category_slug: str = Form(...), network_ids: list[int] = Form(...), reason: str = Form(...),
+                category_slug: str = Form(...), network_ids: list[int] = Form(...), reason: str = Form(""),
                 change_reference: str = Form(""), expires_at: str = Form(""), csrf_token: str = Form(...)):
     u = request.state.user
     if not admin_only(request):
@@ -107,7 +107,7 @@ def edit_submit(rule_id: int, request: Request, destination: str = Form(...), pr
         return HTMLResponse("Invalid request", 403)
     try:
         baseline_dirty=save_apply_state()["dirty"]
-        result = update_rule(rule_id, destination, protocol, network_ids, u["username"], reason,
+        result = update_rule(rule_id, destination, protocol, network_ids, u["username"], reason.strip() or "Updated access rule",
                              change_reference, expires_at, allow_system=True, category_slug=category_slug)
         audit(u["username"], "SYSTEM_DOMAIN_EDIT", "SUCCESS", "rule", rule_id, auth.client_ip(request), json.dumps(result))
         applied,msg=_apply_after_save(request,u,"Save protected system rule "+destination,baseline_dirty)

@@ -117,7 +117,7 @@ class Workflows(unittest.TestCase):
                 self.assertEqual(client.post('/connection', data={'csrf_token': 'wrong'}).status_code, 403)
                 self.assertEqual(client.post('/connection/services/windows-update',data={'csrf_token':'wrong','enabled':'true'}).status_code,403)
             response = client.get('/connection')
-            self.assertIn('One policy. Every device.', response.text)
+            self.assertIn('/connection/windows.zip', response.text)
             self.assertNotIn('Search traffic</a>', response.text)
             c = self.connect()
             csrf = c.execute('SELECT csrf_token FROM sessions ORDER BY id DESC LIMIT 1').fetchone()['csrf_token']

@@ -59,7 +59,8 @@ def create_network(name,cidr,actor,reason,change_reference="",vlan_id=None,descr
             for x in c.execute("SELECT rule_id FROM rule_networks WHERE network_id=?",(src,)):
                 c.execute("INSERT OR IGNORE INTO rule_networks(rule_id,network_id) VALUES(?,?)",(x["rule_id"],nid));c.execute("UPDATE rules SET pending=1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",(actor,x["rule_id"]));cloned+=1
             for x in c.execute("SELECT application_id FROM application_networks WHERE network_id=?",(src,)):c.execute("INSERT OR IGNORE INTO application_networks VALUES(?,?)",(x["application_id"],nid))
-            for x in c.execute("SELECT group_id FROM policy_group_networks WHERE network_id=?",(src,)):c.execute("INSERT OR IGNORE INTO policy_group_networks VALUES(?,?)",(x["group_id"],nid))
+            if policy_group_ids is None:
+                for x in c.execute("SELECT group_id FROM policy_group_networks WHERE network_id=?",(src,)):c.execute("INSERT OR IGNORE INTO policy_group_networks VALUES(?,?)",(x["group_id"],nid))
         for gid in {int(x) for x in (policy_group_ids or [])}:c.execute("INSERT OR IGNORE INTO policy_group_networks(group_id,network_id) VALUES(?,?)",(gid,nid))
         c.commit();return {"id":nid,"name":name,"vlan_id":vlan_id,"cidr":cidr,"proxy_enabled":bool(proxy_enabled),"cloned_rules":cloned,"policy_groups":len(set(policy_group_ids or []))}
     except Exception:c.rollback();raise

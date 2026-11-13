@@ -31,6 +31,8 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="7" height="7" rx="2"/><rect x="13" y="5" width="7" height="7" rx="2"/><rect x="4" y="14" width="7" height="5" rx="2"/><rect x="13" y="14" width="7" height="5" rx="2"/></svg><span>Access</span>
       </a>
 
+      <a href="/policies/groups" class="nav-primary {% if request.url.path.startswith('/policies/') %}active{% endif %}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v6M5 15v-4h14v4M12 11v4"/><rect x="8" y="3" width="8" height="5" rx="1"/><rect x="2" y="15" width="6" height="5" rx="1"/><rect x="9" y="15" width="6" height="5" rx="1"/><rect x="16" y="15" width="6" height="5" rx="1"/></svg><span>Profiles &amp; VLANs</span></a>
+
       <details class="nav-group" {% if '/traffic/' in request.url.path or request.url.path in ('/system/health','/system/notifications','/system/performance') %}open{% endif %}>
         <summary><span class="nav-summary-main"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17h2.5l3-7 4 10 3-7 2 4H21"/></svg><span>Monitoring</span></span><span class="nav-chevron">›</span></summary>
         <div class="nav-children">
@@ -44,7 +46,7 @@
       <a href="/connection" class="nav-primary {% if request.url.path=='/connection' %}active{% endif %}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v5M17 3v5M5 8h14v3a7 7 0 0 1-14 0V8ZM12 18v3"/></svg><span>Connection</span></a>
       {% endif %}
 
-      {% if request.state.user.role=='admin' %}<a href="/connection/bypass" class="nav-primary {% if request.url.path=='/connection/bypass' %}active{% endif %}"><span>Proxy bypass</span></a>{% endif %}
+      {% if request.state.user.role=='admin' %}<a href="/connection/bypass" class="nav-primary {% if request.url.path=='/connection/bypass' %}active{% endif %}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10a5 5 0 0 1 0 10H4M8 3 4 7l4 4M8 13l-4 4 4 4"/></svg><span>Proxy bypass</span></a>{% endif %}
       <a href="/changes/review" class="nav-primary {% if '/changes/' in request.url.path %}active{% endif %}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg><span>Activity</span>
         {% if request.state.user.role in ('admin','operator') %}<span class="nav-count" data-pending-count></span>{% endif %}
@@ -61,11 +63,9 @@
         </div>
       </details>
 
-      <details class="nav-group nav-advanced" {% if '/policies/' in request.url.path or '/rules/' in request.url.path or '/bulk/' in request.url.path or '/intelligence/' in request.url.path %}open{% endif %}>
+      <details class="nav-group nav-advanced" {% if '/bulk/' in request.url.path or '/intelligence/' in request.url.path %}open{% endif %}>
         <summary><span class="nav-summary-main"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18"/></svg><span>Policy &amp; tools</span></span><span class="nav-chevron">›</span></summary>
         <div class="nav-children">
-          <a href="/policies/groups" class="{% if request.url.path.startswith('/policies/groups') %}active{% endif %}">Access profiles</a>
-          <a href="/policies/networks" class="{% if request.url.path.startswith('/policies/networks') %}active{% endif %}">Networks &amp; VLANs</a>
           <a href="/intelligence/simulator" class="{% if request.url.path=='/intelligence/simulator' %}active{% endif %}">Policy simulator</a>
           <a href="/intelligence/dependency-candidates" class="{% if request.url.path=='/intelligence/dependency-candidates' %}active{% endif %}">Dependency review</a>
           <a href="/bulk/import" class="{% if request.url.path.startswith('/bulk/') %}active{% endif %}">Import / export</a>

@@ -191,6 +191,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   const sync=()=>picker.querySelectorAll('[data-access-panel]').forEach(panel=>{const active=panel.dataset.accessPanel===select.value;panel.hidden=!active;panel.querySelectorAll('input').forEach(input=>input.disabled=!active)});
   select.addEventListener('change',sync);sync();
  });
+ document.querySelectorAll('[data-filter-options]').forEach(input=>{const root=document.getElementById(input.dataset.filterOptions);if(root)input.addEventListener('input',()=>{const query=input.value.trim().toLowerCase();root.querySelectorAll('.check').forEach(option=>option.hidden=!option.textContent.toLowerCase().includes(query))})});
  setupNavigation();setupCommandPalette();setupCardFilters();setupLiveTrafficRefresh();setupApplicationActivityPoll();setupNotificationStatus();refreshCharts();drawSystemPerformance();if(document.getElementById("traffic-chart"))setInterval(refreshCharts,15000);
 });
 window.addEventListener("resize",()=>{clearTimeout(window.__pmResize);window.__pmResize=setTimeout(()=>{refreshCharts();drawSystemPerformance()},160)});

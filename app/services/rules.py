@@ -41,10 +41,11 @@ def _validate_network(name,cidr,vlan_id=None):
     return name,str(net),vlan_id,net
 
 
-def create_network(name,cidr,actor,reason,change_reference="",vlan_id=None,description="",proxy_enabled=True,clone_from_network_id=None,policy_group_ids=None):
+def create_network(name,cidr,actor,reason,change_reference="",vlan_id=None,description="",proxy_enabled=True,clone_from_network_id=None,policy_group_ids=None,c=None):
     name,cidr,vlan_id,net=_validate_network(name,cidr,vlan_id)
     if len(reason.strip())<3:raise ValueError("A change reason is required.")
-    c=connect()
+    own=c is None
+    c=c or connect()
     try:
         if c.execute("SELECT 1 FROM networks WHERE name=? OR cidr=?",(name,cidr)).fetchone():raise ValueError("A network with this name or CIDR already exists.")
         if vlan_id is not None and c.execute("SELECT 1 FROM networks WHERE vlan_id=?",(vlan_id,)).fetchone():raise ValueError("This VLAN ID is already assigned to another network policy.")
@@ -62,9 +63,13 @@ def create_network(name,cidr,actor,reason,change_reference="",vlan_id=None,descr
             if policy_group_ids is None:
                 for x in c.execute("SELECT group_id FROM policy_group_networks WHERE network_id=?",(src,)):c.execute("INSERT OR IGNORE INTO policy_group_networks VALUES(?,?)",(x["group_id"],nid))
         for gid in {int(x) for x in (policy_group_ids or [])}:c.execute("INSERT OR IGNORE INTO policy_group_networks(group_id,network_id) VALUES(?,?)",(gid,nid))
-        c.commit();return {"id":nid,"name":name,"vlan_id":vlan_id,"cidr":cidr,"proxy_enabled":bool(proxy_enabled),"cloned_rules":cloned,"policy_groups":len(set(policy_group_ids or []))}
-    except Exception:c.rollback();raise
-    finally:c.close()
+        if own:c.commit()
+        return {"id":nid,"name":name,"vlan_id":vlan_id,"cidr":cidr,"proxy_enabled":bool(proxy_enabled),"cloned_rules":cloned,"policy_groups":len(set(policy_group_ids or []))}
+    except Exception:
+        if own:c.rollback()
+        raise
+    finally:
+        if own:c.close()
 
 
 def update_network(network_id,name,cidr,actor,reason,change_reference="",vlan_id=None,description="",proxy_enabled=True,policy_group_ids=None):

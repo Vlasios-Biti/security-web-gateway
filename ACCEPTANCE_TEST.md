@@ -1,7 +1,7 @@
-# Security Web Gateway v3.12.0 Acceptance Test
+# Security Web Gateway v3.12.1 Acceptance Test
 
-1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.12.0`.
-2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.12.0`, mode `production`.
+1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.12.1`.
+2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.12.1`, mode `production`.
 3. `SELECT MAX(version) FROM schema_migrations` returns `017`; `PRAGMA integrity_check` returns `ok`; `PRAGMA foreign_key_check` returns no rows.
 4. `squid -k parse` and `nginx -t` succeed.
 5. `security-web-gateway.service`, `squid.service`, `nginx.service`, and `security-web-gateway-deploy-helper.socket` are active.
@@ -76,3 +76,12 @@
 - Enable SNMP read-only polling with an explicit management IP, high UDP port, long private community and manager source list. Verify authorized GET/GETNEXT/GETBULK, wrong-community/source rejection, SET denial and actual firewall isolation.
 - Enable SNMP traps and queue a test; independently confirm receiver receipt. Local SENT records UDP submission only. Exercise confirmed incident/recovery and test total VM loss using NMS polling failure detection.
 - Pilot Windows package/GPO deployment and Edge JSON. Verify fail-open with both Squid-only loss and full VM/PAC loss, independent DNS/routing and direct egress. Do not infer universal behavior for independent application proxy stacks.
+
+
+## 3.12.1 combined profile/VLAN acceptance
+
+- Create a profile, enter a new subnet/VLAN and select Google Search on one page; verify both records and their membership are saved and applied with one operation.
+- Repeat with an existing VLAN using the prefilled shortcut; confirm no duplicate network is created.
+- Try a duplicate profile name, overlapping subnet and invalid membership; confirm no orphan VLAN/profile is inserted and entered data stays visible.
+- Add a VLAN while editing a profile and keep an existing VLAN checked; verify both memberships remain.
+- Verify operator/viewer and CSRF boundaries, Copy preview without mutation, and a new copy requires its own selected/new VLAN.

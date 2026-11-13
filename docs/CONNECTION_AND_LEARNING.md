@@ -1,4 +1,14 @@
-# Access and connection guide — 3.12
+# Access and connection guide — 3.12.1
+
+## Profile and VLAN in one save
+
+Open **Profiles & VLANs → Create profile & VLAN**. Enter the profile name, select existing VLANs or expand **Create a VLAN here** and enter its subnet plus optional VLAN ID. Select the allowed applications/domains/IPs in the same form and save once. The network name is filled from the profile name; no separate network name, change reason or ticket is required.
+
+A new VLAN and its profile/memberships are saved in one database transaction and followed by one validated apply. Invalid/duplicate profile names, overlapping subnets or invalid memberships roll the entire desired-state save back. Failed forms keep entered fields. An apply failure retains the desired change as pending while the previous live policy remains active. Operators can select existing VLANs and propose custom profiles; creating a new VLAN remains administrator-only.
+
+Editing a profile can add a new VLAN while retaining checked existing VLANs. **Copy** prepares the same access selections with a new profile name and no preselected VLANs; opening it makes no changes. VLANs left after a profile is deleted appear under **VLANs without a profile**, with a shortcut that prefills the creation form. The separate Networks menu has been removed from primary navigation; legacy routes remain compatible.
+
+VLAN ID is a descriptive identifier. The source subnet/IP determines proxy matching; saving here does not create physical VLAN interfaces or change router configuration.
 
 ## One place to grant access
 
@@ -14,14 +24,6 @@ Install/upgrade runs a transactional, one-time default initializer after schema 
 
 The starter is intentionally narrow, has no *.google.com wildcard and is not a complete vendor-maintained endpoint feed. Test actual searches/consent in your environment and review captures for missing dependencies. Hostname policy cannot restrict HTTPS to the /search path or prove that every other feature on the same allowed hostname is inaccessible.
 
-
-## Simple network and profile setup (3.11.1)
-
-Open **Policy & tools → Networks & VLANs → Add network**. Enter a name and IPv4 subnet (or `/32` for one computer). VLAN ID is an optional label; access is matched by the source IP/subnet. Choose access profiles if available and save. Proxy policy membership defaults to enabled. Notes, a ticket reference and the metadata-only mode remain under **More options**; routine changes receive an automatic audit note.
-
-Use **Copy** on an existing network to prepare another with the same access. Give it a new name/subnet and optional unique VLAN ID, adjust profiles if needed, then **Create copy**. Opening the copy screen changes nothing. Copying includes direct rule/application scopes as well as the selected profiles; it does not configure the physical router or Windows clients.
-
-Profile editors show applications and networks first. Application editors show identity and profiles first. Optional integration settings and custom exceptions remain in **More options** and retain their saved values. Email/Slack and optional Windows-service settings expand when enabled; disabling a channel does not erase its configuration. Success messages can be dismissed. Failure and pending-change messages remain visible; review them in **Activity**.
 
 ## Central connection policy
 

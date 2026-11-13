@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.12.1 — profile and VLAN in one save
+
+- One Profiles & VLANs entry and combined editor for profile name, existing/new VLAN and allowed applications/domains/IPs. New network names are automatic; notes remain optional.
+- Atomic combined save rolls back network/profile/membership creation together on validation failure, preserves failed input and invokes one normal Save & Apply. Existing role/CSRF/pending-approval controls remain.
+- Profile Copy prepares access selections without silently copying production network assignments. Unassigned existing VLANs have a prefilled Create profile shortcut and reference-protected cleanup. The combined page is a primary menu entry; secondary labels/icons and long option lists were checked for readability.
+- Existing standalone network routes remain compatible; no database migration beyond 017.
+
+
 ## 3.12.0 — unified access and monitoring
 
 - One Access inventory/add flow for websites, domains and IPs; one profile-or-VLAN selector across application discovery/editing, standalone rules and bulk defaults. Existing mixed assignments can be preserved explicitly.

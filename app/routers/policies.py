@@ -108,14 +108,15 @@ def toggle(network_id:int,request:Request,enabled:int=Form(...),reason:str=Form(
     except Exception as exc:return RedirectResponse("/policies/networks?error="+str(exc).replace(" ","+"),303)
 
 @router.post("/networks/{network_id}/delete")
-def delete(network_id:int,request:Request,csrf_token:str=Form(...)):
+def delete(network_id:int,request:Request,csrf_token:str=Form(...),return_to:str=Form("")):
     u=request.state.user
     if not admin(request):return HTMLResponse("Forbidden",403)
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
+    destination="/policies/groups" if return_to=="profiles" else "/policies/networks"
     try:
         baseline_dirty=save_apply_state()["dirty"]
         delete_network(network_id,u["username"]);audit(u["username"],"NETWORK_DELETE","SUCCESS","network",network_id,auth.client_ip(request))
         applied,msg=_apply_after_save(request,u,"Delete network",baseline_dirty)
         key="msg" if applied.get("ok") else "error"
-        return RedirectResponse("/policies/networks?"+key+"="+quote_plus(msg),303)
-    except Exception as exc:return RedirectResponse("/policies/networks?error="+str(exc).replace(" ","+"),303)
+        return RedirectResponse(destination+"?"+key+"="+quote_plus(msg),303)
+    except Exception as exc:return RedirectResponse(destination+"?error="+quote_plus(str(exc)),303)

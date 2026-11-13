@@ -64,3 +64,7 @@ input::placeholder,textarea::placeholder{color:#647084!important;opacity:1}label
 [hidden]{display:none!important}
 
 .table .inline{display:inline-block;margin:0 0 0 6px}.table .inline .btn{margin:2px 0}
+
+.profile-setup{max-width:980px!important}.profile-section{margin-top:26px;padding-top:24px;border-top:1px solid #e4e9f0}.profile-section h3{font-size:15px;margin:0 0 14px}.profile-section .check span{display:block}.profile-section .check small{display:block;margin-top:4px}.new-network{margin-top:16px}.available-networks{padding:8px 18px}.available-networks>div{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-top:1px solid #e5e9f0}.available-networks>div:first-child{border-top:0}.profile-scope .chip{white-space:normal}.profile-scope code{margin-left:5px;font-size:10px}@media(max-width:650px){.available-networks>div{align-items:flex-start;flex-direction:column}.profile-actions{justify-content:flex-start!important}}
+
+.profile-section .checks{max-height:360px;overflow:auto;padding:2px}.option-search{margin-bottom:12px;width:100%}

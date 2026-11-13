@@ -199,23 +199,29 @@ def get_policy_group(group_id):
     finally:c.close()
 
 
-def create_policy_group(name,description,application_ids,rule_ids,network_ids,actor):
+def create_policy_group(name,description,application_ids,rule_ids,network_ids,actor,c=None):
     name=name.strip()
     if len(name)<2:raise ValueError("Policy group name is required.")
     apps={int(x) for x in (application_ids or [])};rules={int(x) for x in (rule_ids or [])};nets={int(x) for x in (network_ids or [])}
     effective=bool(nets and (apps or rules))
-    c=connect()
+    own=c is None
+    c=c or connect()
     try:
         if c.execute("SELECT 1 FROM policy_groups WHERE name=? AND status!='deleted'",(name,)).fetchone():raise ValueError("Policy group already exists.")
         cur=c.execute("INSERT INTO policy_groups(name,description,status,pending,created_by,updated_by) VALUES(?,?,'active',?,?,?)",(name,description.strip() or None,1 if effective else 0,actor,actor));gid=cur.lastrowid
         _replace_group_members(c,gid,apps,rules,nets)
-        c.commit();return gid
-    except Exception:c.rollback();raise
-    finally:c.close()
+        if own:c.commit()
+        return gid
+    except Exception:
+        if own:c.rollback()
+        raise
+    finally:
+        if own:c.close()
 
 
-def update_policy_group(group_id,name,description,application_ids,rule_ids,network_ids,actor):
-    c=connect()
+def update_policy_group(group_id,name,description,application_ids,rule_ids,network_ids,actor,c=None):
+    own=c is None
+    c=c or connect()
     try:
         if not c.execute("SELECT 1 FROM policy_groups WHERE id=? AND status!='deleted'",(group_id,)).fetchone():raise ValueError("Policy group not found.")
         if c.execute("SELECT 1 FROM policy_groups WHERE name=? AND id!=? AND status!='deleted'",(name.strip(),group_id)).fetchone():raise ValueError("Another policy group uses this name.")
@@ -225,9 +231,13 @@ def update_policy_group(group_id,name,description,application_ids,rule_ids,netwo
         new_apps={int(x) for x in (application_ids or [])};new_rules={int(x) for x in (rule_ids or [])};new_nets={int(x) for x in (network_ids or [])}
         policy_changed=(old_apps!=new_apps or old_rules!=new_rules or old_nets!=new_nets)
         c.execute("UPDATE policy_groups SET name=?,description=?,pending=CASE WHEN ? THEN 1 ELSE pending END,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",(name.strip(),description.strip() or None,1 if policy_changed else 0,actor,group_id))
-        _replace_group_members(c,group_id,new_apps,new_rules,new_nets);c.commit()
-    except Exception:c.rollback();raise
-    finally:c.close()
+        _replace_group_members(c,group_id,new_apps,new_rules,new_nets)
+        if own:c.commit()
+    except Exception:
+        if own:c.rollback()
+        raise
+    finally:
+        if own:c.close()
 
 
 def _replace_group_members(c,gid,application_ids,rule_ids,network_ids):

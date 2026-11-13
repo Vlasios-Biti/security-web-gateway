@@ -1,9 +1,11 @@
 # Security Web Gateway
 
+Create the Access Profile, select/create its VLAN and choose allowed access on **one page with one save**: Profiles & VLANs.
+
 Version 3.12 consolidates websites/domains/IPs under **Access**, separates **Proxy bypass**, groups traffic/health/notifications under **Monitoring**, and uses one profile-or-VLAN selector. Install/upgrade provides an unassigned Google Search starter and no customer-specific application data. Optional read-only SNMPv2c polling/traps are configured with email/Slack; SNMPv3 is not included. See [the access/deployment guide](docs/CONNECTION_AND_LEARNING.md) and [notification/SNMP setup](docs/HEALTH_NOTIFICATIONS.md).
 
 
-**Version:** 3.12.0
+**Version:** 3.12.1
 
 **Target:** single-VM, on-prem enterprise appliance  
 **Target OS:** Ubuntu Server 24.04 LTS / 26.04 LTS  
@@ -58,7 +60,7 @@ Sizing should ultimately follow concurrent CONNECT sessions, requests/sec, WAN t
 - Browser discovery rejects private/reserved targets and DNS-rebinding/SSRF-style pivots.
 - PAC supports explicit DIRECT bypasses plus fail-open `PROXY ...; DIRECT` behavior.
 
-## v3.12.0 — health notifications and operational safety
+## v3.12.1 — health notifications and operational safety
 
 - **System → Health notifications** configures optional SMTP email and Slack Incoming Webhooks entirely from the GUI, with test buttons and live delivery history.
 - Confirmed incidents, recovery, grouped messages, repeat control and independent retry/backoff run in a low-priority background worker.
@@ -242,11 +244,11 @@ Keep the repository private unless publication is intentional.
 git add -A
 git status
 git diff --cached
-git commit -m "Security Web Gateway v3.12.0"
+git commit -m "Security Web Gateway v3.12.1"
 git push
 
-git tag -a v3.12.0 -m "Security Web Gateway v3.12.0"
-git push origin v3.12.0
+git tag -a v3.12.1 -m "Security Web Gateway v3.12.1"
+git push origin v3.12.1
 ```
 
 Never stage `.db`, `.sqlite*`, `.env`, TLS/private-key material, HAR files, logs or backups.
@@ -260,7 +262,7 @@ python3 tools/migrate.py --db /tmp/swg-test.db --root .
 python3 tests/smoke_v340.py
 python3 tests/smoke_v370.py
 python3 tests/smoke_v380.py
-python3 tests/smoke_v3120.py
+python3 tests/smoke_v3121.py
 ```
 
 See `docs/ARCHITECTURE.md`, `docs/DEPLOYMENT.md`, `docs/PERFORMANCE.md`, `docs/OPERATIONS.md`, and `SECURITY_MODEL.md`.

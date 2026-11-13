@@ -1,7 +1,7 @@
-# Security Web Gateway v3.11.1 Acceptance Test
+# Security Web Gateway v3.12.0 Acceptance Test
 
-1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.11.1`.
-2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.11.1`, mode `production`.
+1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.12.0`.
+2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.12.0`, mode `production`.
 3. `SELECT MAX(version) FROM schema_migrations` returns `017`; `PRAGMA integrity_check` returns `ok`; `PRAGMA foreign_key_check` returns no rows.
 4. `squid -k parse` and `nginx -t` succeed.
 5. `security-web-gateway.service`, `squid.service`, `nginx.service`, and `security-web-gateway-deploy-helper.socket` are active.
@@ -64,3 +64,15 @@
 56. Exercise concurrent edits during a slow apply. The recorded snapshot must match the sent configuration and newer work must remain pending.
 57. Restore a portable/legacy export into a test VM of this release. Verify writer quiescence, archive/hash checks, migration, rollback-on-failure, target credentials/PAC preservation and queued-job revocation.
 58. Verify the new helper RuntimeDirectory and health-monitor timer permissions on Ubuntu. Confirm an external monitor covers full-VM/network/monitor outages.
+
+
+## 3.12 consolidated access acceptance
+
+- Open Access, add a public website and select either an Access Profile or a VLAN. Only the chosen method is visible/submitted. Confirm discovery and resulting policy, then exercise a login/button workflow using capture as needed.
+- Add an IPv4 destination in the same flow; confirm its explicit destination rule appears in Access. No website discovery is implied for IP/subnet entries.
+- Delete a mistaken profile. Confirm it disappears, the name can be reused, the network/application objects remain and another profile's shared access still works. Confirm unauthorized/invalid-CSRF deletion fails.
+- On fresh install confirm only the unassigned Google Search starter appears. Upgrade must not replace configured Google dependencies or grant it to existing networks automatically.
+- Save multiple proxy bypass destinations, change connection behavior and confirm the bypass list survives unchanged. Verify DIRECT paths with actual clients/router/DNS.
+- Enable SNMP read-only polling with an explicit management IP, high UDP port, long private community and manager source list. Verify authorized GET/GETNEXT/GETBULK, wrong-community/source rejection, SET denial and actual firewall isolation.
+- Enable SNMP traps and queue a test; independently confirm receiver receipt. Local SENT records UDP submission only. Exercise confirmed incident/recovery and test total VM loss using NMS polling failure detection.
+- Pilot Windows package/GPO deployment and Edge JSON. Verify fail-open with both Squid-only loss and full VM/PAC loss, independent DNS/routing and direct egress. Do not infer universal behavior for independent application proxy stacks.

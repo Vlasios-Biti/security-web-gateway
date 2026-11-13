@@ -29,8 +29,8 @@ python3 "$ROOT/tools/prepare_state_restore.py" "$ARCHIVE" "$TMP"
 "$VENV/bin/python" "$ROOT/tools/migrate.py" --db "$TMP/swg.db" --root "$ROOT"
 PYTHONPATH="$ROOT" SWG_DB_PATH="$TMP/swg.db" "$VENV/bin/python" -c 'from app.db import verify_schema; verify_schema()'
 TIMERS=(security-web-gateway-telemetry.timer security-web-gateway-source-sync.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer security-web-gateway-performance.timer security-web-gateway-health-monitor.timer)
-WORKERS=(security-web-gateway-telemetry.service security-web-gateway-source-sync.service security-web-gateway-storage-maintenance.service security-web-gateway-discovery.service security-web-gateway-performance.service security-web-gateway-health-monitor.service)
-for unit in security-web-gateway.service "${TIMERS[@]}"; do if systemctl is-active --quiet "$unit"; then RESTART+=("$unit"); fi; done
+WORKERS=(security-web-gateway-snmp.service security-web-gateway-telemetry.service security-web-gateway-source-sync.service security-web-gateway-storage-maintenance.service security-web-gateway-discovery.service security-web-gateway-performance.service security-web-gateway-health-monitor.service)
+for unit in security-web-gateway.service security-web-gateway-snmp.service "${TIMERS[@]}"; do if systemctl is-active --quiet "$unit"; then RESTART+=("$unit"); fi; done
 systemctl stop "${TIMERS[@]}" "${WORKERS[@]}" security-web-gateway.service
 for unit in "${WORKERS[@]}" security-web-gateway.service; do if systemctl is-active --quiet "$unit"; then echo "Writer still active: $unit"; exit 1; fi; done
 install -d -o root -g root -m 0700 "$BACKUP"

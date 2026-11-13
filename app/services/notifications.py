@@ -110,6 +110,9 @@ def send_channel(channel,cfg,body):
             response=connection.getresponse();result=response.read(256)
             if response.status!=200 or result.strip()!=b'ok':raise RuntimeError('SLACK_HTTP_'+str(response.status))
         finally:connection.close()
+    elif channel=='snmp':
+        from app.services.snmp import send_trap
+        send_trap(cfg,body)
     else:raise ValueError('Unsupported channel')
 
 
@@ -123,7 +126,7 @@ def deliver(cfg,now=None):
     now=time.time() if now is None else now
     if MODE!='production' or not cfg['enabled']:return {'sent':0,'failed':0}
     sent=failed=0
-    for channel in ('email','slack'):
+    for channel in ('email','slack','snmp'):
         if not cfg[channel+'_enabled']:continue
         c=connect()
         try:
@@ -167,7 +170,7 @@ def deliver(cfg,now=None):
 def queue_test(channel,actor):
     cfg=settings()
     if MODE!='production':raise ValueError('Outbound tests are disabled in candidate preview.')
-    if channel not in ('email','slack') or not cfg[channel+'_enabled']:raise ValueError('Configure and enable that channel first.')
+    if channel not in ('email','slack','snmp') or not cfg[channel+'_enabled']:raise ValueError('Configure and enable that channel first.')
     c=connect()
     try:
         if c.execute("SELECT 1 FROM health_test_queue WHERE channel=? AND status='pending'",(channel,)).fetchone():raise ValueError('A test is already queued.')

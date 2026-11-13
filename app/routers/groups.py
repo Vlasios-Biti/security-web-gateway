@@ -6,7 +6,7 @@ from fastapi import APIRouter,Request,Form
 from fastapi.responses import HTMLResponse,RedirectResponse
 from app import auth
 from app.db import audit
-from app.services.access_model import list_policy_groups,get_policy_group,create_policy_group,update_policy_group,set_policy_group_status,list_applications
+from app.services.access_model import delete_policy_group, list_policy_groups,get_policy_group,create_policy_group,update_policy_group,set_policy_group_status,list_applications
 from app.services.rules import list_networks,list_rules
 from app.services.apply import save_apply_state,apply_saved_change,apply_message
 router=APIRouter(dependencies=[Depends(policy_guard)],prefix="/policies/groups")
@@ -78,3 +78,17 @@ def status(group_id:int,request:Request,status:str=Form(...),csrf_token:str=Form
     applied,msg=_apply_after_save(request,u,"Update access profile "+g["name"],baseline_dirty)
     key="msg" if applied.get("ok") else "error"
     return RedirectResponse("/policies/groups?"+key+"="+quote_plus(msg),303)
+
+
+@router.post('/{group_id}/delete')
+def delete(group_id:int,request:Request,csrf_token:str=Form(...)):
+    user=request.state.user;group=get_policy_group(group_id)
+    if not group or group['status']=='deleted':return HTMLResponse('Not found',404)
+    if not can_modify_group(request,group):return HTMLResponse('Forbidden',403)
+    if not auth.check_csrf(user,csrf_token):return HTMLResponse('Invalid request',403)
+    try:
+        baseline=save_apply_state()['dirty'];delete_policy_group(group_id,user['username'])
+        audit(user['username'],'POLICY_GROUP_DELETE','SUCCESS','policy_group',group_id,auth.client_ip(request))
+        applied,msg=_apply_after_save(request,user,'Delete access profile '+group['name'],baseline)
+        return RedirectResponse('/policies/groups?'+('msg' if applied.get('ok') else 'error')+'='+quote_plus(msg),303)
+    except ValueError as exc:return RedirectResponse('/policies/groups?error='+quote_plus(str(exc)),303)

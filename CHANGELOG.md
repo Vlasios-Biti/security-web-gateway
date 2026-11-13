@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.12.0 — unified access and monitoring
+
+- One Access inventory/add flow for websites, domains and IPs; one profile-or-VLAN selector across application discovery/editing, standalone rules and bulk defaults. Existing mixed assignments can be preserved explicitly.
+- Dedicated proxy bypass page, grouped Monitoring menu, confirmed/audited profile deletion and readable responsive login.
+- Transactional unassigned Google Search starter on install/upgrade; configured applications remain untouched. No organization-specific starter data.
+- Optional SNMPv2c read-only polling and incident/recovery traps, configured alongside email/Slack; source/community checks, bounded responses and loopback transport tests. SNMPv3 and INFORM acknowledgements are not included.
+- Optional Edge PAC policy JSON and GPO deployment guidance; no new schema migration beyond 017.
+
+
 ## 3.11.1 — simpler administration and readable surfaces
 
 - Network creation needs only a name and subnet; VLAN ID and access profiles are optional. Proxy membership defaults to enabled. Optional notes/reference live under More options; audit notes are generated when omitted.

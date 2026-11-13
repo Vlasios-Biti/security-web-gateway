@@ -22,7 +22,7 @@ rollback(){
   rc=$?; trap - ERR EXIT
   if [[ $SUCCESS -eq 1 || $CUTOVER -eq 0 ]]; then exit "$rc"; fi
   echo "ERROR: upgrade failed; rolling back..." >&2
-  systemctl stop security-web-gateway.service security-web-gateway-health-monitor.service security-web-gateway-discovery.service security-web-gateway-telemetry.service security-web-gateway-performance.service security-web-gateway-source-sync.service security-web-gateway-storage-maintenance.service 2>/dev/null || true
+  systemctl stop security-web-gateway-snmp.service security-web-gateway.service security-web-gateway-health-monitor.service security-web-gateway-discovery.service security-web-gateway-telemetry.service security-web-gateway-performance.service security-web-gateway-source-sync.service security-web-gateway-storage-maintenance.service 2>/dev/null || true
   systemctl stop security-web-gateway-telemetry.timer security-web-gateway-source-sync.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer security-web-gateway-performance.timer security-web-gateway-health-monitor.timer 2>/dev/null || true
   if [[ -f "$BACKUP/swg.db" ]]; then
     rm -f "$PDB" "$PDB-wal" "$PDB-shm"; cp -a "$BACKUP/swg.db" "$PDB"; chown proxy-mgmt:proxy-mgmt "$PDB"; chmod 0640 "$PDB"
@@ -41,6 +41,12 @@ rollback(){
   if [[ ! -f "$BACKUP/security-web-gateway-health-monitor.service" ]]; then
     systemctl disable security-web-gateway-health-monitor.timer 2>/dev/null || true
     rm -f /etc/systemd/system/security-web-gateway-health-monitor.service /etc/systemd/system/security-web-gateway-health-monitor.timer
+  fi
+  if [[ -f "$BACKUP/security-web-gateway-snmp.service" ]]; then
+    systemctl daemon-reload; systemctl start security-web-gateway-snmp.service 2>/dev/null || true
+  else
+    systemctl disable security-web-gateway-snmp.service 2>/dev/null || true
+    rm -f /etc/systemd/system/security-web-gateway-snmp.service
   fi
   systemctl daemon-reload
   systemctl restart security-web-gateway-deploy-helper.socket 2>/dev/null || true
@@ -101,6 +107,8 @@ chown proxy-mgmt:proxy-mgmt "$SHADOW"; chmod 0640 "$SHADOW"
 runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH="$REL" SWG_DB_PATH="$SHADOW" \
   "$VENV/bin/python" "$REL/tools/migrate.py" --db "$SHADOW" --root "$REL"
 runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH="$REL" SWG_DB_PATH="$SHADOW" \
+  "$VENV/bin/python" "$REL/bin/setup_defaults.py"
+runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH="$REL" SWG_DB_PATH="$SHADOW" \
   "$VENV/bin/python" -c 'from app.main import app; print("APP IMPORT OK",len(app.routes))'
 runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH="$REL" SWG_DB_PATH="$SHADOW" \
   "$VENV/bin/python" "$REL/tools/validate_policy.py"
@@ -108,12 +116,14 @@ runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production
 echo "===== 5. TRANSACTIONAL CUTOVER ====="
 CUTOVER=1
 systemctl stop security-web-gateway-telemetry.timer security-web-gateway-source-sync.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer security-web-gateway-performance.timer security-web-gateway-health-monitor.timer 2>/dev/null || true
-systemctl stop security-web-gateway-health-monitor.service 2>/dev/null || true
+systemctl stop security-web-gateway-snmp.service security-web-gateway-health-monitor.service 2>/dev/null || true
 systemctl stop security-web-gateway.service security-web-gateway-discovery.service security-web-gateway-telemetry.service security-web-gateway-performance.service security-web-gateway-source-sync.service security-web-gateway-storage-maintenance.service
 runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH="$REL" \
   "$VENV/bin/python" "$REL/tools/migrate.py" --db "$PDB" --root "$REL"
+runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH="$REL" \
+  "$VENV/bin/python" "$REL/bin/setup_defaults.py"
 ln -sfn "$REL" /opt/security-web-gateway/current
-for f in security-web-gateway.service security-web-gateway-source-sync.service security-web-gateway-source-sync.timer security-web-gateway-telemetry.service security-web-gateway-telemetry.timer security-web-gateway-storage-maintenance.service security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.service security-web-gateway-discovery.timer security-web-gateway-performance.service security-web-gateway-performance.timer security-web-gateway-health-monitor.service security-web-gateway-health-monitor.timer; do
+for f in security-web-gateway-snmp.service security-web-gateway.service security-web-gateway-source-sync.service security-web-gateway-source-sync.timer security-web-gateway-telemetry.service security-web-gateway-telemetry.timer security-web-gateway-storage-maintenance.service security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.service security-web-gateway-discovery.timer security-web-gateway-performance.service security-web-gateway-performance.timer security-web-gateway-health-monitor.service security-web-gateway-health-monitor.timer; do
   install -o root -g root -m 0644 "$ROOT/systemd/$f" "/etc/systemd/system/$f"
 done
 install -o root -g root -m 0750 "$ROOT/privileged/security-web-gateway-deploy-helper.py" /usr/local/sbin/security-web-gateway-deploy-helper
@@ -125,6 +135,7 @@ systemctl daemon-reload
 systemctl restart security-web-gateway-deploy-helper.socket
 systemctl restart squid
 systemctl start security-web-gateway.service
+systemctl enable --now security-web-gateway-snmp.service
 systemctl enable --now security-web-gateway-source-sync.timer security-web-gateway-telemetry.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer security-web-gateway-performance.timer security-web-gateway-health-monitor.timer
 
 for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8200/healthz >/tmp/security-web-gateway-upgrade-health.json 2>/dev/null && break; sleep 1; done

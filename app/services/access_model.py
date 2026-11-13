@@ -238,6 +238,7 @@ def _replace_group_members(c,gid,application_ids,rule_ids,network_ids):
 
 
 def set_policy_group_status(group_id,status,actor):
+    if status=="deleted":return delete_policy_group(group_id,actor)
     if status not in("active","disabled","deleted"):raise ValueError("Invalid group status.")
     c=connect()
     try:
@@ -307,7 +308,7 @@ def create_application_dependency(application_id,kind,destination,protocol,actor
                     "Review the shared destination before widening its protocol globally."
                 )
         else:
-            slug='app-'+app['slug'];c.execute("INSERT OR IGNORE INTO categories(name,slug,system_managed) VALUES(?,?,?)",(app['name'],slug,app['system_managed']));cid=c.execute("SELECT id FROM categories WHERE slug=?",(slug,)).fetchone()['id'];mgmt='system' if app['system_managed'] else 'custom';fp=hashlib.sha256(f"{kind}|{destination}|{protocol}|{mgmt}|{cid}".encode()).hexdigest()
+            slug='app-'+app['slug'];c.execute("INSERT OR IGNORE INTO categories(name,slug,system_managed) VALUES(?,?,?)",('Application: '+app['name'],slug,app['system_managed']));cid=c.execute("SELECT id FROM categories WHERE slug=?",(slug,)).fetchone()['id'];mgmt='system' if app['system_managed'] else 'custom';fp=hashlib.sha256(f"{kind}|{destination}|{protocol}|{mgmt}|{cid}".encode()).hexdigest()
             cur=c.execute("""INSERT INTO rules(rule_type,action,destination,protocol,category_id,management_type,status,pending,reason,fingerprint,created_by,updated_by,scope_mode)
                 VALUES(?,'ALLOW',?,?,?,?, 'active',1,?,?,?,?,'selected')""",(kind,destination,protocol,cid,mgmt,reason,fp,actor,actor));rid=cur.lastrowid
         c.execute("INSERT OR REPLACE INTO application_rules(application_id,rule_id,required,source,confidence,enabled) VALUES(?,?,1,'manual','high',1)",(application_id,rid));c.execute("UPDATE applications SET pending=1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",(actor,application_id));c.commit();return rid
@@ -339,3 +340,17 @@ def set_application_dependency_status(application_id,rule_id,status,actor):
         c.rollback();raise
     finally:
         c.close()
+
+
+def delete_policy_group(group_id,actor):
+    c=connect()
+    try:
+        row=c.execute("SELECT * FROM policy_groups WHERE id=? AND status!='deleted'",(group_id,)).fetchone()
+        if not row:raise ValueError('Access profile not found.')
+        c.execute('BEGIN IMMEDIATE')
+        for table in ('policy_group_applications','policy_group_rules','policy_group_networks'):
+            c.execute('DELETE FROM '+table+' WHERE group_id=?',(group_id,))
+        c.execute("UPDATE policy_groups SET name=?,status='deleted',pending=1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",(row['name']+' [deleted '+str(group_id)+']',actor,group_id))
+        c.commit()
+    except Exception:c.rollback();raise
+    finally:c.close()

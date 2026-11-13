@@ -1,5 +1,6 @@
 from fastapi import Depends
 from app.services.policy_lock import policy_guard
+import json
 from urllib.parse import quote_plus
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -25,6 +26,23 @@ def page(request: Request):
         "page_title": "Connection", "request": request, "policy": connection_policy(),
         "pac_url": f"http://{PROXY_IP}:8081/proxy.pac", "proxy_endpoint": f"{PROXY_IP}:{PROXY_PORT}", "mode": MODE,
         "pc_services":service_profiles(), "groups":list_policy_groups()})
+
+
+@router.get('/bypass',response_class=HTMLResponse)
+def bypass_page(request:Request):
+    if not _admin(request):return HTMLResponse('Forbidden',403)
+    return request.app.state.templates.TemplateResponse(request=request,name='bypass.html',context={'request':request,'page_title':'Proxy bypass','policy':connection_policy()})
+
+
+@router.post('/bypass')
+def bypass_save(request:Request,csrf_token:str=Form(...),bypass:str=Form('')):
+    if not _admin(request):return HTMLResponse('Forbidden',403)
+    if not auth.check_csrf(request.state.user,csrf_token):return HTMLResponse('Invalid request',403)
+    try:
+        policy=connection_policy();policy['bypass']=bypass.splitlines()
+        save_connection_policy(policy,request.state.user['username'],auth.client_ip(request))
+        return RedirectResponse('/connection/bypass?msg=Bypass+destinations+saved',303)
+    except (ValueError,OSError,RuntimeError) as exc:return RedirectResponse('/connection/bypass?error='+quote_plus(str(exc)),303)
 
 
 @router.post('/services/{service_key}')
@@ -58,6 +76,13 @@ def save(request: Request, csrf_token: str = Form(...), fail_open: bool = Form(F
         return RedirectResponse("/connection?msg=" + quote_plus(message), 303)
     except (ValueError, OSError, RuntimeError) as exc:
         return RedirectResponse("/connection?error=" + quote_plus(str(exc)), 303)
+
+
+@router.get('/edge-policy.json')
+def edge_policy_download(request:Request):
+    if not _admin(request):return HTMLResponse('Forbidden',403)
+    value={'ProxyMode':'pac_script','ProxyPacUrl':f'http://{PROXY_IP}:8081/proxy.pac','ProxyPacMandatory':not connection_policy()['fail_open']}
+    return Response(json.dumps(value,indent=2),media_type='application/json',headers={'Content-Disposition':'attachment; filename="Edge-ProxySettings.json"'})
 
 
 @router.get("/windows.zip")

@@ -93,6 +93,8 @@ jobs:
               'bin/sync_sources.py',
               'bin/maintain_storage.py',
               'bin/monitor_health.py',
+              'bin/setup_defaults.py',
+              'bin/snmp_agent.py',
           ):
               runpy.run_path(path, run_name='swg_ci_import')
               print('IMPORT OK', path)
@@ -133,7 +135,7 @@ jobs:
       - name: v3.8 save and apply smoke tests
         run: python tests/smoke_v380.py
       - name: Connection, health notifications and publication safety
-        run: python tests/smoke_v3111.py
+        run: python tests/smoke_v3120.py
       - name: App import
         env:
           SWG_DB_PATH: /tmp/swg-ci.db
@@ -179,4 +181,4 @@ jobs:
           python tests/smoke_v340.py
           python tests/smoke_v370.py
           python tests/smoke_v380.py
-          python tests/smoke_v3111.py
+          python tests/smoke_v3120.py

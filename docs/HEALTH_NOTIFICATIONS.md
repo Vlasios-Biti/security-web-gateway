@@ -2,7 +2,7 @@
 
 ## Configure everything from the GUI
 
-Open **System → Health notifications** as an Administrator. Email and Slack are independent options; both and the global notification switch are off by default. No credentials are supplied with the source code.
+Open **Monitoring → Alerts & SNMP** as an Administrator. Email and Slack are independent options; both and the global notification switch are off by default. No credentials are supplied with the source code.
 
 1. For email, enter SMTP hostname, port, STARTTLS/implicit TLS, optional username/password, sender address and up to twenty recipients. Certificate verification is mandatory. Use an organisation-approved SMTP relay or an SMTP/app password supported by your provider; OAuth-only mail providers require an appropriate relay or a future OAuth integration.
 2. For Slack, create an Incoming Webhook for the desired Slack channel and paste its secret URL. The channel is selected when the webhook is authorised in Slack. Only HTTPS webhooks on hooks.slack.com or hooks.slack-gov.com are accepted; redirects are not followed.
@@ -49,3 +49,29 @@ Fresh install/upgrade deploys `security-web-gateway-health-monitor.service` and 
 `tests/smoke_v3110.py` includes existing connection/capture regressions plus incident confirmation, deduplication, recovery, per-channel retry, credential masking, TLS ordering, Slack redirect rejection, queued tests, frozen policy publication, deployed-only expiry, archive staging and discovery-proxy checks. Transport tests use mocks and do not contact real recipients.
 
 Before production rollout verify systemd permissions, real Squid parsing/reload, SMTP delivery/TLS with your provider, the chosen Slack channel, an actual restore drill and external outage monitoring on the target VM. None of those credentials or destinations are presumed from a developer machine.
+
+
+## Optional SNMP polling and traps (3.12)
+
+SNMPv2c is available as two independent opt-in options under Alerts & SNMP: outbound incident/recovery traps and inbound read-only polling. Both start off. This revision does not implement SNMPv3, encryption or INFORM acknowledgements. Use a private management network and a long private community; community/notification values are visible to observers on that network. The secret is masked and stored in the same protected VM configuration as other channel credentials, outside Git and state exports.
+
+For traps configure the receiver's IPv4 address, UDP port (normally 162) and community. Enable the notification master switch for automatic incidents; the explicit queued SNMP test works independently. A SENT history row means local UDP submission, not confirmed receiver delivery. The global minimum severity, confirmation, deduplication, recovery and retry rules apply, though an unacknowledged UDP packet loss cannot be detected/retried by the sender.
+
+For polling configure a specific gateway listener IPv4, UDP port (default 1161, range 1024–65535) and explicit permitted monitoring IPv4 addresses/subnets. There is no default public/community listener and no SET support. Source filtering, bounded packet/response size, GETBULK limits and response rate limits apply. The optional service watches configuration changes and opens/closes its listener accordingly. Polling is independent of the notification master switch. Configure firewall access to this UDP port only from the monitoring servers; installation does not alter the firewall automatically.
+
+The default numeric base is `1.3.6.1.4.1.32473.42`, an example enterprise branch. Configure your assigned enterprise branch for production integration. The following scalar suffixes are readable:
+
+| Suffix | Value |
+| --- | --- |
+| .1.0 | Health: 0 unknown, 1 healthy, 2 warning, 3 critical |
+| .2.0 | Active incident count |
+| .3.0 | CPU percent multiplied by 100 |
+| .4.0 | Memory percent multiplied by 100 |
+| .5.0 | Disk percent multiplied by 100 |
+| .6.0 | Sampler stale: 1 stale, 0 fresh |
+| .7.0 | Proxy listener: 1 up, 0 down, -1 unknown |
+| .8.0 | Application version string |
+
+Standard sysDescr.0, sysName.0 and agent-process sysUpTime.0 are also readable. Metric snapshots refresh about every five seconds from existing health/performance data; use health/stale indicators before interpreting zero resource values. Notification OID is base.0.1 with message at base.10.0 and severity at base.11.0. These scalar/OID conventions are documented for manual configuration in your NMS; no vendor MIB or automatic NMS provisioning is implied.
+
+Local tests exchange real SNMP packets over loopback and verify read-only responses, wrong-community/source rejection, bounded bulk responses and trap decoding. Actual remote NMS receipt, polling, UDP firewall behavior and service installation need a target-VM acceptance check. See [Net-SNMP notification semantics](https://www.net-snmp.org/tutorial/tutorial-5/commands/snmptrap-v3.html) for the distinction between traps and acknowledged informs.

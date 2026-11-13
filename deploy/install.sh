@@ -208,6 +208,8 @@ ln -sfn "$REL" /opt/security-web-gateway/current
 echo "===== 7. DATABASE ====="
 runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH="$REL" \
   /opt/security-web-gateway/venv/bin/python "$REL/tools/migrate.py" --db /var/lib/security-web-gateway/prod/swg.db --root "$REL"
+runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH="$REL" \
+  /opt/security-web-gateway/venv/bin/python "$REL/bin/setup_defaults.py"
 chown proxy-mgmt:proxy-mgmt /var/lib/security-web-gateway/prod/swg.db; chmod 0640 /var/lib/security-web-gateway/prod/swg.db
 
 echo "===== 8. INITIAL MANAGED POLICY ====="
@@ -245,7 +247,7 @@ echo "===== 10. PRIVILEGED HELPER + SYSTEMD ====="
 install -o root -g root -m 0750 "$ROOT/privileged/security-web-gateway-deploy-helper.py" /usr/local/sbin/security-web-gateway-deploy-helper
 install -o root -g root -m 0644 "$ROOT/privileged/security-web-gateway-deploy-helper.socket" /etc/systemd/system/security-web-gateway-deploy-helper.socket
 install -o root -g root -m 0644 "$ROOT/privileged/security-web-gateway-deploy-helper@.service" /etc/systemd/system/security-web-gateway-deploy-helper@.service
-for f in security-web-gateway.service security-web-gateway-source-sync.service security-web-gateway-source-sync.timer security-web-gateway-telemetry.service security-web-gateway-telemetry.timer security-web-gateway-storage-maintenance.service security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.service security-web-gateway-discovery.timer security-web-gateway-performance.service security-web-gateway-performance.timer security-web-gateway-health-monitor.service security-web-gateway-health-monitor.timer; do
+for f in security-web-gateway-snmp.service security-web-gateway.service security-web-gateway-source-sync.service security-web-gateway-source-sync.timer security-web-gateway-telemetry.service security-web-gateway-telemetry.timer security-web-gateway-storage-maintenance.service security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.service security-web-gateway-discovery.timer security-web-gateway-performance.service security-web-gateway-performance.timer security-web-gateway-health-monitor.service security-web-gateway-health-monitor.timer; do
   install -o root -g root -m 0644 "$ROOT/systemd/$f" "/etc/systemd/system/$f"
 done
 install -d -o root -g root -m 0755 /etc/systemd/system/squid.service.d
@@ -254,6 +256,7 @@ systemctl daemon-reload
 systemctl restart squid
 systemctl enable --now security-web-gateway-deploy-helper.socket
 systemctl enable --now security-web-gateway.service
+systemctl enable --now security-web-gateway-snmp.service
 systemctl enable --now security-web-gateway-source-sync.timer security-web-gateway-telemetry.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer security-web-gateway-performance.timer security-web-gateway-health-monitor.timer
 
 for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8200/healthz >/tmp/security-web-gateway-health.json 2>/dev/null && break; sleep 1; done

@@ -20,10 +20,7 @@
     <label>Website URL<input name="source_ref" type="url" required placeholder="https://portal.vendor.example"></label>
   </div>
 
-  <div class="scope-picker">
-    <span class="label">Who should have access?</span>
-    <div class="checks">{% for g in groups %}<label class="check"><input type="checkbox" name="policy_group_ids" value="{{ g.id }}">{{ g.name }} <small>{{ g.network_count }} network(s)</small></label>{% else %}<span class="muted">No Access Profiles configured yet. You can assign access later.</span>{% endfor %}</div>
-  </div>
+  <div class="scope-picker">{% include 'components/access_choice.html' %}</div>
 
   <div class="onboarding-actions"><button class="btn primary large">Add application</button><span></span></div>
 </form>
@@ -39,7 +36,7 @@
       <form method="post" action="/applications/discover/har" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}">
         <div class="form-grid"><label>Application name<input name="name" required></label><label>Primary domain<input name="seed_domain" required placeholder="example.com"></label><label class="full">HAR file<input type="file" name="har_file" accept=".har,application/json" required></label></div>
-        <div class="checks">{% for g in groups %}<label class="check"><input type="checkbox" name="policy_group_ids" value="{{ g.id }}">{{ g.name }}</label>{% endfor %}</div>
+        {% include 'components/access_choice.html' %}
         <button class="btn ghost">Analyze HAR</button>
       </form>
     </section>

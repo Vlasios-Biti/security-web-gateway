@@ -65,6 +65,13 @@ $ErrorActionPreference = "Stop"
 if ($LASTEXITCODE -ne 0) {{ throw "Proxy installation failed." }}
 ''')
         archive.writestr("Build-For-This-Gateway.ps1", f'& "$PSScriptRoot\\Build-Proxy-Control-Setup.ps1" -PacUrl "{pac_url}"\r\n')
+        archive.writestr('GPO-DEPLOYMENT.txt', '''Deploy the entire extracted package through your managed GPO startup or Intune install process.
+Run Install-Managed-Proxy.ps1 with administrator/SYSTEM rights using your approved script signing policy.
+Test on one computer before rollout. Do not run a script directly from an untrusted writable share.
+The package controls Windows system proxy settings; applications with independent stacks need their own settings.
+Microsoft Edge ProxySettings JSON can be downloaded from Connection in the gateway GUI.
+For fail-open operation, the router must allow direct egress and DNS must remain available without this gateway.
+''')
         archive.writestr("START-HERE.txt", f'''SECURITY WEB GATEWAY - WINDOWS SETUP
 PAC: {pac_url}
 

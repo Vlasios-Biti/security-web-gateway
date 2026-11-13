@@ -1,14 +1,15 @@
 from fastapi import Depends
 from app.services.policy_lock import policy_guard
-import json
+import json,ipaddress
 from urllib.parse import urlparse,quote_plus
 from fastapi import APIRouter,Request,Form,File,UploadFile
 from fastapi.responses import HTMLResponse,RedirectResponse,Response
 from app import auth
 from app.db import audit,connect
+from app.services.access_choice import choose_access,save_discovery_access
 from app.services.access_model import list_applications,get_application,create_application,update_application,set_application_status,delete_application,list_policy_groups,create_application_dependency,set_application_dependency_status
 from app.services.discovery import catalog_search,create_run,create_har_run,get_run,list_runs,approve_run
-from app.services.rules import list_networks
+from app.services.rules import list_networks,list_rules,create_rule
 from app.services.apply import save_apply_state,apply_saved_change,apply_message
 from app.services.system import cached_system_health
 from app.services.learning import latest_session, start_session, stop_session
@@ -49,7 +50,45 @@ def index(request:Request):
     for r in runs:
         aid=r.get("application_id")
         if aid and aid not in latest:latest[aid]=r
-    return request.app.state.templates.TemplateResponse(request=request,name="applications/list.html",context={"request":request,"page_title":"Applications","applications":apps,"runs":runs,"stats":stats,"latest_runs":latest})
+    return request.app.state.templates.TemplateResponse(request=request,name="applications/list.html",context={"request":request,"page_title":"Access","standalone":list_rules(management="custom",standalone_only=True),"applications":apps,"runs":runs,"stats":stats,"latest_runs":latest})
+
+@router.get('/allow',response_class=HTMLResponse)
+def allow_page(request:Request):
+    if not can_manage(request):return HTMLResponse('Forbidden',403)
+    return request.app.state.templates.TemplateResponse(request=request,name='applications/allow.html',context={'request':request,'page_title':'Add access','networks':list_networks(),'groups':list_policy_groups()})
+
+
+@router.post('/allow')
+def allow_submit(request:Request,destination:str=Form(...),name:str=Form(''),access_mode:str=Form('none'),network_ids:list[int]=Form(default=[]),policy_group_ids:list[int]=Form(default=[]),csrf_token:str=Form(...)):
+    if not can_manage(request):return HTMLResponse('Forbidden',403)
+    if not auth.check_csrf(request.state.user,csrf_token):return HTMLResponse('Invalid request',403)
+    target=destination.strip()
+    try:
+        networks,groups,_=choose_access(access_mode,network_ids,policy_group_ids)
+        try:ip=ipaddress.ip_network(target,strict=False)
+        except ValueError:ip=None
+        if ip:
+            if not networks and not groups:raise ValueError('Choose a profile or VLAN for this IP.')
+            baseline=save_apply_state()['dirty']
+            result=create_rule('ip',str(ip),'BOTH',networks,request.state.user['username'],('Access label: '+name.strip()) if name.strip() else 'Allowed from Access',policy_group_ids=groups)
+            audit(request.state.user['username'],'IP_CREATE','SUCCESS','rule',result['id'],auth.client_ip(request))
+            applied,msg=_apply_after_save(request,request.state.user,'Allow IP '+str(ip),baseline)
+            return RedirectResponse('/applications?'+('msg' if applied.get('ok') else 'error')+'='+quote_plus(msg),303)
+        url=target if '://' in target else 'https://'+target
+        parsed=urlparse(url)
+        if parsed.scheme not in ('http','https') or not parsed.hostname or parsed.username or parsed.password:raise ValueError('Enter a website, domain or IPv4 address.')
+        if not name.strip():
+            c=connect()
+            try:
+                existing=c.execute("SELECT name FROM applications WHERE status!='deleted' AND seed_domain=?",(parsed.hostname,)).fetchone()
+                if existing:
+                    name=existing['name']
+                    if access_mode=='none':access_mode='keep'
+            finally:c.close()
+        return discover_custom(request,name=name.strip() or parsed.hostname,method='browser_auto',source_ref=url,seed_domain=parsed.hostname,auto_approve=1,access_mode=access_mode,network_ids=networks,policy_group_ids=groups,csrf_token=csrf_token)
+    except ValueError as exc:
+        return request.app.state.templates.TemplateResponse(request=request,name='applications/allow.html',context={'request':request,'page_title':'Add access','networks':list_networks(),'groups':list_policy_groups(),'error':str(exc),'draft_destination':destination,'draft_name':name,'access_groups':policy_group_ids if access_mode=='profiles' else [],'access_networks':network_ids if access_mode=='networks' else []},status_code=400)
+
 
 @router.get("/add",response_class=HTMLResponse)
 def add_page(request:Request):
@@ -57,12 +96,13 @@ def add_page(request:Request):
     return request.app.state.templates.TemplateResponse(request=request,name="applications/form.html",context={"request":request,"page_title":"Add Application Policy","application":None,"networks":list_networks(),"groups":list_policy_groups(),"error":None})
 
 @router.post("/add")
-def add_submit(request:Request,name:str=Form(...),provider:str=Form(""),description:str=Form(""),seed_domain:str=Form(""),source_kind:str=Form("manual"),source_ref:str=Form(""),auto_monitor:int=Form(0),network_ids:list[int]=Form(default=[]),policy_group_ids:list[int]=Form(default=[]),csrf_token:str=Form(...)):
+def add_submit(request:Request,name:str=Form(...),provider:str=Form(""),description:str=Form(""),seed_domain:str=Form(""),source_kind:str=Form("manual"),source_ref:str=Form(""),auto_monitor:int=Form(0),network_ids:list[int]=Form(default=[]),policy_group_ids:list[int]=Form(default=[]),csrf_token:str=Form(...),access_mode:str=Form("")):
     u=request.state.user
     if not can_manage(request):return HTMLResponse("Forbidden",403)
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
     try:
         baseline_dirty=save_apply_state()["dirty"]
+        network_ids,policy_group_ids,_=choose_access(access_mode,network_ids,policy_group_ids,None)
         aid=create_application(name,provider,description,seed_domain,source_kind,source_ref,bool(auto_monitor),u["username"]);update_application(aid,name,provider,description,seed_domain,source_kind,source_ref,bool(auto_monitor),network_ids,u["username"],policy_group_ids);audit(u["username"],"APPLICATION_CREATE","SUCCESS","application",aid,auth.client_ip(request))
         result,msg=_apply_after_save(request,u,f"Save application {name}",baseline_dirty)
         key="msg" if result.get("ok") else "error"
@@ -72,10 +112,10 @@ def add_submit(request:Request,name:str=Form(...),provider:str=Form(""),descript
 @router.get("/discover",response_class=HTMLResponse)
 def discover_page(request:Request,query:str=""):
     if not can_manage(request):return HTMLResponse("Forbidden",403)
-    return request.app.state.templates.TemplateResponse(request=request,name="applications/discover.html",context={"request":request,"page_title":"Discover Application","query":query,"catalog":catalog_search(query) if query else [],"groups":list_policy_groups(),"error":None})
+    return request.app.state.templates.TemplateResponse(request=request,name="applications/discover.html",context={"request":request,"page_title":"Discover Application","query":query,"catalog":catalog_search(query) if query else [],"networks":list_networks(),"groups":list_policy_groups(),"error":None})
 
 @router.post("/discover/catalog")
-def discover_catalog(request:Request,catalog_key:str=Form(...),policy_group_ids:list[int]=Form(default=[]),csrf_token:str=Form(...)):
+def discover_catalog(request:Request,catalog_key:str=Form(...),policy_group_ids:list[int]=Form(default=[]),csrf_token:str=Form(...),access_mode:str=Form(""),network_ids:list[int]=Form(default=[])):
     u=request.state.user
     if not can_manage(request):return HTMLResponse("Forbidden",403)
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
@@ -85,18 +125,13 @@ def discover_catalog(request:Request,catalog_key:str=Form(...),policy_group_ids:
         baseline_dirty=save_apply_state()["dirty"]
         c=connect();existing=c.execute("SELECT id FROM applications WHERE name=? AND status!='deleted'",(item["name"],)).fetchone();c.close()
         aid=existing["id"] if existing else create_application(item["name"],item["provider"],item["description"],item["seed_domain"],item.get("source_kind",item["method"]),item.get("source_ref",catalog_key),bool(item.get("auto_monitor")),u["username"],system_managed=False)
-        if policy_group_ids:
-            c=connect()
-            try:
-                for gid in {int(x) for x in policy_group_ids}:c.execute("INSERT OR IGNORE INTO policy_group_applications(group_id,application_id) VALUES(?,?)",(gid,aid));c.execute("UPDATE policy_groups SET pending=1 WHERE id=?",(gid,))
-                c.commit()
-            finally:c.close()
+        save_discovery_access(aid,access_mode,network_ids,policy_group_ids)
         method=item["method"]
         rid=create_run(aid,item.get("seed_domain") or item["name"],method,u["username"],source_ref=item.get("source_ref"),catalog_key=catalog_key,auto_apply=bool(u["role"]=="admin"),baseline_dirty=baseline_dirty);audit(u["username"],"DISCOVERY_START","SUCCESS","discovery_run",rid,auth.client_ip(request),json.dumps({"catalog":catalog_key,"method":method}));return RedirectResponse(f"/applications/discovery/{rid}",303)
     except Exception as exc:return RedirectResponse("/applications/discover?error="+str(exc).replace(" ","+"),303)
 
 @router.post("/discover/custom")
-def discover_custom(request:Request,name:str=Form(...),seed_domain:str=Form(""),method:str=Form(...),source_ref:str=Form(""),client_ip:str=Form(""),window_minutes:int=Form(10),auto_approve:int=Form(0),policy_group_ids:list[int]=Form(default=[]),csrf_token:str=Form(...)):
+def discover_custom(request:Request,name:str=Form(...),seed_domain:str=Form(""),method:str=Form(...),source_ref:str=Form(""),client_ip:str=Form(""),window_minutes:int=Form(10),auto_approve:int=Form(0),policy_group_ids:list[int]=Form(default=[]),csrf_token:str=Form(...),access_mode:str=Form(""),network_ids:list[int]=Form(default=[])):
     u=request.state.user
     if not can_manage(request):return HTMLResponse("Forbidden",403)
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
@@ -107,12 +142,7 @@ def discover_custom(request:Request,name:str=Form(...),seed_domain:str=Form(""),
             seed_domain=(p.hostname or "").strip().lower()
         c=connect();existing=c.execute("SELECT id FROM applications WHERE name=? AND status!='deleted'",(name.strip(),)).fetchone();c.close()
         aid=existing["id"] if existing else create_application(name,"Custom",f"Managed web application: {name}",seed_domain,"official_url" if method=="official_url" else "observed",source_ref,False,u["username"])
-        if policy_group_ids:
-            c=connect()
-            try:
-                for gid in {int(x) for x in policy_group_ids}:c.execute("INSERT OR IGNORE INTO policy_group_applications VALUES(?,?)",(gid,aid));c.execute("UPDATE policy_groups SET pending=1 WHERE id=?",(gid,))
-                c.commit()
-            finally:c.close()
+        save_discovery_access(aid,access_mode,network_ids,policy_group_ids)
         query=seed_domain if method=="seed_probe" else (source_ref if method=="browser_auto" else name)
         rid=create_run(aid,query,method,u["username"],source_ref=source_ref,client_ip=client_ip,window_minutes=window_minutes,auto_approve=bool(auto_approve),auto_apply=bool(auto_approve and u["role"]=="admin"),baseline_dirty=baseline_dirty);audit(u["username"],"DISCOVERY_START","SUCCESS","discovery_run",rid,auth.client_ip(request),json.dumps({"method":method,"automatic":bool(auto_approve)}))
         if auto_approve:
@@ -121,7 +151,7 @@ def discover_custom(request:Request,name:str=Form(...),seed_domain:str=Form(""),
     except Exception as exc:return RedirectResponse("/applications/discover?error="+str(exc).replace(" ","+"),303)
 
 @router.post("/discover/har")
-async def discover_har_upload(request:Request,name:str=Form(...),seed_domain:str=Form(""),policy_group_ids:list[int]=Form(default=[]),har_file:UploadFile=File(...),csrf_token:str=Form(...)):
+async def discover_har_upload(request:Request,name:str=Form(...),seed_domain:str=Form(""),policy_group_ids:list[int]=Form(default=[]),har_file:UploadFile=File(...),csrf_token:str=Form(...),access_mode:str=Form(""),network_ids:list[int]=Form(default=[])):
     u=request.state.user
     if not can_manage(request):return HTMLResponse("Forbidden",403)
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
@@ -130,13 +160,7 @@ async def discover_har_upload(request:Request,name:str=Form(...),seed_domain:str
         raw=await har_file.read()
         c=connect();existing=c.execute("SELECT id FROM applications WHERE name=? AND status!='deleted'",(name.strip(),)).fetchone();c.close()
         aid=existing["id"] if existing else create_application(name,"Custom",f"Discovered application: {name}",seed_domain,"observed","HAR workflow",False,u["username"])
-        if policy_group_ids:
-            c=connect()
-            try:
-                for gid in {int(x) for x in policy_group_ids}:
-                    c.execute("INSERT OR IGNORE INTO policy_group_applications VALUES(?,?)",(gid,aid));c.execute("UPDATE policy_groups SET pending=1 WHERE id=?",(gid,))
-                c.commit()
-            finally:c.close()
+        save_discovery_access(aid,access_mode,network_ids,policy_group_ids)
         rid=create_har_run(aid,seed_domain,raw,u["username"],auto_apply=bool(u["role"]=="admin"),baseline_dirty=baseline_dirty)
         audit(u["username"],"DISCOVERY_HAR","SUCCESS","discovery_run",rid,auth.client_ip(request),json.dumps({"filename":har_file.filename,"bytes":len(raw)}))
         return RedirectResponse(f"/applications/discovery/{rid}",303)
@@ -269,13 +293,14 @@ def edit_page(application_id:int,request:Request):
     return request.app.state.templates.TemplateResponse(request=request,name="applications/form.html",context={"request":request,"page_title":"Edit Application Policy","application":app,"networks":list_networks(),"groups":list_policy_groups(),"error":None})
 
 @router.post("/{application_id}/edit")
-def edit_submit(application_id:int,request:Request,name:str=Form(...),provider:str=Form(""),description:str=Form(""),seed_domain:str=Form(""),source_kind:str=Form("manual"),source_ref:str=Form(""),auto_monitor:int=Form(0),network_ids:list[int]=Form(default=[]),policy_group_ids:list[int]=Form(default=[]),csrf_token:str=Form(...)):
+def edit_submit(application_id:int,request:Request,name:str=Form(...),provider:str=Form(""),description:str=Form(""),seed_domain:str=Form(""),source_kind:str=Form("manual"),source_ref:str=Form(""),auto_monitor:int=Form(0),network_ids:list[int]=Form(default=[]),policy_group_ids:list[int]=Form(default=[]),csrf_token:str=Form(...),access_mode:str=Form("")):
     u=request.state.user;app=get_application(application_id)
     if not app:return HTMLResponse("Not found",404)
     if not can_modify_application(request,app):return HTMLResponse("Forbidden",403)
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
     try:
         baseline_dirty=save_apply_state()["dirty"]
+        network_ids,policy_group_ids,_=choose_access(access_mode,network_ids,policy_group_ids,app)
         update_application(application_id,name,provider,description,seed_domain,source_kind,source_ref,bool(auto_monitor),network_ids,u["username"],policy_group_ids);audit(u["username"],"APPLICATION_EDIT","SUCCESS","application",application_id,auth.client_ip(request))
         result,msg=_apply_after_save(request,u,f"Save application {name}",baseline_dirty)
         key="msg" if result.get("ok") else "error"

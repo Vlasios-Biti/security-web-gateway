@@ -98,6 +98,7 @@ def worker_health():
       "telemetry":"security-web-gateway-telemetry.timer",
       "performance":"security-web-gateway-performance.timer",
       "health_monitor":"security-web-gateway-health-monitor.timer",
+      "snmp_agent":"security-web-gateway-snmp.service",
       "discovery":"security-web-gateway-discovery.timer",
       "source_sync":"security-web-gateway-source-sync.timer",
       "storage":"security-web-gateway-storage-maintenance.timer",

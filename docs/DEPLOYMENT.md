@@ -96,7 +96,7 @@ sudo ./deploy/upgrade.sh --confirm
 
 ### VALIDATION
 
-- `/healthz` reports version `3.11.1`
+- `/healthz` reports version `3.12.0`
 - schema migration is `017`
 - `PRAGMA integrity_check` returns `ok`
 - all expected timers including `security-web-gateway-performance.timer` and `security-web-gateway-health-monitor.timer` are active

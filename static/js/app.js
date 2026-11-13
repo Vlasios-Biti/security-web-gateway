@@ -186,6 +186,11 @@ document.addEventListener("DOMContentLoaded",()=>{
  });
  document.querySelectorAll("[data-dismiss-message]").forEach(button=>button.addEventListener("click",()=>button.closest("[data-success-message]").remove()));
  document.querySelectorAll("[data-channel-toggle]").forEach(input=>input.addEventListener("change",()=>{const details=input.closest(".settings-card").querySelector(".channel-settings");if(details&&input.checked)details.open=true}));
+ document.querySelectorAll('[data-access-choice]').forEach(picker=>{
+  const select=picker.querySelector('[data-access-method]');
+  const sync=()=>picker.querySelectorAll('[data-access-panel]').forEach(panel=>{const active=panel.dataset.accessPanel===select.value;panel.hidden=!active;panel.querySelectorAll('input').forEach(input=>input.disabled=!active)});
+  select.addEventListener('change',sync);sync();
+ });
  setupNavigation();setupCommandPalette();setupCardFilters();setupLiveTrafficRefresh();setupApplicationActivityPoll();setupNotificationStatus();refreshCharts();drawSystemPerformance();if(document.getElementById("traffic-chart"))setInterval(refreshCharts,15000);
 });
 window.addEventListener("resize",()=>{clearTimeout(window.__pmResize);window.__pmResize=setTimeout(()=>{refreshCharts();drawSystemPerformance()},160)});

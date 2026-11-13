@@ -1,4 +1,19 @@
-# Connection and application learning
+# Access and connection guide — 3.12
+
+## One place to grant access
+
+Open **Access → Add access**. Enter a website/domain or an IPv4 address/subnet and select **Access profile** or **VLAN / network**. Only the selected method's controls are displayed. A website/domain starts public browser dependency discovery; an IP/subnet becomes an explicit HTTP/HTTPS destination rule without a website scan. All applications and standalone rules appear in Access. A successful public scan is evidence from visited pages, not a guarantee of every login/button workflow; selected-tab and HAR capture remain available inside the application's page.
+
+Existing entries with both profile and direct-network assignments show **Keep existing access**. Saving that choice preserves the existing union. Selecting a new method intentionally replaces the previous assignments. Old API/import payloads remain compatible. New GUI forms cannot accidentally submit hidden selections from the other method.
+
+**Proxy bypass** is separate: destinations there always use DIRECT, following endpoint routing/DNS. Connection saves preserve the bypass list. **Monitoring** groups traffic, health, and Alerts & SNMP. **Connection** contains deployment, fail-open behavior and optional Windows services. Profile deletion is confirmed and audited; it archives the profile and removes only its memberships, preserving shared networks, applications and rules. Admin approval/pending-change rules still apply.
+
+## Generic Google starter
+
+Install/upgrade runs a transactional, one-time default initializer after schema migration, first against the upgrade shadow DB. Fresh installs expose Google Search with a small exact-host HTTPS starter (google.com, www.google.com, consent.google.com, www.gstatic.com, ssl.gstatic.com). There are no customer-specific applications. The empty old Maps placeholder is retired; configured applications are retained. Existing configured Google access is not replaced. A newly filled/created starter is unassigned, so adding it never silently grants access to an existing VLAN or profile. Assign it through the same Access editor.
+
+The starter is intentionally narrow, has no *.google.com wildcard and is not a complete vendor-maintained endpoint feed. Test actual searches/consent in your environment and review captures for missing dependencies. Hostname policy cannot restrict HTTPS to the /search path or prove that every other feature on the same allowed hostname is inaccessible.
+
 
 ## Simple network and profile setup (3.11.1)
 
@@ -73,3 +88,12 @@ Microsoft sources:
 Python regressions cover roles/CSRF, PAC publication, review-only capture import, data minimization, retirement of IP-based grants, optional service scope, shared rules and transactional protocol conflicts. tests/tab_capture_contract.cjs verifies scoping, expiry and privacy. tests/browser_capture_e2e.py exercises a real extension with a button-triggered request and unrelated second-tab traffic, using synthetic hosts resolved to loopback and a disposable Chromium profile.
 
 VM acceptance still requires actual Squid/Nginx behaviour, Windows installation, authenticated business workflows, firewall/DNS routing and failover timing. The extension test proves the synthetic workflow; it cannot establish complete coverage of every browser/application/network scenario.
+
+
+## Windows rollout and availability preference
+
+The Windows package installs machine-wide system PAC configuration. For a small fleet install the package on each PC; for a domain fleet distribute the same approved/signed package with an elevated GPO startup or Intune install process. A GPO deployment note is included in the ZIP. Browser/application proxy stacks remain distinct; do not assume a Windows system proxy setting configures every native service.
+
+Connection also offers gateway-specific Microsoft Edge ProxySettings JSON. Deploy it with your Edge policy tooling; ProxyPacMandatory follows the inverse of the central fail-open switch. With fail-open enabled, Edge is permitted to use DIRECT if PAC loading fails, while a loaded PAC returns PROXY host:port; DIRECT when the proxy is unreachable. Policy JSON must be redeployed if these browser-policy settings change. This is an optional Edge-specific deployment, not automatic configuration of all browsers/services. [Microsoft Edge ProxySettings](https://learn.microsoft.com/en-us/deployedge/microsoft-edge-policies/proxysettings) and [Windows proxy deployment](https://learn.microsoft.com/en-us/troubleshoot/windows-server/networking/configure-proxy-server-settings) document the supported policy paths.
+
+Availability-first operation requires independent DNS/routing and firewall permission for direct web egress. During fallback traffic has none of this gateway's filtering/telemetry. A policy denial is not treated as a proxy outage. Client timeouts, cached PAC state and existing connections affect transition timing; this is not an instantaneous universal failover guarantee. The existing Windows controller has no background reachability watchdog; clients that mandate remote PAC or ignore normal PAC fallback require their own tested deployment policy. Test both proxy-only failure and complete VM/PAC-server loss on a pilot PC before rollout. Strict firewall prevention of all direct egress conflicts with fail-open internet access unless the network itself also switches policy during an outage.

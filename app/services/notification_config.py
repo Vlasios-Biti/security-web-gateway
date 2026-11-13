@@ -1,5 +1,6 @@
 """Structured health-channel configuration, shared with the privileged helper."""
 import json
+import ipaddress
 import re
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -8,7 +9,7 @@ PATH=Path('/etc/security-web-gateway/notifications.json')
 DEFAULTS={'enabled':False,'email_enabled':False,'slack_enabled':False,'smtp_host':'','smtp_port':587,'smtp_tls':'starttls',
  'smtp_username':'','smtp_password':'','sender':'','recipients':[],'slack_webhook':'','minimum_severity':'warning',
  'confirmation_samples':2,'recovery_samples':2,'repeat_minutes':60,'disk_percent':85,'memory_percent':90,
- 'certificate_days':30,'telemetry_lag_seconds':120,'cpu_percent':90,'backup_age_hours':72,'revision':0}
+ 'certificate_days':30,'telemetry_lag_seconds':120,'cpu_percent':90,'backup_age_hours':72,'revision':0,'snmp_enabled':False,'snmp_agent_enabled':False,'snmp_host':'','snmp_port':162,'snmp_bind':'127.0.0.1','snmp_agent_port':1161,'snmp_managers':[],'snmp_community':'','snmp_oid':'1.3.6.1.4.1.32473.42'}
 
 
 def _email(value):
@@ -20,7 +21,7 @@ def _email(value):
 def validate_settings(value,previous=None):
     if not isinstance(value,dict):raise ValueError('Invalid notification settings.')
     old={**DEFAULTS,**(previous or {})};result={**DEFAULTS}
-    for key in ('enabled','email_enabled','slack_enabled'):
+    for key in ('enabled','email_enabled','slack_enabled','snmp_enabled','snmp_agent_enabled'):
         if type(value.get(key,False)) is not bool:raise ValueError('Invalid channel switch.')
         result[key]=value.get(key,False)
     for key in ('smtp_host','smtp_username','sender'):
@@ -41,7 +42,7 @@ def validate_settings(value,previous=None):
     if any(not isinstance(x,str) for x in recipients):raise ValueError('Invalid recipient.')
     result['recipients']=list(dict.fromkeys(_email(x.strip()) for x in recipients if isinstance(x,str) and x.strip()))
     if result['sender']:_email(result['sender'])
-    for key,clear in [('smtp_password','clear_smtp_password'),('slack_webhook','clear_slack_webhook')]:
+    for key,clear in [('smtp_password','clear_smtp_password'),('slack_webhook','clear_slack_webhook'),('snmp_community','clear_snmp_community')]:
         item=value.get(key,'')
         if not isinstance(item,str) or len(item)>2048 or any(ord(x)<32 for x in item):raise ValueError('Invalid credential field.')
         result[key]='' if value.get(clear) is True else (item or old.get(key,''))
@@ -57,6 +58,33 @@ def validate_settings(value,previous=None):
     if result['email_enabled'] and not (result['smtp_host'] and result['sender'] and result['recipients']):raise ValueError('Email requires SMTP host, sender and recipients.')
     if result['smtp_username'] and result['email_enabled'] and not result['smtp_password']:raise ValueError('SMTP authentication requires a password.')
     if result['slack_enabled'] and not result['slack_webhook']:raise ValueError('Configure a Slack webhook before enabling Slack.')
+    for key,low,high in [('snmp_port',1,65535),('snmp_agent_port',1024,65535)]:
+        item=value.get(key,DEFAULTS[key])
+        if type(item) is not int or not low<=item<=high:raise ValueError('Invalid SNMP port.')
+        result[key]=item
+    for key in ('snmp_host','snmp_bind'):
+        item=value.get(key,DEFAULTS[key])
+        if not isinstance(item,str):raise ValueError('Use an IPv4 address for SNMP.')
+        if item:
+            try:ip=ipaddress.IPv4Address(item)
+            except ValueError:raise ValueError('Use an IPv4 address for SNMP.') from None
+            if ip.is_unspecified or ip.is_multicast or str(ip)=='255.255.255.255':raise ValueError('Use a specific unicast IPv4 address for SNMP.')
+        result[key]=item
+    managers=value.get('snmp_managers',[])
+    if not isinstance(managers,list) or len(managers)>16:raise ValueError('Use up to 16 SNMP manager addresses or subnets.')
+    result['snmp_managers']=[]
+    for item in managers:
+        try:net=ipaddress.ip_network(item,strict=False)
+        except (ValueError,TypeError):raise ValueError('Invalid SNMP manager IPv4 subnet.') from None
+        if net.version!=4 or net.prefixlen<8:raise ValueError('Use specific SNMP manager IPv4 addresses/subnets, not all networks.')
+        result['snmp_managers'].append(str(net))
+    oid=value.get('snmp_oid',DEFAULTS['snmp_oid'])
+    if not isinstance(oid,str) or not re.fullmatch(r'1\.3\.6\.1\.4\.1\.[1-9][0-9]*(?:\.[0-9]+){1,12}',oid) or any(int(x)>2147483647 for x in oid.split('.')):raise ValueError('Use a numeric enterprise SNMP OID.')
+    result['snmp_oid']=oid
+    if result['snmp_enabled'] or result['snmp_agent_enabled']:
+        if not (16<=len(result['snmp_community'])<=128 and result['snmp_community'].isascii() and result['snmp_community'].isprintable()):raise ValueError('Set an SNMP community of 16–128 characters.')
+    if result['snmp_enabled'] and not result['snmp_host']:raise ValueError('Set the SNMP notification receiver IP.')
+    if result['snmp_agent_enabled'] and (not result['snmp_bind'] or not result['snmp_managers']):raise ValueError('Set the SNMP listener IP and permitted manager IPs.')
     result['revision']=int(old.get('revision',0))+1
     return result
 
@@ -73,4 +101,5 @@ def public_settings(value):
     result={**value}
     result['smtp_password_configured']=bool(result.pop('smtp_password',''))
     result['slack_webhook_configured']=bool(result.pop('slack_webhook',''))
+    result['snmp_community_configured']=bool(result.pop('snmp_community',''))
     return result

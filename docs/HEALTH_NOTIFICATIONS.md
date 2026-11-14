@@ -77,3 +77,14 @@ Standard sysDescr.0, sysName.0 and agent-process sysUpTime.0 are also readable. 
 Local tests exchange real SNMP packets over loopback and verify read-only responses, wrong-community/source rejection, bounded bulk responses and trap decoding. Actual remote NMS receipt, polling, UDP firewall behavior and service installation need a target-VM acceptance check. See [Net-SNMP notification semantics](https://www.net-snmp.org/tutorial/tutorial-5/commands/snmptrap-v3.html) for the distinction between traps and acknowledged informs.
 
 In 3.12.2, Alerts & SNMP is a direct primary navigation entry. Channel links at the top jump directly to Email, Slack or SNMP, without opening the Monitoring submenu. Administrator access remains required.
+
+
+### Slack delivery choices (3.12.3)
+
+In **Alerts & SNMP → Slack**, select categories (services, resources, DNS, certificate, backup, workers, clock, traffic, policy drift), severity, recovery notices, repeat interval and compact/detailed messages. All categories selected, inherited severity/repeats and recovery enabled preserve previous behavior. An empty category selection pauses incident delivery to Slack only. Tests bypass category filters, but never mention people.
+
+Each Incoming Webhook has a destination channel selected during Slack authorization. The optional channel label is documentation only; replace the webhook to change the channel. Add up to ten explicit Slack member IDs (U/W...) or user-group IDs (S...). Mentions default to critical alerts only; recovery and tests never mention. Slack access, group membership and personal notification settings determine actual push delivery. The gateway does not fetch workspace members or send direct messages.
+
+Only configured mention tokens use Slack markup; incident text remains plain text. Slack settings do not modify email/SNMP preferences. Existing deduplication, confirmation and delivery backoff continue to apply.
+
+References: https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/ and https://docs.slack.dev/messaging/formatting-message-text/

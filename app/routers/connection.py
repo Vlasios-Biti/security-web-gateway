@@ -1,4 +1,4 @@
-from fastapi import Depends
+from fastapi import Depends, UploadFile, File
 from app.services.policy_lock import policy_guard
 import json
 from urllib.parse import quote_plus
@@ -8,6 +8,9 @@ from app import auth
 from app.config import MODE, PROXY_IP, PROXY_PORT
 from app.services.connectivity import connection_policy, save_connection_policy, windows_package
 from app.services.pac_policy import render_pac
+from app.services.endpoint_config import pac_address, endpoint_settings, save_endpoint
+from app.config import MANAGEMENT_FQDN
+from app.services.system import certificate_health
 from app.services.pc_services import service_profiles, save_service
 from app.services.access_model import list_policy_groups
 
@@ -24,7 +27,7 @@ def page(request: Request):
         return HTMLResponse("Forbidden", 403)
     return request.app.state.templates.TemplateResponse(request=request, name="connection.html", context={
         "page_title": "Connection", "request": request, "policy": connection_policy(),
-        "pac_url": f"http://{PROXY_IP}:8081/proxy.pac", "proxy_endpoint": f"{PROXY_IP}:{PROXY_PORT}", "mode": MODE,
+        "pac_url": pac_address(), "endpoint": endpoint_settings(), "management_fqdn": MANAGEMENT_FQDN, "certificate": certificate_health(), "proxy_endpoint": f"{PROXY_IP}:{PROXY_PORT}", "mode": MODE,
         "pc_services":service_profiles(), "groups":list_policy_groups()})
 
 
@@ -81,7 +84,7 @@ def save(request: Request, csrf_token: str = Form(...), fail_open: bool = Form(F
 @router.get('/edge-policy.json')
 def edge_policy_download(request:Request):
     if not _admin(request):return HTMLResponse('Forbidden',403)
-    value={'ProxyMode':'pac_script','ProxyPacUrl':f'http://{PROXY_IP}:8081/proxy.pac','ProxyPacMandatory':not connection_policy()['fail_open']}
+    value={'ProxyMode':'pac_script','ProxyPacUrl':pac_address(),'ProxyPacMandatory':not connection_policy()['fail_open']}
     return Response(json.dumps(value,indent=2),media_type='application/json',headers={'Content-Disposition':'attachment; filename="Edge-ProxySettings.json"'})
 
 
@@ -97,3 +100,37 @@ def preview(request: Request):
     if not _admin(request):
         return HTMLResponse("Forbidden", 403)
     return Response(render_pac(connection_policy(), PROXY_IP, PROXY_PORT), media_type="text/plain")
+
+
+@router.post('/endpoint')
+def save_pac_endpoint(request:Request,csrf_token:str=Form(...),scheme:str=Form('http'),host:str=Form('')):
+    if not _admin(request):return HTMLResponse('Forbidden',403)
+    if not auth.check_csrf(request.state.user,csrf_token):return HTMLResponse('Invalid request',403)
+    try:
+        save_endpoint(scheme,host,request.state.user['username'],auth.client_ip(request))
+        return RedirectResponse('/connection?msg=PAC+address+saved.+Redeploy+updated+settings+to+existing+PCs.#device-setup',303)
+    except ValueError as exc:return RedirectResponse('/connection?error='+quote_plus(str(exc))+'#device-setup',303)
+
+
+@router.post('/certificate')
+async def install_certificate(request:Request,csrf_token:str=Form(...),certificate:UploadFile=File(...),private_key:UploadFile=File(...)):
+    if not _admin(request):return HTMLResponse('Forbidden',403)
+    if not auth.check_csrf(request.state.user,csrf_token):return HTMLResponse('Invalid request',403)
+    if MODE!='production':return HTMLResponse('Certificate changes are disabled in preview.',400)
+    import base64
+    from app.services.deployment import helper_request
+    from app.db import audit
+    from starlette.concurrency import run_in_threadpool
+    try:
+        cert=await certificate.read(20001);key=await private_key.read(20001)
+        if not cert or not key or max(len(cert),len(key))>20000:raise ValueError('Use PEM files of at most 20 KB each.')
+        endpoint=endpoint_settings()
+        payload={'certificate':base64.b64encode(cert).decode('ascii'),'private_key':base64.b64encode(key).decode('ascii'),'hostname':endpoint['host'] if endpoint['scheme']=='https' else ''}
+        result=await run_in_threadpool(helper_request,'install_certificate',certificate_data=payload)
+        if not result.get('ok'):raise ValueError(result.get('message') or 'Certificate installation failed.')
+        audit(request.state.user['username'],'TLS_CERTIFICATE_RENEW','SUCCESS','settings','management_tls',auth.client_ip(request))
+        return RedirectResponse('/connection?msg=Certificate+installed.+nginx+reloaded.#device-setup',303)
+    except (ValueError,OSError,RuntimeError):
+        return RedirectResponse('/connection?error=Certificate+installation+failed.+Check+PEM+format,+matching+key,+validity,+hostname+coverage+and+nginx+TLS+paths.#device-setup',303)
+    finally:
+        await certificate.close();await private_key.close()

@@ -1,6 +1,6 @@
 {
   "product": "Security Web Gateway",
-  "version": "3.12.2",
+  "version": "3.12.3",
   "schema_migration": "017",
   "target_os": "Ubuntu 24.04 LTS / Ubuntu 26.04 LTS",
   "deployment_model": "single-vm-on-prem-appliance",
@@ -39,5 +39,12 @@
   "access_assignment": "exclusive-profile-or-network-with-explicit-legacy-preservation",
   "snmp": "optional-readonly-v2c-and-traps",
   "default_application": "unassigned-google-search-starter",
-  "profile_network_onboarding": "one-page-one-transaction-one-apply"
+  "profile_network_onboarding": "one-page-one-transaction-one-apply",
+  "pac_distribution": {
+    "http_port": 8081,
+    "https_port": 443,
+    "path": "/proxy.pac",
+    "shared_endpoint_downloads": true
+  },
+  "certificate_management": "admin-fixed-path-pem-renewal-with-nginx-validation-and-rollback"
 }

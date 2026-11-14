@@ -1,4 +1,10 @@
 "use strict";
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-copy-target]');if(!button)return;
+ const input=document.getElementById(button.dataset.copyTarget);if(!input)return;
+ try{await navigator.clipboard.writeText(input.value);button.textContent='Copied';}
+ catch(error){input.focus();input.select();button.textContent='Selected — press Ctrl+C';}
+});
 
 function css(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim()}
 function fitCanvas(canvas){const r=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1;canvas.width=Math.max(1,Math.floor(r.width*dpr));canvas.height=Math.max(1,Math.floor(r.height*dpr));const c=canvas.getContext("2d");c.setTransform(dpr,0,0,dpr,0,0);return {ctx:c,w:r.width,h:r.height}}

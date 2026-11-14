@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.12.3
+
+- Connection shows a copyable PAC setup-script URL and one HTTP/HTTPS hostname setting shared by Windows package, installer build and Edge GPO downloads. Existing PCs need the changed address redeployed.
+- HTTPS PAC is served as a static anonymous nginx location; upgrades preserve the existing nginx configuration and restore it on cutover failure.
+- Admin/CSRF-protected PEM certificate renewal validates key pairing, validity and management/HTTPS PAC hostname coverage. Fixed root-managed destinations, nginx validation, reload and rollback; custom nginx TLS paths remain managed externally. CA trust and DNS must be deployed to PCs separately.
+- Slack has independent event categories, urgency, recovery, repeat interval, compact/detailed messages and explicit member/user-group mentions. Tests and recovery never mention people; changing a channel label does not reroute its webhook.
+- Adds workflow tests for endpoint parity, permissions, Slack filters/mention handling and TLS rollback. Notification tests mock remote delivery.
+
 ## 3.12.2 — readable navigation and discoverable SNMP
 
 - Corrects the legacy fixed icon width being applied to menu text. Primary labels stay on one line and inherit the correct active color; numeric badges retain their own sizing.

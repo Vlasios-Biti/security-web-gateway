@@ -5,11 +5,21 @@ import re
 from pathlib import Path
 from urllib.parse import urlsplit
 
+SLACK_TOPICS={'services':'Proxy & management services','resources':'CPU, memory & disk','dns':'DNS resolution','certificate':'HTTPS certificate','backup':'Configuration backups','workers':'Background workers','clock':'Clock synchronization','traffic':'Traffic telemetry','policy':'Policy drift'}
+
+
+def event_topic(code):
+    if code in ('squid_status','nginx_status','app_status','proxy_listener'):return 'services'
+    if code in ('disk','memory','cpu'):return 'resources'
+    if code.startswith('certificate'):return 'certificate'
+    if code.startswith('worker_'):return 'workers'
+    return {'backup':'backup','dns':'dns','ntp':'clock','telemetry':'traffic','sampler':'traffic','policy_drift':'policy'}.get(code,'services')
+
 PATH=Path('/etc/security-web-gateway/notifications.json')
 DEFAULTS={'enabled':False,'email_enabled':False,'slack_enabled':False,'smtp_host':'','smtp_port':587,'smtp_tls':'starttls',
  'smtp_username':'','smtp_password':'','sender':'','recipients':[],'slack_webhook':'','minimum_severity':'warning',
  'confirmation_samples':2,'recovery_samples':2,'repeat_minutes':60,'disk_percent':85,'memory_percent':90,
- 'certificate_days':30,'telemetry_lag_seconds':120,'cpu_percent':90,'backup_age_hours':72,'revision':0,'snmp_enabled':False,'snmp_agent_enabled':False,'snmp_host':'','snmp_port':162,'snmp_bind':'127.0.0.1','snmp_agent_port':1161,'snmp_managers':[],'snmp_community':'','snmp_oid':'1.3.6.1.4.1.32473.42'}
+ 'certificate_days':30,'telemetry_lag_seconds':120,'cpu_percent':90,'backup_age_hours':72,'revision':0,'slack_topics':list(SLACK_TOPICS),'slack_minimum_severity':'inherit','slack_recovery':True,'slack_repeat_minutes':-1,'slack_format':'detailed','slack_mentions':[],'slack_mention_critical_only':True,'slack_destination':'','snmp_enabled':False,'snmp_agent_enabled':False,'snmp_host':'','snmp_port':162,'snmp_bind':'127.0.0.1','snmp_agent_port':1161,'snmp_managers':[],'snmp_community':'','snmp_oid':'1.3.6.1.4.1.32473.42'}
 
 
 def _email(value):
@@ -37,6 +47,26 @@ def validate_settings(value,previous=None):
     if result['smtp_tls'] not in ('starttls','ssl'):raise ValueError('Choose STARTTLS or implicit TLS.')
     result['minimum_severity']=value.get('minimum_severity','warning')
     if result['minimum_severity'] not in ('warning','critical'):raise ValueError('Invalid minimum severity.')
+    for key in ('slack_recovery','slack_mention_critical_only'):
+        item=value.get(key,DEFAULTS[key])
+        if type(item) is not bool:raise ValueError('Invalid Slack notification switch.')
+        result[key]=item
+    topics=value.get('slack_topics',list(SLACK_TOPICS))
+    if not isinstance(topics,list) or any(not isinstance(x,str) or x not in SLACK_TOPICS for x in topics):raise ValueError('Choose valid Slack event categories.')
+    result['slack_topics']=list(dict.fromkeys(topics))
+    result['slack_minimum_severity']=value.get('slack_minimum_severity','inherit')
+    if result['slack_minimum_severity'] not in ('inherit','warning','critical'):raise ValueError('Invalid Slack severity.')
+    repeat=value.get('slack_repeat_minutes',-1)
+    if type(repeat) is not int or not -1<=repeat<=1440:raise ValueError('Invalid Slack repeat interval.')
+    result['slack_repeat_minutes']=repeat
+    result['slack_format']=value.get('slack_format','detailed')
+    if result['slack_format'] not in ('detailed','compact'):raise ValueError('Choose compact or detailed Slack messages.')
+    mentions=value.get('slack_mentions',[])
+    if not isinstance(mentions,list) or len(mentions)>10 or any(not isinstance(x,str) or not re.fullmatch(r'[UWS][A-Z0-9]{2,31}',x) for x in mentions):raise ValueError('Use up to 10 Slack member IDs (U/W...) or user-group IDs (S...), separated by commas.')
+    result['slack_mentions']=list(dict.fromkeys(mentions))
+    destination=value.get('slack_destination','')
+    if not isinstance(destination,str) or len(destination)>80 or any(ord(x)<32 for x in destination):raise ValueError('Invalid Slack channel label.')
+    result['slack_destination']=destination.strip()
     recipients=value.get('recipients',[])
     if not isinstance(recipients,list) or len(recipients)>20:raise ValueError('Use up to twenty recipients.')
     if any(not isinstance(x,str) for x in recipients):raise ValueError('Invalid recipient.')

@@ -51,7 +51,8 @@ def save_connection_policy(policy, actor, source_ip=None):
 
 
 def windows_package():
-    pac_url = f"http://{PROXY_IP}:8081/proxy.pac"
+    from app.services.endpoint_config import pac_address
+    pac_url = pac_address()
     out = io.BytesIO()
     source = APP_ROOT / "tools/windows/Proxy-Control-v1.3.1"
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as archive:

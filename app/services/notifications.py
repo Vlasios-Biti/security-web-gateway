@@ -12,7 +12,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from app.config import MODE,DATA_ROOT,MANAGEMENT_FQDN
 from app.db import connect,audit
-from app.services.notification_config import PATH,read_settings,validate_settings,public_settings
+from app.services.notification_config import PATH,read_settings,validate_settings,public_settings,event_topic,SLACK_TOPICS
 
 
 def config_path():return PATH if MODE=='production' else DATA_ROOT/'notifications-preview.json'
@@ -105,7 +105,7 @@ def send_channel(channel,cfg,body):
         # No redirects: the secret path must never be forwarded to another host.
         connection=http.client.HTTPSConnection(url.hostname,443,timeout=12,context=ssl.create_default_context())
         try:
-            payload=json.dumps({'text':'Security Web Gateway health update','blocks':[{'type':'section','text':{'type':'plain_text','text':body[:2900]}}]})
+            payload=json.dumps(slack_payload(cfg,body))
             connection.request('POST',url.path,body=payload,headers={'Content-Type':'application/json'})
             response=connection.getresponse();result=response.read(256)
             if response.status!=200 or result.strip()!=b'ok':raise RuntimeError('SLACK_HTTP_'+str(response.status))
@@ -114,6 +114,26 @@ def send_channel(channel,cfg,body):
         from app.services.snmp import send_trap
         send_trap(cfg,body)
     else:raise ValueError('Unsupported channel')
+
+
+def slack_payload(cfg,body):
+    blocks=[{'type':'section','text':{'type':'plain_text','text':body[:2900]}}]
+    # Only explicitly configured IDs are parsed by Slack; event text stays plain text.
+    alert='ALERT [' in body
+    critical='ALERT [CRITICAL]' in body
+    mention=alert and (critical or not cfg.get('slack_mention_critical_only',True))
+    ids=cfg.get('slack_mentions',[]) if mention else []
+    tokens=['<!subteam^'+x+'>' if x.startswith('S') else '<@'+x+'>' for x in ids]
+    if tokens:blocks.insert(0,{'type':'section','text':{'type':'mrkdwn','text':' '.join(tokens),'verbatim':True}})
+    fallback=body[:2900].replace('&','&amp;').replace('<','&lt;').replace('>','&gt;')
+    return {'text':fallback,'blocks':blocks,'mrkdwn':False,'parse':'none','unfurl_links':False,'unfurl_media':False}
+
+
+def channel_preferences(channel,cfg):
+    if channel!='slack':return cfg['minimum_severity'],cfg['repeat_minutes']
+    minimum=cfg.get('slack_minimum_severity','inherit')
+    repeat=cfg.get('slack_repeat_minutes',-1)
+    return (cfg['minimum_severity'] if minimum=='inherit' else minimum,cfg['repeat_minutes'] if repeat<0 else repeat)
 
 
 def _error_code(exc):
@@ -128,6 +148,7 @@ def deliver(cfg,now=None):
     sent=failed=0
     for channel in ('email','slack','snmp'):
         if not cfg[channel+'_enabled']:continue
+        minimum,repeat=channel_preferences(channel,cfg)
         c=connect()
         try:
             due=[]
@@ -135,10 +156,12 @@ def deliver(cfg,now=None):
                 event=dict(row);prior=c.execute('SELECT * FROM health_delivery_state WHERE code=? AND channel=?',(event['code'],channel)).fetchone()
                 prior=dict(prior) if prior else {'generation':0,'revision':0,'last_active':0,'last_sent_epoch':0,'next_attempt_epoch':0,'failures':0,'attempt_generation':0}
                 if prior['next_attempt_epoch']>now and prior['revision']==cfg['revision'] and prior['attempt_generation']==event['generation']:continue
+                if channel=='slack' and event_topic(event['code']) not in cfg.get('slack_topics',list(SLACK_TOPICS)):continue
+                if channel=='slack' and not event['active'] and not cfg.get('slack_recovery',True):continue
                 if not event['active'] and not prior['last_active']:continue
-                if event['active'] and cfg['minimum_severity']=='critical' and event['severity']!='critical':continue
+                if event['active'] and minimum=='critical' and event['severity']!='critical':continue
                 new=event['generation']!=prior['generation'] or prior['revision']!=cfg['revision']
-                reminder=bool(event['active'] and cfg['repeat_minutes'] and now-prior['last_sent_epoch']>=cfg['repeat_minutes']*60)
+                reminder=bool(event['active'] and repeat and now-prior['last_sent_epoch']>=repeat*60)
                 if new or reminder:due.append((event,prior))
                 if len(due)>=10:break
         finally:c.close()
@@ -146,7 +169,8 @@ def deliver(cfg,now=None):
         lines=[f'Security Web Gateway — {MANAGEMENT_FQDN}', '']
         for event,prior in due:
             label='ALERT' if event['active'] else 'RECOVERED'
-            lines.append(f"{label} [{event['severity'].upper()}] {event['title'][:80]}: {event['detail'][:120]}")
+            detail='' if channel=='slack' and cfg.get('slack_format')=='compact' else ': '+event['detail'][:120]
+            lines.append(f"{label} [{event['severity'].upper()}] {event['title'][:80]}{detail}")
         error=None
         try:send_channel(channel,cfg,'\n'.join(lines))
         except Exception as exc:error=_error_code(exc)

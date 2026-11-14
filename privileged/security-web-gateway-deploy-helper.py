@@ -202,6 +202,14 @@ def main():
             r=backup()
         elif act=='publish_pac':
             r=publish_pac(req.get('policy'))
+        elif act=='install_certificate':
+            module_path=Path('/opt/security-web-gateway/current/privileged/tls_install.py')
+            spec=importlib.util.spec_from_file_location('swg_tls_install',module_path)
+            module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+            LOCK.parent.mkdir(parents=True,exist_ok=True)
+            with LOCK.open('a+') as lockf:
+                fcntl.flock(lockf.fileno(),fcntl.LOCK_EX)
+                r=module.install(req.get('certificate_data',{}))
         elif act=='save_notifications':
             r=save_notifications(req.get('settings'))
         else:

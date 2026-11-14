@@ -19,7 +19,7 @@ def render_pages(folder):
     token=create_session(uid,Request({'type':'http','headers':[],'client':('127.0.0.1',1)}))
     with TestClient(app,base_url='https://localhost') as client:
         client.cookies.set(SESSION_COOKIE,token)
-        for name,url in [('profiles','/policies/groups'),('notifications','/system/notifications')]:
+        for name,url in [('profiles','/policies/groups'),('notifications','/system/notifications'),('connection','/connection')]:
             response=client.get(url);assert response.status_code==200,(url,response.status_code)
             html=response.text.replace('/static/',(ROOT/'static').as_uri()+'/')
             (folder/(name+'.html')).write_text(html,encoding='utf-8')
@@ -49,6 +49,17 @@ def check(folder,executable=None):
         page.get_by_role('link',name='SNMP',exact=True).click()
         position=page.locator('#snmp h3').bounding_box()
         assert position and 0<=position['y']<900,'SNMP jump link must bring configuration into view'
+        for name in ('connection','notifications'):
+            for width in (1440,920,390):
+                page.set_viewport_size({'width':width,'height':1000})
+                page.goto((folder/(name+'.html')).resolve().as_uri())
+                page.locator('main details').evaluate_all('nodes=>nodes.forEach(e=>e.open=true)')
+                assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),('Form overflow',name,width)
+        page.goto((folder/'connection.html').resolve().as_uri())
+        assert page.locator('#pac-address').input_value().endswith('/proxy.pac')
+        page.get_by_role('button',name='Copy address',exact=True).click()
+        page.wait_for_function("document.querySelector('[data-copy-target=\"pac-address\"]').textContent !== 'Copy address'")
+        assert page.locator('[data-copy-target="pac-address"]').inner_text() in ('Copied','Selected — press Ctrl+C')
         browser.close()
     print('Navigation fit at five widths and 125/150% zoom; direct SNMP entry and section jump: PASS')
 

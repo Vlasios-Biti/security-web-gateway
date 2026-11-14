@@ -1,4 +1,4 @@
-# Access and connection guide — 3.12.2
+# Access and connection guide — 3.12.3
 
 ## Profile and VLAN in one save
 
@@ -99,3 +99,12 @@ The Windows package installs machine-wide system PAC configuration. For a small 
 Connection also offers gateway-specific Microsoft Edge ProxySettings JSON. Deploy it with your Edge policy tooling; ProxyPacMandatory follows the inverse of the central fail-open switch. With fail-open enabled, Edge is permitted to use DIRECT if PAC loading fails, while a loaded PAC returns PROXY host:port; DIRECT when the proxy is unreachable. Policy JSON must be redeployed if these browser-policy settings change. This is an optional Edge-specific deployment, not automatic configuration of all browsers/services. [Microsoft Edge ProxySettings](https://learn.microsoft.com/en-us/deployedge/microsoft-edge-policies/proxysettings) and [Windows proxy deployment](https://learn.microsoft.com/en-us/troubleshoot/windows-server/networking/configure-proxy-server-settings) document the supported policy paths.
 
 Availability-first operation requires independent DNS/routing and firewall permission for direct web egress. During fallback traffic has none of this gateway's filtering/telemetry. A policy denial is not treated as a proxy outage. Client timeouts, cached PAC state and existing connections affect transition timing; this is not an instantaneous universal failover guarantee. The existing Windows controller has no background reachability watchdog; clients that mandate remote PAC or ignore normal PAC fallback require their own tested deployment policy. Test both proxy-only failure and complete VM/PAC-server loss on a pilot PC before rollout. Strict firewall prevention of all direct egress conflicts with fail-open internet access unless the network itself also switches policy during an outage.
+
+
+### PAC address and HTTPS (3.12.3)
+
+Open **Connection**. Copy the PAC address into Windows Settings → Network & Internet → Proxy → Use setup script. The Windows ZIP and Edge policy JSON use this same saved address. Existing installations keep their installed address until the package/GPO is redeployed. The script URL is not the path of the PowerShell installer.
+
+Expand **Address & HTTPS certificate** to choose HTTP (port 8081) or HTTPS (443) and the gateway hostname. The server serves `/proxy.pac` without a login on both listeners. DNS must resolve the hostname on PCs. Before HTTPS rollout, install a matching trusted certificate and deploy its CA chain to PCs; do not bypass TLS verification. HTTPS protects PAC distribution and does not turn the explicit Squid proxy into an HTTPS proxy.
+
+The same section accepts a PEM full chain and unencrypted matching PEM private key, up to 20 KB each. Production Admin only, CSRF protected. The helper checks key pairing, dates, the configured management FQDN and any selected HTTPS PAC hostname. It writes only the standard management.crt/key paths, tests nginx, reloads and restores old files if validation/reload fails. Customized nginx TLS paths require your existing external renewal process. It does not issue certificates, change DNS or install client CA trust. Prefer your existing automated renewal process if certificates are managed by an ACME client. Private keys are not shown or exported.

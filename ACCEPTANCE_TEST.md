@@ -1,7 +1,7 @@
-# Security Web Gateway v3.12.2 Acceptance Test
+# Security Web Gateway v3.12.3 Acceptance Test
 
-1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.12.2`.
-2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.12.2`, mode `production`.
+1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.12.3`.
+2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.12.3`, mode `production`.
 3. `SELECT MAX(version) FROM schema_migrations` returns `017`; `PRAGMA integrity_check` returns `ok`; `PRAGMA foreign_key_check` returns no rows.
 4. `squid -k parse` and `nginx -t` succeed.
 5. `security-web-gateway.service`, `squid.service`, `nginx.service`, and `security-web-gateway-deploy-helper.socket` are active.
@@ -78,7 +78,7 @@
 - Pilot Windows package/GPO deployment and Edge JSON. Verify fail-open with both Squid-only loss and full VM/PAC loss, independent DNS/routing and direct egress. Do not infer universal behavior for independent application proxy stacks.
 
 
-## 3.12.2 combined profile/VLAN acceptance
+## 3.12.3 combined profile/VLAN acceptance
 
 - Create a profile, enter a new subnet/VLAN and select Google Search on one page; verify both records and their membership are saved and applied with one operation.
 - Repeat with an existing VLAN using the prefilled shortcut; confirm no duplicate network is created.
@@ -87,8 +87,16 @@
 - Verify operator/viewer and CSRF boundaries, Copy preview without mutation, and a new copy requires its own selected/new VLAN.
 
 
-## 3.12.2 navigation regression
+## 3.12.3 navigation regression
 
 - Verify Profiles & VLANs, Proxy bypass and Alerts & SNMP fit on one line on desktop and in the mobile drawer, including browser zoom.
 - Verify Alerts & SNMP appears exactly once as a direct primary entry for Admin, with channel links that scroll to the correct Email/Slack/SNMP cards.
 - Run `python -m playwright install --with-deps chromium` and `python tests/browser_navigation_layout.py` for the real-browser layout regression included in CI.
+
+
+## 3.12.3 PAC / TLS / Slack acceptance
+
+- Connection: copy PAC into a pilot PC's automatic proxy script setting. Verify the Windows ZIP and Edge JSON contain that same saved URL. Changing the URL requires redeployment to existing PCs.
+- HTTPS: resolve the selected hostname from that PC, install the issuing CA, install a full PEM chain/matching key via Connection, and open the PAC anonymously with normal TLS verification. Verify management login still works. Confirm wrong key/hostname and expired certificates fail without replacing the old certificate.
+- Slack: select a single event category, critical-only severity, no repeats and recovery on/off. Use mocked local tests first; then explicitly send a channel test using your own webhook and confirm receiver delivery. Test messages/recovery must not mention people. Verify member/group mentions with authorized IDs and Slack notification preferences. Email/SNMP settings must remain independent.
+- Disconnect the VM on a pilot PC with independent DNS/router/direct egress and verify the chosen PAC fail-open behavior. Target systemd/nginx behavior, client CA trust and actual Slack push delivery require environment testing.

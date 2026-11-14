@@ -73,3 +73,7 @@ input::placeholder,textarea::placeholder{color:#647084!important;opacity:1}label
 .sidebar .simple-nav .nav-primary>span:not(.nav-count){width:auto!important;min-width:0;flex:1 1 auto;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4;color:inherit!important}.sidebar .simple-nav .nav-primary>svg{flex:0 0 18px}.sidebar .simple-nav .nav-primary{min-height:44px;flex-wrap:nowrap}.channel-jumps{display:flex;gap:10px;flex-wrap:wrap;margin:-8px 0 24px}.channel-jumps a{display:inline-flex;padding:8px 15px;border:1px solid #d6dfed;border-radius:8px;background:#fff;color:#3157b7;font-size:13px;font-weight:600;text-decoration:none}.channel-jumps a:hover{background:#edf3ff}.notification-form [id]{scroll-margin-top:105px}
 
 .profile-head{align-items:flex-start!important;gap:16px}.profile-head>div{flex:1;min-width:0}.profile-head>.badge{flex:0 0 auto;align-self:flex-start;white-space:nowrap;line-height:1.4}
+
+.pac-setup{margin-bottom:24px}.pac-copy-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.pac-copy-row input{flex:1 1 300px;min-width:0}.tls-summary{margin:20px 0;overflow-wrap:anywhere}.pac-setup form+form{margin-top:20px}.slack-topics{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+
+.channel-settings>label:not(.check){display:grid;gap:6px;margin:14px 0}.channel-settings>label:not(.check)>input{width:100%;min-width:0}

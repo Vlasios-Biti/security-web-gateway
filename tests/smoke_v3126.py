@@ -17,12 +17,14 @@ class DetailedFunctionalAudit(prior.ClientActivityWorkflows):
         rid=create_rule('ip','203.0.113.19','HTTPS',[1],'admin','Audit fixture')['id']
         c=self.connect()
         drid=c.execute("SELECT id FROM rules WHERE rule_type='domain' LIMIT 1").fetchone()[0]
+        move_rule=c.execute('SELECT rule_id FROM application_rules WHERE application_id=? LIMIT 1',(aid,)).fetchone()[0]
+        move_candidate=c.execute("INSERT INTO application_dependency_candidates(application_id,destination,status) VALUES(?,'candidate.example.test','pending')",(aid,)).lastrowid
         category=c.execute("INSERT INTO categories(name,slug,system_managed) VALUES('Audit system','audit-system',1)").lastrowid
         srid=c.execute("INSERT INTO rules(rule_type,destination,protocol,category_id,management_type,status,fingerprint,created_by) VALUES('domain','protected.example.com','HTTPS',?,'system','active','audit-system-fixture','admin')",(category,)).lastrowid
         run=c.execute("INSERT INTO discovery_runs(application_id,method,status,started_by) VALUES(?,'har_import','ready','admin')",(aid,)).lastrowid
         c.execute("INSERT INTO users(username,password_hash,role,enabled) VALUES('auditor','unused-test-hash','auditor',1)");c.commit();c.close()
         self.event('10.20.0.10','portal.example.com','matrix')
-        mapping={'application_id':aid,'group_id':gid,'network_id':1,'run_id':run,'rule_id':rid,'user_id':1,'event_id':1,'client_ip':'10.20.0.10','deployment_id':999,'candidate_id':999,'batch_id':999,'session_id':999,'service_key':'windows-update','channel':'slack','action':'backup'}
+        mapping={'application_id':aid,'group_id':gid,'network_id':1,'run_id':run,'rule_id':rid,'user_id':1,'event_id':1,'client_ip':'10.20.0.10','deployment_id':999,'candidate_id':move_candidate,'batch_id':999,'session_id':999,'service_key':'windows-update','channel':'slack','action':'backup'}
         record=[];before=state_snapshot()
         for role in ('admin','operator','viewer','auditor'):
             client,_=self.client_for(role)
@@ -30,17 +32,22 @@ class DetailedFunctionalAudit(prior.ClientActivityWorkflows):
                 for route in inventory()['routes']:
                     if route['method']=='POST' and route['path'] in ('/login','/intelligence/simulator'):continue
                     ids={**mapping,'rule_id':srid if '/system/' in route['path'] else (drid if '/domains/' in route['path'] else rid)}
+                    if '/dependency/{rule_id}/move' in route['path']:ids['rule_id']=move_rule
                     path=re.sub(r'{(\w+)}',lambda match:str(ids[match[1]]),route['path'])
                     if route['method']=='GET':
                         response=client.get(path,follow_redirects=False)
-                        admin_only=path.startswith(('/connection','/security','/system/notifications','/system/storage','/system/backups')) or route['path'] in ('/policies/networks/add','/policies/networks/{network_id}/copy','/policies/networks/{network_id}/edit','/rules/system/add','/rules/system/{rule_id}/edit')
+                        admin_only=path.startswith(('/connection','/security','/system/integrations','/system/notifications','/system/storage','/system/backups')) or route['path'] in ('/policies/networks/add','/policies/networks/{network_id}/copy','/policies/networks/{network_id}/edit','/rules/system/add','/rules/system/{rule_id}/edit')
                         manager_only=route['path'] in ('/applications/allow','/applications/add','/applications/discover','/applications/discovery/{run_id}','/applications/capture/extension.zip','/applications/{application_id}/edit','/policies/groups/add','/policies/groups/{group_id}/copy','/policies/groups/{group_id}/edit','/rules/domains/add','/rules/domains/{rule_id}/edit','/rules/ips/add','/rules/ips/{rule_id}/edit','/bulk/import')
                         expected=403 if (admin_only and role!='admin') or (manager_only and role not in ('admin','operator')) else (303 if route['path'] in ('/login','/rules/domains','/rules/ips') else 200)
+                        if route['path'].endswith('/move') and role not in ('admin','operator'):expected=403
+                        if path.startswith('/api/v1/'):expected=401
                         self.assertEqual(response.status_code,expected,(role,path,response.status_code,response.text[:150]))
                     else:
                         numbers={'auto_monitor':0,'auto_approve':0,'window_minutes':10,'smtp_port':587,'snmp_port':162,'snmp_agent_port':1161,'confirmation_samples':2,'recovery_samples':2,'repeat_minutes':60,'slack_repeat_minutes':-1,'disk_percent':85,'memory_percent':90,'certificate_days':30,'telemetry_lag_seconds':120,'cpu_percent':90,'backup_age_hours':72,'retention_days':30,'days':30,'raw_days':14,'max_gb':8,'target_gb':6,'min_free_gb':10,'raw_max_gb':4,'enabled':1}
                         booleans={'remove_logo','fail_open','internal_direct','email_enabled','slack_enabled','snmp_enabled','snmp_agent_enabled','clear_smtp_password','clear_slack_webhook','clear_snmp_community','slack_recovery','slack_mention_critical_only','slack_options_present','combined_setup','unlock','proxy_enabled'}
                         data={key:str(numbers.get(key,False if key in booleans else 'audit')) for key in route['fields']}
+                        for key in ('target_application_id','token_id'):
+                            if key in data:data[key]='1'
                         data.update({key:value for key,value in {'csrf_token':'invalid-csrf','network_ids':'1','policy_group_ids':str(gid),'application_ids':str(aid),'rule_ids':str(rid),'candidate_ids':'1','port':'443'}.items() if key in route['fields']})
                         files={key:('audit.json',b'{}','application/json') for key in route['files']}
                         response=client.post(path,data=data,files=files or None,follow_redirects=False)
@@ -58,7 +65,7 @@ class DetailedFunctionalAudit(prior.ClientActivityWorkflows):
                 if route['path']=='/login' and route['method']=='POST':continue
                 path=re.sub(r'{(\w+)}',lambda match:str(mapping[match[1]]),route['path'])
                 response=client.request(route['method'],path,follow_redirects=False)
-                self.assertEqual(response.status_code,200 if path=='/login' else 303,(path,response.status_code))
+                self.assertEqual(response.status_code,401 if path.startswith('/api/v1/') else (200 if path=='/login' else 303),(path,response.status_code))
                 record.append({'role':'anonymous','method':route['method'],'path':route['path'],'status':response.status_code})
         if os.getenv('SWG_FUNCTION_AUDIT_REPORT'):Path(os.environ['SWG_FUNCTION_AUDIT_REPORT']).write_text(json.dumps(record,indent=2),encoding='utf-8')
         print('Endpoint role/CSRF/anonymous checks:',len(record))

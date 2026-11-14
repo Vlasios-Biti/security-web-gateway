@@ -24,7 +24,8 @@ def render_pages(folder):
     token=create_session(uid,Request({'type':'http','headers':[],'client':('127.0.0.1',1)}))
     with TestClient(app,base_url='https://localhost') as client:
         client.cookies.set(SESSION_COOKIE,token)
-        for name,url in [('access-add','/applications/allow'),('application-add','/applications/discover'),('application-edit',f'/applications/{aid}/edit'),('dependency-review','/intelligence/dependency-candidates'),('profiles','/policies/groups'),('notifications','/system/notifications'),('connection','/connection'),('simulator','/intelligence/simulator'),('traffic-clients','/traffic/clients'),('pc-detail','/traffic/clients/10.20.0.10')]:
+        c=connect();candidate_id=c.execute('SELECT id FROM application_dependency_candidates LIMIT 1').fetchone()[0];c.close()
+        for name,url in [('integrations','/system/integrations'),('candidate-move',f'/intelligence/dependency-candidates/{candidate_id}/move'),('access-add','/applications/allow'),('application-add','/applications/discover'),('application-edit',f'/applications/{aid}/edit'),('dependency-review','/intelligence/dependency-candidates'),('profiles','/policies/groups'),('notifications','/system/notifications'),('connection','/connection'),('simulator','/intelligence/simulator'),('traffic-clients','/traffic/clients'),('pc-detail','/traffic/clients/10.20.0.10')]:
             response=client.get(url);assert response.status_code==200,(url,response.status_code)
             html=response.text.replace('/static/',(ROOT/'static').as_uri()+'/')
             (folder/(name+'.html')).write_text(html,encoding='utf-8')
@@ -57,7 +58,7 @@ def check(folder,executable=None):
         page.get_by_role('link',name='SNMP',exact=True).click()
         position=page.locator('#snmp h3').bounding_box()
         assert position and 0<=position['y']<900,'SNMP jump link must bring configuration into view'
-        for name in ('access-add','application-add','application-edit','dependency-review','connection','notifications','simulator','simulator-result','traffic-clients','pc-detail'):
+        for name in ('integrations','candidate-move','access-add','application-add','application-edit','dependency-review','connection','notifications','simulator','simulator-result','traffic-clients','pc-detail'):
             for width in (1440,920,390):
                 page.set_viewport_size({'width':width,'height':1000})
                 page.goto((folder/(name+'.html')).resolve().as_uri())
@@ -79,6 +80,8 @@ def check(folder,executable=None):
                 if name=='traffic-clients':
                     assert page.locator('#clients-table tbody code').count()>0
                     assert page.locator('#clients-table tbody code').evaluate_all('nodes=>nodes.every(e=>e.getBoundingClientRect().height<30)'), 'PC IPs must stay on one line, including on phones'
+                if name=='pc-detail':
+                    assert page.locator('.pc-name-form input[name=name]').bounding_box()['width']>=page.locator('.pc-name-form').bounding_box()['width']*.9,'PC name field must fill its own row'
         page.goto((folder/'traffic-clients.html').resolve().as_uri())
         page.locator('select[name=range]').select_option('7d')
         page.wait_for_url(re.compile(r'[?&]range=7d(?:&|$)'))

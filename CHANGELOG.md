@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.12.11
+
+- Adds explicit domain membership moves between applications, pending-candidate reassignment/merge, and suggestions based on configured primary domains or known memberships. Corrections guide future timing correlation; suggestions do not publish access. Timing-only scores are capped Low/review and migration 019 downgrades existing pending scores without changing approved access.
+- Adds admin-managed current PC display labels with automatic cached DNS/PTR fallback. IP, label and DNS hostname stay separate in the GUI/API, with DHCP/NAT identity limits stated.
+- Adds System → Integrations API: expiring, revocable, hashed read-only Bearer tokens, inventory/per-PC traffic endpoints, scope checks, HTTPS requirement, owner revalidation, bounded pages and per-token rate limiting. Portable exports strip tokens, restores revoke imports and retain target PC labels. No endpoint agent or API policy writer is installed.
+- Clarifies recovered health notifications by separating the cleared condition from the previous alert, instead of repeating a stale failure detail as current. No live channel messages are sent during tests.
+
 ## 3.12.10
 
 - Removes the profile-versus-direct-VLAN method selector from Add access, application discovery, HAR import and application create/edit. Select existing Access Profiles once; their names and inherited VLAN/subnet details are shown together. Profile creation stays in Profiles & VLANs and adding an application never creates another profile.

@@ -112,7 +112,7 @@ jobs:
           c=sqlite3.connect('/tmp/swg-ci.db')
           assert c.execute('pragma integrity_check').fetchone()[0]=='ok'
           assert not list(c.execute('pragma foreign_key_check'))
-          assert c.execute('select max(version) from schema_migrations').fetchone()[0]=='018'
+          assert c.execute('select max(version) from schema_migrations').fetchone()[0]=='019'
           assert c.execute('pragma journal_mode').fetchone()[0].lower()=='wal'
           PY
       - name: v3.3.1 to v3.4 migration
@@ -126,7 +126,7 @@ jobs:
           python - <<'PY'
           import sqlite3
           c=sqlite3.connect('/tmp/swg-v331.db')
-          assert c.execute('select max(version) from schema_migrations').fetchone()[0]=='018'
+          assert c.execute('select max(version) from schema_migrations').fetchone()[0]=='019'
           assert c.execute('pragma integrity_check').fetchone()[0]=='ok'
           assert not list(c.execute('pragma foreign_key_check'))
           PY
@@ -139,7 +139,7 @@ jobs:
       - name: v3.8 save and apply smoke tests
         run: python tests/smoke_v380.py
       - name: Connection, health notifications and publication safety
-        run: python tests/smoke_v31210.py
+        run: python tests/smoke_v31211.py
       - name: Windows backup validation without machine changes
         run: pwsh -NoProfile -NonInteractive -File tests/windows_backup_contract.ps1
       - name: Public PAC access without exposing private configuration
@@ -198,4 +198,4 @@ jobs:
           python tests/smoke_v340.py
           python tests/smoke_v370.py
           python tests/smoke_v380.py
-          python tests/smoke_v31210.py
+          python tests/smoke_v31211.py

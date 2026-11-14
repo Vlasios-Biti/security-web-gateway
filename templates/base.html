@@ -57,13 +57,14 @@
       </a>
 
       {% if request.state.user.role=='admin' %}
-      <details class="nav-group" {% if request.url.path in ('/system/storage','/system/backups','/security/users') %}open{% endif %}>
+      <details class="nav-group" {% if request.url.path in ('/system/storage','/system/backups','/security/users','/system/integrations') %}open{% endif %}>
         <summary><span class="nav-summary-main"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="6" rx="2"/><rect x="4" y="14" width="16" height="6" rx="2"/></svg><span>System</span></span><span class="nav-chevron">›</span></summary>
         <div class="nav-children">
           {% if request.state.user.role=='admin' %}
           <a href="/system/storage" class="{% if request.url.path=='/system/storage' %}active{% endif %}">Storage</a>
           <a href="/system/backups" class="{% if request.url.path=='/system/backups' %}active{% endif %}">Backups</a>
           <a href="/security/users" class="{% if request.url.path.startswith('/security/users') %}active{% endif %}">Administrators</a>
+          <a href="/system/integrations" class="{% if request.url.path=='/system/integrations' %}active{% endif %}">Integrations API</a>
           {% endif %}
         </div>
       </details>

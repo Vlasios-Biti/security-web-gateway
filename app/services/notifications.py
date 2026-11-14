@@ -88,6 +88,14 @@ def update_incidents(found,cfg,now=None):
     finally:c.close()
 
 
+def incident_line(event, compact=False):
+    severity=event['severity'].upper();title=event['title'][:80]
+    if not event['active']:
+        return f"RECOVERED [{severity}] Condition cleared. Previous alert: {title}"
+    detail='' if compact else ': '+event['detail'][:120]
+    return f"ALERT [{severity}] {title}{detail}"
+
+
 def send_channel(channel,cfg,body):
     if channel=='email':
         message=EmailMessage();message['From']=cfg['sender'];message['To']=', '.join(cfg['recipients'])
@@ -168,9 +176,7 @@ def deliver(cfg,now=None):
         if not due:continue
         lines=[f'Security Web Gateway — {MANAGEMENT_FQDN}', '']
         for event,prior in due:
-            label='ALERT' if event['active'] else 'RECOVERED'
-            detail='' if channel=='slack' and cfg.get('slack_format')=='compact' else ': '+event['detail'][:120]
-            lines.append(f"{label} [{event['severity'].upper()}] {event['title'][:80]}{detail}")
+            lines.append(incident_line(event,channel=='slack' and cfg.get('slack_format')=='compact'))
         error=None
         try:send_channel(channel,cfg,'\n'.join(lines))
         except Exception as exc:error=_error_code(exc)

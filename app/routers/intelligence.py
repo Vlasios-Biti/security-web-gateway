@@ -36,6 +36,7 @@ def why_blocked(event_id:int,request:Request):
 
 @router.get('/dependency-candidates',response_class=HTMLResponse)
 def dependency_candidates(request:Request):
+    from app.services.dependency_assignment import catalog,suggestions
     try: filters=_candidate_filters(request.query_params)
     except ValueError as exc:return HTMLResponse(str(exc),400)
     clauses=[];args=[]
@@ -52,6 +53,8 @@ def dependency_candidates(request:Request):
         pages=max(1,(total+49)//50);filters['page']=min(filters['page'],pages)
         rows=[dict(r) for r in c.execute('SELECT adc.*,a.name application_name'+source+where+
             ' ORDER BY adc.confidence_score DESC,adc.request_count DESC,adc.last_seen_at DESC,adc.id DESC LIMIT 50 OFFSET ?',args+[(filters['page']-1)*50])]
+        apps=catalog(c)
+        for row in rows:row['suggestions']=suggestions(row['destination'],row['application_id'],apps)
     finally:c.close()
     query=urlencode({k:v for k,v in filters.items() if k!='page'})
     return request.app.state.templates.TemplateResponse(request=request,name='intelligence/dependency_candidates.html',context={'request':request,'page_title':'Dependency Candidates','rows':rows,'applications':applications,'filters':filters,'total':total,'pages':pages,'nav_query':query,'return_filters':urlencode(filters)})
@@ -67,8 +70,25 @@ def _candidate_filters(values):
     if len(q)>200:raise ValueError('Search must be at most 200 characters.')
     return {'application_id':application_id,'q':q,'status':status,'confidence':confidence,'page':page}
 
+@router.get('/dependency-candidates/{candidate_id}/move',response_class=HTMLResponse)
+def candidate_move_page(candidate_id:int,request:Request):
+    from app.services.dependency_assignment import catalog,suggestions
+    if not _manage(request):return HTMLResponse('Forbidden',403)
+    c=connect()
+    try:
+        row=c.execute("SELECT * FROM application_dependency_candidates WHERE id=? AND status='pending'",(candidate_id,)).fetchone()
+        if not row:return HTMLResponse('Not found',404)
+        source=get_application(row['application_id'])
+        if not source or (source['system_managed'] and request.state.user['role']!='admin'):return HTMLResponse('Forbidden',403)
+        targets=[a for a in catalog(c) if a['id']!=source['id'] and (request.state.user['role']=='admin' or not a['system_managed'])]
+        try:filters=urlencode(_candidate_filters(request.query_params))
+        except ValueError:return HTMLResponse('Invalid filters',400)
+    finally:c.close()
+    return request.app.state.templates.TemplateResponse(request=request,name='applications/move_dependency.html',context={'request':request,'page_title':'Move suggestion','source':source,'destination':row['destination'],'protocol':row['protocol'],'targets':targets,'suggestions':suggestions(row['destination'],source['id'],targets),'form_action':f'/intelligence/dependency-candidates/{candidate_id}/review','fields':{'action':'reassign','filters':filters},'back_url':'/intelligence/dependency-candidates?'+filters,'is_candidate':True})
+
+
 @router.post('/dependency-candidates/{candidate_id}/review')
-def review_candidate(candidate_id:int,request:Request,action:str=Form(...),csrf_token:str=Form(...),filters:str=Form('')):
+def review_candidate(candidate_id:int,request:Request,action:str=Form(...),csrf_token:str=Form(...),filters:str=Form(''),target_application_id:int=Form(0)):
     u=request.state.user
     if not _manage(request):return HTMLResponse('Forbidden',403)
     if not auth.check_csrf(u,csrf_token):return HTMLResponse('Invalid request',403)
@@ -87,6 +107,10 @@ def review_candidate(candidate_id:int,request:Request,action:str=Form(...),csrf_
     if not application:return HTMLResponse('Application not found',404)
     if application['system_managed'] and u['role']!='admin':return HTMLResponse('Forbidden',403)
     try:
+        if action=='reassign':
+            from app.services.dependency_assignment import move_candidate
+            move_candidate(candidate_id,target_application_id,u['username'])
+            return RedirectResponse(return_url+'msg=Suggestion+moved.+No+access+was+granted.',303)
         baseline_dirty=save_apply_state()["dirty"]
         if action=='approve':
             rid=create_application_dependency(row['application_id'],'domain',row['destination'],row['protocol'],u['username'],'Approved dependency candidate')

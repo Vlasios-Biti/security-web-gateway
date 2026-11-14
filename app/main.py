@@ -9,7 +9,7 @@ from app.db import verify_schema
 from app.config import MANAGEMENT_FQDN, PROXY_IP, APP_VERSION, MODE, APP_ROOT
 from app.routers import (
     auth_routes, overview, domains, ips, system_rules, traffic, policies,
-    deployments, audit, users, system, bulk, api, applications, groups, intelligence, connection, monitoring
+    deployments, audit, users, system, bulk, api, applications, groups, intelligence, connection, monitoring, integrations, integration_api
 )
 
 verify_schema()
@@ -33,8 +33,15 @@ async def gate(request: Request, call_next):
     # login/session regressions visible in Server-Timing instead of hiding them.
     started = time.perf_counter()
     public = request.url.path in ("/login", "/healthz") or request.url.path.startswith("/static/")
-    request.state.user = auth.user_from_request(request)
-    if not public and not request.state.user:
+    request.state.user = None if request.url.path.startswith('/api/v1/') else auth.user_from_request(request)
+    if request.url.path.startswith('/api/v1/'):
+        from app.services.integrations import authenticate
+        from fastapi import HTTPException
+        try:
+            request.state.api_identity=authenticate(request)
+            response=await call_next(request)
+        except HTTPException as exc:response=JSONResponse({'detail':exc.detail},exc.status_code,headers=exc.headers)
+    elif not public and not request.state.user:
         response = RedirectResponse("/login", 303)
     else:
         response = await call_next(request)
@@ -64,6 +71,6 @@ def healthz():
 for r in (
     auth_routes.router, overview.router, domains.router, ips.router, system_rules.router,
     traffic.router, policies.router, deployments.router, audit.router, users.router,
-    system.router, bulk.router, api.router, applications.router, groups.router, intelligence.router, connection.router, monitoring.router,
+    system.router, bulk.router, api.router, applications.router, groups.router, intelligence.router, connection.router, monitoring.router, integrations.router, integration_api.router,
 ):
     app.include_router(r)

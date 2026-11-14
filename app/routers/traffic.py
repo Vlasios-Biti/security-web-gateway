@@ -1,4 +1,4 @@
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote_plus
 
 from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, Response, RedirectResponse
@@ -129,6 +129,17 @@ def client_detail_page(request: Request, client_ip: str):
         context={'request':request,'page_title':'PC activity','detail':detail,'range_key':filters['range'],'filters':filters,
                  'export_query':urlencode(params),'nav_query':urlencode({**params,'page_size':page_size}),
                  'ranges':[('1h','Last hour'),('24h','Last 24 hours'),('7d','Last 7 days'),('30d','Last 30 days'),('all','All retained')]})
+
+
+@router.post('/clients/{client_ip}/label')
+def name_client(client_ip:str,request:Request,name:str=Form(''),csrf_token:str=Form(...)):
+    if not request.state.user or request.state.user['role']!='admin':return HTMLResponse('Forbidden',403)
+    if not auth.check_csrf(request.state.user,csrf_token):return HTMLResponse('Invalid request',403)
+    from app.services.client_identity import save_label
+    try:
+        save_label(client_ip,name,request.state.user['username'])
+        return RedirectResponse('/traffic/clients/'+quote_plus(client_ip)+'?msg=PC+name+saved',303)
+    except ValueError:return HTMLResponse('Invalid IP or PC name',400)
 
 
 @router.get("/export.csv")

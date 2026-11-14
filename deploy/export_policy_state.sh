@@ -10,7 +10,9 @@ TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 chmod 0700 "$TMP"
 python3 - "$DB" "$TMP/swg.db" <<'PY'
 import sqlite3,sys
-s=sqlite3.connect(sys.argv[1]);d=sqlite3.connect(sys.argv[2]);s.backup(d);d.close();s.close()
+s=sqlite3.connect(sys.argv[1]);d=sqlite3.connect(sys.argv[2]);s.backup(d)
+if d.execute("SELECT 1 FROM sqlite_master WHERE name='api_tokens' AND type='table'").fetchone():d.execute('DELETE FROM api_tokens');d.commit()
+d.close();s.close()
 PY
 cat > "$TMP/metadata.txt" <<META
 created_at=$(date -Is)

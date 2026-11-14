@@ -24,7 +24,7 @@ def main():
         c=connect()
         try:
             c.execute("INSERT INTO users(username,password_hash,role,enabled) VALUES('test','unused-fixture-hash','admin',1)")
-            assert c.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0]=="018"
+            assert c.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0]=="019"
             cols={r["name"] for r in c.execute("PRAGMA table_info(discovery_runs)")}
             assert "auto_approve" in cols
 

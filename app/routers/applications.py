@@ -342,6 +342,33 @@ def status(application_id:int,request:Request,status:str=Form(...),csrf_token:st
     return RedirectResponse("/applications?"+key+"="+quote_plus(msg),303)
 
 
+@router.get('/{application_id}/dependency/{rule_id}/move',response_class=HTMLResponse)
+def move_page(application_id:int,rule_id:int,request:Request):
+    from app.services.dependency_assignment import catalog,suggestions
+    source=get_application(application_id)
+    if not source:return HTMLResponse('Not found',404)
+    if not can_modify_application(request,source):return HTMLResponse('Forbidden',403)
+    dependency=next((r for r in source['dependencies'] if r['id']==rule_id and r['rule_type']=='domain'),None)
+    if not dependency:return HTMLResponse('Dependency not found',404)
+    c=connect()
+    try:targets=[a for a in catalog(c) if a['id']!=application_id and (admin(request) or not a['system_managed'])]
+    finally:c.close()
+    return request.app.state.templates.TemplateResponse(request=request,name='applications/move_dependency.html',context={'request':request,'page_title':'Move domain','source':source,'destination':dependency['destination'],'protocol':dependency['protocol'],'targets':targets,'suggestions':suggestions(dependency['destination'],application_id,targets),'form_action':f'/applications/{application_id}/dependency/{rule_id}/move','fields':{},'back_url':f'/applications/{application_id}','is_candidate':False})
+
+
+@router.post('/{application_id}/dependency/{rule_id}/move')
+def move_domain(application_id:int,rule_id:int,request:Request,target_application_id:int=Form(...),csrf_token:str=Form(...)):
+    if not can_manage(request):return HTMLResponse('Forbidden',403)
+    if not auth.check_csrf(request.state.user,csrf_token):return HTMLResponse('Invalid request',403)
+    from app.services.dependency_assignment import move_dependency
+    try:
+        baseline=save_apply_state()['dirty']
+        move_dependency(application_id,rule_id,target_application_id,request.state.user['username'])
+        result,msg=_apply_after_save(request,request.state.user,'Move domain between applications',baseline)
+        return RedirectResponse(f'/applications/{application_id}?'+('msg' if result.get('ok') else 'error')+'='+quote_plus(msg),303)
+    except ValueError as exc:return RedirectResponse(f'/applications/{application_id}?error='+quote_plus(str(exc)),303)
+
+
 @router.post("/{application_id}/dependency/add")
 def dependency_add(application_id:int,request:Request,kind:str=Form(...),destination:str=Form(...),protocol:str=Form(...),reason:str=Form("Manual application dependency"),csrf_token:str=Form(...)):
     u=request.state.user;app=get_application(application_id)

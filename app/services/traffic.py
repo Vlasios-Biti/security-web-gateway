@@ -672,6 +672,11 @@ def refresh_dependency_candidates(max_denied=2000):
             app_ids=list(dict.fromkeys(app_ids))
             if len(app_ids)!=1: continue
             aid=app_ids[0]
+            host=(d['destination_host'] or '').lower().rstrip('.')
+            protocol='HTTPS' if int(d['destination_port'] or 443)==443 else 'HTTP'
+            from app.services.dependency_assignment import matches
+            correction=next((row for row in c.execute("SELECT destination,target_application_id FROM dependency_corrections WHERE source_application_id=? AND protocol IN (?,'BOTH') ORDER BY length(destination) DESC",(aid,protocol)) if matches(row['destination'],host)),None)
+            if correction:aid=correction['target_application_id']
             app=c.execute("SELECT id,name,seed_domain FROM applications WHERE id=? AND status='active'",(aid,)).fetchone()
             if not app: continue
             host=(d['destination_host'] or '').lower().rstrip('.')
@@ -684,6 +689,8 @@ def refresh_dependency_candidates(max_denied=2000):
             cls,rec=_classify_endpoint(host,seed_host=(app['seed_domain'] or '').lower().rstrip('.'))
             if rec=='ignore': continue
             score,confidence=_confidence_for_classification(cls,rec)
+            # A nearby request from the same IP cannot prove process/application origin.
+            score,confidence,rec=min(score,40),'low','review'
             protocol='HTTPS' if int(d['destination_port'] or 443)==443 else 'HTTP'
             row=c.execute("SELECT id,status FROM application_dependency_candidates WHERE application_id=? AND destination=? AND protocol=?",(aid,host,protocol)).fetchone()
             evidence=json.dumps({"correlated_from_application":app['name'],"window_seconds":window,"event_id":d['id']},separators=(",",":"))
@@ -770,17 +777,21 @@ def client_inventory(filters=None, page=1, page_size=50, search=''):
             COUNT(DISTINCT NULLIF(destination_host,'')) destinations,COALESCE(SUM(bytes),0) bytes,
             GROUP_CONCAT(DISTINCT network_name) network,GROUP_CONCAT(DISTINCT vlan_id) vlan_id
             FROM telemetry_events t"""+where+""" GROUP BY client_ip), named AS (
-            SELECT devices.*,COALESCE(CASE WHEN json_valid(cache.payload_json) THEN json_extract(cache.payload_json,'$.hostname') END,'') hostname
-            FROM devices LEFT JOIN dashboard_cache cache ON cache.key='client-ptr:'||devices.ip AND cache.expires_at>?)
+            SELECT devices.*,COALESCE(CASE WHEN json_valid(cache.payload_json) THEN json_extract(cache.payload_json,'$.hostname') END,'') hostname,COALESCE(labels.name,'') label
+            FROM devices LEFT JOIN dashboard_cache cache ON cache.key='client-ptr:'||devices.ip AND cache.expires_at>?
+            LEFT JOIN client_labels labels ON labels.ip=devices.ip)
             """
         values=params+[time.time()]
         condition=''
         if search:
-            condition=" WHERE instr(lower(ip),?)>0 OR instr(lower(hostname),?)>0 OR instr(lower(COALESCE(network,'')),?)>0 OR instr(COALESCE(vlan_id,''),?)>0"
-            values.extend([search]*4)
+            condition=" WHERE instr(lower(ip),?)>0 OR instr(lower(hostname),?)>0 OR instr(lower(label),?)>0 OR instr(lower(COALESCE(network,'')),?)>0 OR instr(COALESCE(vlan_id,''),?)>0"
+            values.extend([search]*5)
         total=c.execute(base+'SELECT COUNT(*) FROM named'+condition,values).fetchone()[0]
         pages=max(1,(total+page_size-1)//page_size);page=min(page,pages)
         rows=[dict(row) for row in c.execute(base+'SELECT * FROM named'+condition+' ORDER BY requests DESC,ip LIMIT ? OFFSET ?',values+[page_size,(page-1)*page_size])]
+        for row in rows:
+            row['display_name']=row['label'] or row['hostname'] or row['ip']
+            row['identity_source']='manual' if row['label'] else ('DNS/PTR' if row['hostname'] else 'IP only')
         return {'rows':rows,'total':total,'page':page,'pages':pages,'page_size':page_size}
     finally:c.close()
 
@@ -800,6 +811,9 @@ def client_detail(ip, range_key="24h", filters=None, page=1, page_size=100):
         span=c.execute('SELECT MIN(event_time) first_seen,MAX(event_time) last_seen FROM telemetry_events t'+where,params).fetchone()
         latest=c.execute('SELECT network_name,vlan_id FROM telemetry_events t'+where+' ORDER BY epoch DESC,id DESC LIMIT 1',params).fetchone()
         meta={**dict(span),**(dict(latest) if latest else {}),'hostname':_cached_hostnames(c,[ip]).get(ip,''),'ip':ip}
+        from app.services.client_identity import label
+        meta['label']=label(c,ip);meta['display_name']=meta['label'] or meta['hostname'] or ip
+        meta['identity_source']='manual' if meta['label'] else ('DNS/PTR' if meta['hostname'] else 'IP only')
     finally:c.close()
     return {'meta':meta,'summary':summary,'events':events,'applications':apps,'destinations':dest,'destination_ips':dips}
 

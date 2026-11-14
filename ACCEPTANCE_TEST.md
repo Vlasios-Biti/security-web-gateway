@@ -110,3 +110,11 @@
 - Open Clients with slow/unavailable DNS. The page must show IPs promptly; worker lookups are bounded and unsuccessful names remain optional.
 - Inspect original CSV export formula-like notes/network names and XLSX text typing. Use XLSX for spreadsheet review; edited/re-saved CSVs require inspection before re-import.
 - On the real VM, verify live nginx/Squid/systemd behavior, installed certificate/CA trust and remote NMS/Slack/email receipt. On a pilot PC verify PAC refresh, direct bypass and full VM outage with independent DNS/router egress. These are not proven by isolated source tests.
+
+
+## 3.12.5 PC activity acceptance
+
+- Monitoring → PC activity: search current cached names, source IPs, VLANs/networks across all pages. Open one PC and filter by domain/decision/date; pagination, rankings and exports must retain that source IP.
+- Verify first/last matching timestamps and the latest network/VLAN agree with the selected filters. Compare requests to actual Squid logs for two different PCs.
+- Keep client source IPs visible to the proxy; document NAT/VPN aggregation. Validate DHCP history or reservations for historical device ownership and PTR records for current readable names.
+- Confirm HTTPS shows domain/port rather than encrypted contents. DIRECT bypass/fallback does not appear in proxy telemetry. AD/GPO deployment is distinct from unimplemented user authentication/group policies.

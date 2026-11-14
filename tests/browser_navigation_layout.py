@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Real-browser regression: navigation labels must fit and SNMP must be discoverable."""
-import argparse,os,subprocess,sys,tempfile
+import argparse,os,re,subprocess,sys,tempfile,time
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -15,11 +15,11 @@ def render_pages(folder):
     from app.config import SESSION_COOKIE
     from starlette.testclient import TestClient
     from starlette.requests import Request
-    c=connect();uid=c.execute("INSERT INTO users(username,password_hash,role,enabled) VALUES('layout-admin','unused-test-hash','admin',1)").lastrowid;c.commit();c.close()
+    c=connect();uid=c.execute("INSERT INTO users(username,password_hash,role,enabled) VALUES('layout-admin','unused-test-hash','admin',1)").lastrowid;c.execute("INSERT INTO telemetry_events(epoch,event_time,client_ip,decision,event_hash,destination_host,destination_port) VALUES(?,CURRENT_TIMESTAMP,'10.20.0.10','ALLOW','layout-fixture','www.google.com',443)",(time.time(),));c.commit();c.close()
     token=create_session(uid,Request({'type':'http','headers':[],'client':('127.0.0.1',1)}))
     with TestClient(app,base_url='https://localhost') as client:
         client.cookies.set(SESSION_COOKIE,token)
-        for name,url in [('profiles','/policies/groups'),('notifications','/system/notifications'),('connection','/connection'),('simulator','/intelligence/simulator'),('traffic-clients','/traffic/clients')]:
+        for name,url in [('profiles','/policies/groups'),('notifications','/system/notifications'),('connection','/connection'),('simulator','/intelligence/simulator'),('traffic-clients','/traffic/clients'),('pc-detail','/traffic/clients/10.20.0.10')]:
             response=client.get(url);assert response.status_code==200,(url,response.status_code)
             html=response.text.replace('/static/',(ROOT/'static').as_uri()+'/')
             (folder/(name+'.html')).write_text(html,encoding='utf-8')
@@ -52,15 +52,18 @@ def check(folder,executable=None):
         page.get_by_role('link',name='SNMP',exact=True).click()
         position=page.locator('#snmp h3').bounding_box()
         assert position and 0<=position['y']<900,'SNMP jump link must bring configuration into view'
-        for name in ('connection','notifications','simulator','simulator-result'):
+        for name in ('connection','notifications','simulator','simulator-result','traffic-clients','pc-detail'):
             for width in (1440,920,390):
                 page.set_viewport_size({'width':width,'height':1000})
                 page.goto((folder/(name+'.html')).resolve().as_uri())
                 page.locator('main details').evaluate_all('nodes=>nodes.forEach(e=>e.open=true)')
                 assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),('Form overflow',name,width)
+                if name=='traffic-clients':
+                    assert page.locator('#clients-table tbody code').count()>0
+                    assert page.locator('#clients-table tbody code').evaluate_all('nodes=>nodes.every(e=>e.getBoundingClientRect().height<30)'), 'PC IPs must stay on one line, including on phones'
         page.goto((folder/'traffic-clients.html').resolve().as_uri())
         page.locator('select[name=range]').select_option('7d')
-        page.wait_for_url('**?range=7d')
+        page.wait_for_url(re.compile(r'[?&]range=7d(?:&|$)'))
         page.goto((folder/'connection.html').resolve().as_uri())
         assert page.locator('#pac-address').input_value().endswith('/proxy.pac')
         page.get_by_role('button',name='Copy address',exact=True).click()

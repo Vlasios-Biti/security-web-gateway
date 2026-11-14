@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse, Response, RedirectResponse
 from app import auth
 from app.db import audit
 from app.services.traffic import (
-    list_events, traffic_summary, clients, client_detail, filter_options,
+    list_events, traffic_summary, clients, client_inventory, client_detail, filter_options,
     export_csv, export_xlsx, telemetry_health, update_retention, top_items,
 )
 
@@ -84,23 +84,34 @@ def allowed(request: Request):
 
 @router.get("/clients", response_class=HTMLResponse)
 def client_page(request: Request):
-    range_key=request.query_params.get("range","24h")
+    range_key=request.query_params.get('range','24h');search=request.query_params.get('q','').strip()[:200]
+    try:page=max(1,int(request.query_params.get('page','1')))
+    except ValueError:page=1
+    inventory=client_inventory({'range':range_key},page,50,search)
     return request.app.state.templates.TemplateResponse(
-        request=request,name="traffic/clients.html",
-        context={"request":request,"page_title":"Proxy Clients","clients":clients({"range":range_key}),"range_key":range_key,"health":telemetry_health()}
+        request=request,name='traffic/clients.html',
+        context={'request':request,'page_title':'PC activity','clients':inventory['rows'],'inventory':inventory,'search':search,
+                 'range_key':range_key,'nav_query':urlencode({'range':range_key,'q':search}),'health':telemetry_health()}
     )
 
 
 @router.get("/clients/{client_ip}", response_class=HTMLResponse)
 def client_detail_page(request: Request, client_ip: str):
-    range_key=request.query_params.get("range","24h")
-    try: detail=client_detail(client_ip,range_key)
-    except Exception:
-        return RedirectResponse("/traffic/clients?error=Invalid+client+IP",303)
+    import ipaddress
+    try:client_ip=str(ipaddress.ip_address(client_ip))
+    except ValueError:return RedirectResponse('/traffic/clients?error=Invalid+client+IP',303)
+    filters=_filters(request,default_range='24h');filters['client_ip']=client_ip
+    try:page=max(1,int(request.query_params.get('page','1')))
+    except ValueError:page=1
+    try:page_size=max(25,min(500,int(request.query_params.get('page_size','100'))))
+    except ValueError:page_size=100
+    detail=client_detail(client_ip,filters['range'],filters,page,page_size)
+    params={key:value for key,value in filters.items() if value not in (None,'')}
     return request.app.state.templates.TemplateResponse(
-        request=request,name="traffic/client_detail.html",
-        context={"request":request,"page_title":f"Client {client_ip}","detail":detail,"range_key":range_key}
-    )
+        request=request,name='traffic/client_detail.html',
+        context={'request':request,'page_title':'PC activity','detail':detail,'range_key':filters['range'],'filters':filters,
+                 'export_query':urlencode(params),'nav_query':urlencode({**params,'page_size':page_size}),
+                 'ranges':[('1h','Last hour'),('24h','Last 24 hours'),('7d','Last 7 days'),('30d','Last 30 days'),('all','All retained')]})
 
 
 @router.get("/export.csv")

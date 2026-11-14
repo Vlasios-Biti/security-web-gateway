@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.12.5
+
+- Makes Monitoring → PC activity the entry point for identifying recorded source IPs, current DNS names, observed networks/VLANs, request/decision/byte totals and distinct destinations.
+- Adds server-side PC search and inventory pagination. Per-PC domain/decision/date filters, paginated request history and scoped exports preserve the selected IP and traffic context.
+- Corrects per-PC first/last matching timestamps and latest network/VLAN metadata to use the same filtered window, rather than all retained events or lexicographic MAX labels.
+- Explains NAT/DHCP, current-DNS vs historical identity, HTTPS CONNECT visibility and DIRECT logging boundaries. Documents optional AD/GPO deployment and explicitly distinguishes unimplemented AD authentication/group-policy mapping.
+- Adds request-isolation, export, pagination, name-search and historical-metadata regressions plus browser checks for PC views.
+
 ## 3.12.4
 
 - Updates the audited HTTP/upload stack to FastAPI 0.162.7, Starlette 1.3.1 and python-multipart 0.0.33. Install/upgrade updates pip to 26.3; CI checks known installed-package advisories.

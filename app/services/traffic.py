@@ -758,31 +758,50 @@ def refresh_client_hostnames(limit=8):
     return {'checked':len(updates),'resolved':sum(bool(json.loads(row[1])['hostname']) for row in updates)}
 
 
+def client_inventory(filters=None, page=1, page_size=50, search=''):
+    ensure_fresh();filters=filters or {'range':'24h'}
+    where,params=_filter_sql(filters);page_size=max(25,min(500,int(page_size)));page=max(1,int(page))
+    search=str(search).strip()[:200].lower();c=connect()
+    try:
+        base="""WITH devices AS (
+            SELECT client_ip ip,MAX(event_time) last_seen,
+            SUM(CASE WHEN decision='ALLOW' THEN 1 ELSE 0 END) allowed,
+            SUM(CASE WHEN decision='DENY' THEN 1 ELSE 0 END) denied,COUNT(*) requests,
+            COUNT(DISTINCT NULLIF(destination_host,'')) destinations,COALESCE(SUM(bytes),0) bytes,
+            GROUP_CONCAT(DISTINCT network_name) network,GROUP_CONCAT(DISTINCT vlan_id) vlan_id
+            FROM telemetry_events t"""+where+""" GROUP BY client_ip), named AS (
+            SELECT devices.*,COALESCE(CASE WHEN json_valid(cache.payload_json) THEN json_extract(cache.payload_json,'$.hostname') END,'') hostname
+            FROM devices LEFT JOIN dashboard_cache cache ON cache.key='client-ptr:'||devices.ip AND cache.expires_at>?)
+            """
+        values=params+[time.time()]
+        condition=''
+        if search:
+            condition=" WHERE instr(lower(ip),?)>0 OR instr(lower(hostname),?)>0 OR instr(lower(COALESCE(network,'')),?)>0 OR instr(COALESCE(vlan_id,''),?)>0"
+            values.extend([search]*4)
+        total=c.execute(base+'SELECT COUNT(*) FROM named'+condition,values).fetchone()[0]
+        pages=max(1,(total+page_size-1)//page_size);page=min(page,pages)
+        rows=[dict(row) for row in c.execute(base+'SELECT * FROM named'+condition+' ORDER BY requests DESC,ip LIMIT ? OFFSET ?',values+[page_size,(page-1)*page_size])]
+        return {'rows':rows,'total':total,'page':page,'pages':pages,'page_size':page_size}
+    finally:c.close()
+
+
 def clients(filters=None, limit=500):
-    ensure_fresh();filters=filters or {"range":"24h"};where,params=_filter_sql(filters);c=connect()
-    try:
-        rows=[dict(r) for r in c.execute("""SELECT client_ip ip,MAX(event_time) last_seen,
-          SUM(CASE WHEN decision='ALLOW' THEN 1 ELSE 0 END) allowed,
-          SUM(CASE WHEN decision='DENY' THEN 1 ELSE 0 END) denied,COUNT(*) requests,
-          COALESCE(SUM(bytes),0) bytes,MAX(network_name) network,MAX(vlan_id) vlan_id
-          FROM telemetry_events t"""+where+" GROUP BY client_ip ORDER BY requests DESC LIMIT ?",params+[limit])]
-        names=_cached_hostnames(c,[r["ip"] for r in rows])
-        for r in rows:r["hostname"]=names.get(r["ip"],"")
-        return rows
-    finally:c.close()
+    return client_inventory(filters,1,limit)['rows'][:max(0,min(500,int(limit)))]
 
 
-def client_detail(ip, range_key="24h"):
-    ipaddress.ip_address(ip)
-    f={"range":range_key,"client_ip":ip};s=traffic_summary(f);events=list_events(f,1,100)
-    apps=top_items(f,"application_names",10);dest=top_items(f,"destination_host",15);dips=top_items(f,"destination_ip",10)
-    c=connect()
+def client_detail(ip, range_key="24h", filters=None, page=1, page_size=100):
+    ip=str(ipaddress.ip_address(ip))
+    # The path IP is authoritative; query filters must never widen this scope.
+    f={**(filters or {}),'range':range_key,'client_ip':ip}
+    summary=traffic_summary(f);events=list_events(f,page,page_size)
+    apps=top_items(f,'application_names',10);dest=top_items(f,'destination_host',15);dips=top_items(f,'destination_ip',10)
+    where,params=_filter_sql(f);c=connect()
     try:
-        meta=c.execute("SELECT MAX(network_name) network_name,MAX(vlan_id) vlan_id,MIN(event_time) first_seen,MAX(event_time) last_seen FROM telemetry_events WHERE client_ip=?",(ip,)).fetchone()
-        meta=dict(meta) if meta else {}
+        span=c.execute('SELECT MIN(event_time) first_seen,MAX(event_time) last_seen FROM telemetry_events t'+where,params).fetchone()
+        latest=c.execute('SELECT network_name,vlan_id FROM telemetry_events t'+where+' ORDER BY epoch DESC,id DESC LIMIT 1',params).fetchone()
+        meta={**dict(span),**(dict(latest) if latest else {}),'hostname':_cached_hostnames(c,[ip]).get(ip,''),'ip':ip}
     finally:c.close()
-    meta["hostname"]=_ptr(ip);meta["ip"]=ip
-    return {"meta":meta,"summary":s,"events":events,"applications":apps,"destinations":dest,"destination_ips":dips}
+    return {'meta':meta,'summary':summary,'events':events,'applications':apps,'destinations':dest,'destination_ips':dips}
 
 
 

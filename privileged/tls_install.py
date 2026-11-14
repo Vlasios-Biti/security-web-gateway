@@ -11,13 +11,78 @@ import tempfile
 TLS = Path('/etc/security-web-gateway/tls')
 NGINX = Path('/etc/nginx/sites-available/security-web-gateway')
 ENV = Path('/etc/security-web-gateway/production.env')
+MAX_FILE = 65536
 
 
-def command(args):
-    return subprocess.run(args, capture_output=True, timeout=8, check=False)
+def command(args, input_data=None):
+    return subprocess.run(args, input=input_data, capture_output=True, timeout=8, check=False)
+
+
+def private_write(path, raw):
+    fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+    with os.fdopen(fd,'wb') as stream:stream.write(raw)
+
+
+def certificate_blocks(raw):
+    blocks=re.findall(br'-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----',raw,re.S)
+    if not blocks:raise ValueError('No PEM certificate found.')
+    return b'\n'.join(blocks)+b'\n'
+
+
+def install_pfx(value):
+    raw=base64.b64decode(value.get('bundle',''),validate=True)
+    password=value.get('password','')
+    if not raw or len(raw)>MAX_FILE:raise ValueError('Use a PFX file of at most 64 KB.')
+    if not isinstance(password,str) or len(password)>1024 or any(c in password for c in '\x00\r\n'):raise ValueError('Invalid PFX password.')
+    TLS.mkdir(mode=0o700,parents=True,exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='.pfx-',dir=TLS) as td:
+        folder=Path(td);bundle=folder/'bundle.pfx';private_write(bundle,raw)
+        outputs=[folder/'leaf.pem',folder/'ca.pem',folder/'key.pem']
+        for target,options in zip(outputs,(['-clcerts','-nokeys'],['-cacerts','-nokeys'],['-nocerts','-nodes'])):
+            private_write(target,b'')
+            result=command(['/usr/bin/openssl','pkcs12','-in',str(bundle),'-passin','stdin','-out',str(target),*options],input_data=password.encode('utf-8')+b'\n')
+            if result.returncode:raise ValueError('Could not open PFX. Check its password and export a modern AES-compatible bundle with its private key.')
+            if target.stat().st_size>MAX_FILE*2:raise ValueError('PFX contents are too large.')
+        chain=certificate_blocks(outputs[0].read_bytes()+b'\n'+outputs[1].read_bytes());key=outputs[2].read_bytes()
+        return install({'certificate':base64.b64encode(chain).decode('ascii'),'private_key':base64.b64encode(key).decode('ascii'),'hostname':value.get('hostname','')})
+
+
+def renew_self_signed(value):
+    if not isinstance(value,dict) or type(value.get('days')) is not int or value['days'] not in (90,365):raise ValueError('Choose 90 or 365 days.')
+    cert,key=TLS/'management.crt',TLS/'management.key'
+    data=ssl._ssl._test_decode_cert(str(cert))
+    if data.get('issuer')!=data.get('subject'):raise ValueError('This certificate was issued by a CA. Import its renewed certificate instead.')
+    if command(['/usr/bin/openssl','verify','-no_check_time','-check_ss_sig','-no-CApath','-CAfile',str(cert),str(cert)]).returncode:
+        raise ValueError('The current certificate is not a valid self-signed certificate.')
+    env={line.split('=',1)[0]:line.split('=',1)[1].strip().strip('"\'') for line in ENV.read_text().splitlines() if '=' in line and not line.lstrip().startswith('#')}
+    hosts={env.get('SWG_FQDN',''),env.get('SWG_PROXY_IP','')}
+    if value.get('hostname'):hosts.add(value['hostname'])
+    names=[]
+    for host in sorted(hosts):
+        if not isinstance(host,str) or not host or len(host)>253 or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.-]*',host):raise ValueError('Invalid configured gateway name/IP.')
+        try:ipaddress.IPv4Address(host);kind='IP'
+        except ValueError:kind='DNS'
+        names.append(kind+':'+host)
+    if key.stat().st_size>MAX_FILE:raise ValueError('Private key is too large.')
+    with tempfile.TemporaryDirectory(prefix='.self-renew-',dir=TLS) as td:
+        candidate=Path(td)/'certificate.pem'
+        csr=Path(td)/'request.pem';extensions=Path(td)/'extensions.cnf'
+        private_write(csr,b'')
+        private_write(extensions,('subjectAltName='+','.join(names)+'\nbasicConstraints=critical,CA:FALSE\nextendedKeyUsage=serverAuth\n').encode('ascii'))
+        private_write(candidate,b'')
+        # Preserve the existing subject without reconstructing a user-controlled DN.
+        result=command(['/usr/bin/openssl','x509','-x509toreq','-in',str(cert),'-signkey',str(key),'-passin','pass:','-out',str(csr)])
+        if result.returncode:raise ValueError('Could not prepare the self-signed renewal.')
+        result=command(['/usr/bin/openssl','x509','-req','-in',str(csr),'-signkey',str(key),'-passin','pass:','-sha256','-days',str(value['days']),'-extfile',str(extensions),'-out',str(candidate)])
+        if result.returncode:raise ValueError('Self-signed certificate generation failed.')
+        return install({'certificate':base64.b64encode(candidate.read_bytes()).decode('ascii'),'private_key':base64.b64encode(key.read_bytes()).decode('ascii'),'hostname':value.get('hostname','')})
 
 
 def install(value):
+    if not isinstance(value,dict):raise ValueError('Invalid certificate request.')
+    kind=value.get('certificate_format','pem')
+    if kind=='pfx':return install_pfx(value)
+    if kind!='pem':raise ValueError('Choose PEM or PFX.')
     # No arbitrary destination paths, commands, or nginx directives from the GUI.
     config = NGINX.read_text()
     cert, key = TLS/'management.crt', TLS/'management.key'
@@ -31,9 +96,9 @@ def install(value):
         paths = [Path(td)/'chain.pem', Path(td)/'key.pem']
         for field, path in zip(('certificate', 'private_key'), paths):
             raw = base64.b64decode(value.get(field, ''), validate=True)
-            if not raw or len(raw)>20000: raise ValueError('Use PEM files of at most 20 KB each.')
-            fd=os.open(path, os.O_WRONLY|os.O_CREAT|os.O_EXCL, 0o600)
-            with os.fdopen(fd, 'wb') as stream: stream.write(raw)
+            if not raw or len(raw)>MAX_FILE: raise ValueError('Use PEM files of at most 64 KB each.')
+            if field=='certificate':raw=certificate_blocks(raw)
+            private_write(path,raw)
         try:
             context=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
             # A callable returning empty prevents an interactive encrypted-key prompt.

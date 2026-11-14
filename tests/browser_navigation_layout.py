@@ -16,13 +16,14 @@ def render_pages(folder):
     from starlette.testclient import TestClient
     from starlette.requests import Request
     from app.services.access_model import create_application,create_policy_group
+    from unittest.mock import patch
     c=connect();uid=c.execute("INSERT INTO users(username,password_hash,role,enabled) VALUES('layout-admin','unused-test-hash','admin',1)").lastrowid;c.execute("INSERT INTO telemetry_events(epoch,event_time,client_ip,decision,event_hash,destination_host,destination_port) VALUES(?,CURRENT_TIMESTAMP,'10.20.0.10','ALLOW','layout-fixture','www.google.com',443)",(time.time(),));c.commit();c.close()
     aid=create_application('Example workflow','Test','','portal.example.test','manual','',False,'layout-admin')
     c=connect();nid=c.execute("INSERT INTO networks(name,cidr,vlan_id,proxy_enabled,enabled,pending,created_by) VALUES('Office','10.20.0.0/24',131,1,1,0,'layout-admin')").lastrowid;c.commit();c.close()
     create_policy_group('Office access','',[aid],[],[nid],'layout-admin')
     c=connect();c.execute("INSERT INTO application_dependency_candidates(application_id,destination,confidence,confidence_score,request_count,client_count) VALUES(?,'api.portal.example.test','high',90,12,2)",(aid,));c.commit();c.close()
     token=create_session(uid,Request({'type':'http','headers':[],'client':('127.0.0.1',1)}))
-    with TestClient(app,base_url='https://localhost') as client:
+    with patch('app.routers.connection.certificate_health',return_value={'ok':True,'state':'warning','days_remaining':20,'expires_at':'2026-12-04T00:00:00+00:00','subject':'Gateway fixture','issuer':'Gateway fixture','names':['localhost'],'self_signed':True}),TestClient(app,base_url='https://localhost') as client:
         client.cookies.set(SESSION_COOKIE,token)
         c=connect();candidate_id=c.execute('SELECT id FROM application_dependency_candidates LIMIT 1').fetchone()[0];c.close()
         for name,url in [('integrations','/system/integrations'),('candidate-move',f'/intelligence/dependency-candidates/{candidate_id}/move'),('access-add','/applications/allow'),('application-add','/applications/discover'),('application-edit',f'/applications/{aid}/edit'),('dependency-selected',f'/intelligence/dependency-candidates?application_id={aid}'),('dependency-review','/intelligence/dependency-candidates'),('profiles','/policies/groups'),('notifications','/system/notifications'),('connection','/connection'),('simulator','/intelligence/simulator'),('traffic-clients','/traffic/clients'),('pc-detail','/traffic/clients/10.20.0.10')]:
@@ -73,6 +74,13 @@ def check(folder,executable=None):
                     assert len(controls)==4
                     assert all(e['width']>=100 and e['left']>=0 and e['right']<=width for e in controls),('Candidate filter fit',width,controls)
                 if name=='connection':
+                    page.locator('#https-certificate [name=certificate_format]').select_option('pfx')
+                    assert page.locator('#https-certificate input[name=certificate]').is_disabled()
+                    assert page.locator('#https-certificate input[name=private_key]').is_disabled()
+                    assert page.locator('#https-certificate input[name=bundle]').is_enabled()
+                    assert page.locator('#https-certificate input[name=pfx_password]').is_enabled()
+                    page.locator('#https-certificate [name=certificate_format]').select_option('pem')
+                    assert page.locator('#https-certificate input[name=pfx_password]').is_disabled()
                     form_width=page.locator('#blocked-page form').bounding_box()['width']
                     for field in ('message','contact','logo'):
                         control=page.locator('#blocked-page [name="'+field+'"]').bounding_box()

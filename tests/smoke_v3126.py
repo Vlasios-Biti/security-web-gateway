@@ -41,6 +41,7 @@ class DetailedFunctionalAudit(prior.ClientActivityWorkflows):
                         expected=403 if (admin_only and role!='admin') or (manager_only and role not in ('admin','operator')) else (303 if route['path'] in ('/login','/rules/domains','/rules/ips') else 200)
                         if route['path'].endswith('/move') and role not in ('admin','operator'):expected=403
                         if path.startswith('/api/v1/'):expected=401
+                        if path=='/connection/certificate/download' and role=='admin':expected=404
                         self.assertEqual(response.status_code,expected,(role,path,response.status_code,response.text[:150]))
                     else:
                         numbers={'auto_monitor':0,'auto_approve':0,'window_minutes':10,'smtp_port':587,'snmp_port':162,'snmp_agent_port':1161,'confirmation_samples':2,'recovery_samples':2,'repeat_minutes':60,'slack_repeat_minutes':-1,'disk_percent':85,'memory_percent':90,'certificate_days':30,'telemetry_lag_seconds':120,'cpu_percent':90,'backup_age_hours':72,'retention_days':30,'days':30,'raw_days':14,'max_gb':8,'target_gb':6,'min_free_gb':10,'raw_max_gb':4,'enabled':1}

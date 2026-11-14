@@ -5,7 +5,7 @@ Create the Access Profile, select/create its VLAN and choose allowed access on *
 Version 3.12 consolidates websites/domains/IPs under **Access**, separates **Proxy bypass**, groups traffic/health under **Monitoring**, exposes **Alerts & SNMP** directly, and assigns new application access through profiles with inherited VLANs. Install/upgrade provides an unassigned Google Search starter and no customer-specific application data. Optional read-only SNMPv2c polling/traps are configured with email/Slack; SNMPv3 is not included. See [the access/deployment guide](docs/CONNECTION_AND_LEARNING.md) and [notification/SNMP setup](docs/HEALTH_NOTIFICATIONS.md).
 
 
-**Version:** 3.12.12
+**Version:** 3.12.13
 
 **Target:** single-VM, on-prem enterprise appliance  
 **Target OS:** Ubuntu Server 24.04 LTS / 26.04 LTS  
@@ -59,6 +59,10 @@ Sizing should ultimately follow concurrent CONNECT sessions, requests/sec, WAN t
 - Operator changes remain pending for Admin approval. Advanced manual/HAR discovery remains available for authenticated or unusual workflows.
 - Browser discovery rejects private/reserved targets and DNS-rebinding/SSRF-style pivots.
 - PAC supports explicit DIRECT bypasses plus fail-open `PROXY ...; DIRECT` behavior.
+
+## v3.12.13 — certificate operations in the GUI
+
+Connection has a visible HTTPS certificate card: import PEM or Windows PFX/PKCS#12, renew an existing self-signed certificate and download its public certificate. CA-issued renewals are obtained from the issuer and imported. Fixed-path validation and failure rollback protect publication; client trust is managed separately. See [GUI certificate management](docs/HTTPS_CERTIFICATES.md).
 
 ## v3.12.12 — immediate application filter visibility
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.12.13
+
+- Adds a visible Connection → HTTPS certificate card with issuer/subject/names/expiry, public certificate download and one import form for PEM or password-protected Windows PFX/PKCS#12. File limits are 64 KB; hidden format inputs are disabled. Private keys/passwords are never exposed through download or audit.
+- Adds GUI renewal of an existing self-signed certificate for 90/365 days, retaining its subject/key and covering current configured names/IP. The root helper verifies the existing self-signature and refuses CA-issued certificates; CA renewal remains an issuer operation followed by import.
+- Reuses fixed-path validation/publication and rollback on nginx validation/reload failure. PFX passwords go through standard input and temporary material remains private. Tests cover real PFX parsing, wrong passwords, CA refusal, repeat self-renewal, public-only export and rollback. No real VM certificates are changed during tests. Schema stays 019.
+
 ## 3.12.12
 
 - Identifies the expiring certificate as the admin-panel/HTTPS-PAC certificate in Health, Connection and notifications. Health badge color now follows its warning/critical state instead of showing a near-expiry certificate as green. HTTPS traffic inspection remains separate and is not enabled.

@@ -76,7 +76,7 @@ class EndpointAlertWorkflows(prior.CombinedProfileWorkflows):
         with client,patch('app.services.deployment.helper_request') as helper:
             files={'certificate':('chain.pem',b'fake'),'private_key':('key.pem',b'fake')}
             self.assertEqual(client.post('/connection/certificate',data={'csrf_token':'bad'},files=files).status_code,403)
-            response=client.post('/connection/certificate',data={'csrf_token':csrf},files={**files,'private_key':('key.pem',b'x'*20001)},follow_redirects=False)
+            response=client.post('/connection/certificate',data={'csrf_token':csrf},files={**files,'private_key':('key.pem',b'x'*65537)},follow_redirects=False)
             self.assertIn('error=',response.headers['location']);helper.assert_not_called()
         client,csrf=self.client_for('viewer')
         with client:self.assertEqual(client.post('/connection/certificate',data={'csrf_token':csrf},files=files).status_code,403)

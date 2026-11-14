@@ -19,10 +19,13 @@ def render_pages(folder):
     token=create_session(uid,Request({'type':'http','headers':[],'client':('127.0.0.1',1)}))
     with TestClient(app,base_url='https://localhost') as client:
         client.cookies.set(SESSION_COOKIE,token)
-        for name,url in [('profiles','/policies/groups'),('notifications','/system/notifications'),('connection','/connection')]:
+        for name,url in [('profiles','/policies/groups'),('notifications','/system/notifications'),('connection','/connection'),('simulator','/intelligence/simulator'),('traffic-clients','/traffic/clients')]:
             response=client.get(url);assert response.status_code==200,(url,response.status_code)
             html=response.text.replace('/static/',(ROOT/'static').as_uri()+'/')
             (folder/(name+'.html')).write_text(html,encoding='utf-8')
+        response=client.post('/intelligence/simulator',data={'client_ip':'10.20.0.10','destination':'http://printer'})
+        assert response.status_code==200
+        (folder/'simulator-result.html').write_text(response.text.replace('/static/',(ROOT/'static').as_uri()+'/'),encoding='utf-8')
 
 
 def check(folder,executable=None):
@@ -49,12 +52,15 @@ def check(folder,executable=None):
         page.get_by_role('link',name='SNMP',exact=True).click()
         position=page.locator('#snmp h3').bounding_box()
         assert position and 0<=position['y']<900,'SNMP jump link must bring configuration into view'
-        for name in ('connection','notifications'):
+        for name in ('connection','notifications','simulator','simulator-result'):
             for width in (1440,920,390):
                 page.set_viewport_size({'width':width,'height':1000})
                 page.goto((folder/(name+'.html')).resolve().as_uri())
                 page.locator('main details').evaluate_all('nodes=>nodes.forEach(e=>e.open=true)')
                 assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),('Form overflow',name,width)
+        page.goto((folder/'traffic-clients.html').resolve().as_uri())
+        page.locator('select[name=range]').select_option('7d')
+        page.wait_for_url('**?range=7d')
         page.goto((folder/'connection.html').resolve().as_uri())
         assert page.locator('#pac-address').input_value().endswith('/proxy.pac')
         page.get_by_role('button',name='Copy address',exact=True).click()

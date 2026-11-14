@@ -94,6 +94,7 @@ echo "===== 3. STAGE RELEASE ====="
 rm -rf "$REL"; install -d -o root -g proxy-mgmt -m 0750 "$REL"
 rsync -a --delete --exclude '__pycache__' --exclude '*.pyc' "$ROOT/app" "$ROOT/bin" "$ROOT/migrations" "$ROOT/static" "$ROOT/templates" "$ROOT/tools" "$ROOT/privileged" "$ROOT/requirements.txt" "$ROOT/VERSION" "$REL/"
 chown -R root:proxy-mgmt "$REL"; find "$REL" -type d -exec chmod 0750 {} +; find "$REL" -type f -exec chmod 0640 {} +; find "$REL/bin" "$REL/tools" -type f -name '*.py' -exec chmod 0750 {} +
+"$VENV/bin/python" -m pip install --upgrade pip==26.3
 "$VENV/bin/pip" install -r "$REL/requirements.txt"
 if [[ $SKIP_BROWSER -eq 0 ]]; then
   "$VENV/bin/python" -m playwright install-deps chromium

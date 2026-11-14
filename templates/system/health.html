@@ -84,7 +84,7 @@
 </section>
 
 <section class="ops-card alerts-card">
-  <header><div><h3>System events &amp; alerts</h3><p>Only operational issues requiring attention appear here.</p></div></header>
+  <header><div><h3>System events &amp; alerts</h3><p>Checks use the same thresholds configured in Alerts &amp; SNMP. Delivery severity and confirmation control notifications separately.</p></div></header>
   {% if alerts %}
   <div class="ops-alerts">{% for a in alerts %}<div class="ops-alert {{ a.severity }}"><span></span><div><b>{{ a.title }}</b><small>{{ a.detail }}</small></div></div>{% endfor %}</div>
   {% else %}

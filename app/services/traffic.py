@@ -9,6 +9,8 @@ import io
 import json
 import os
 import socket
+import subprocess
+import re
 import shutil
 import time
 import urllib.parse
@@ -17,8 +19,8 @@ from xml.sax.saxutils import escape
 
 from app.config import SQUID_ACCESS_LOG, DATA_ROOT, DB_PATH, SQUID_LOG_DIR, PROXY_IP
 from app.db import connect
+from app.security import csv_cell
 
-_PTR_CACHE = {}
 _ATTR_CACHE = {"ts": 0.0, "data": None}
 _NETWORK_CACHE = {"ts": 0.0, "data": None}
 _LOCK_PATH = DATA_ROOT / "telemetry.lock"
@@ -712,12 +714,48 @@ def refresh_dependency_candidates(max_denied=2000):
         c.close()
 
 
+def _cached_hostnames(c, ips):
+    keys=['client-ptr:'+str(ip) for ip in ips]
+    if not keys:return {}
+    found={}
+    for row in c.execute('SELECT key,payload_json FROM dashboard_cache WHERE key IN ('+','.join('?' for _ in keys)+') AND expires_at>?',keys+[time.time()]):
+        try:found[row['key'].removeprefix('client-ptr:')]=json.loads(row['payload_json']).get('hostname','')
+        except (ValueError,TypeError):pass
+    return found
+
+
 def _ptr(ip):
-    now=time.time();hit=_PTR_CACHE.get(ip)
-    if hit and now-hit[0]<600:return hit[1]
-    try:name=socket.gethostbyaddr(ip)[0]
-    except Exception:name=""
-    _PTR_CACHE[ip]=(now,name);return name
+    c=connect()
+    try:return _cached_hostnames(c,[ip]).get(ip,'')
+    finally:c.close()
+
+
+def refresh_client_hostnames(limit=8):
+    # Worker only: bounded recent-event scan, no DNS while holding a DB write lock.
+    limit=max(1,min(int(limit),8));now=time.time();c=connect()
+    try:
+        rows=c.execute("""SELECT DISTINCT recent.client_ip FROM
+            (SELECT client_ip FROM telemetry_events ORDER BY epoch DESC LIMIT 2000) recent
+            LEFT JOIN dashboard_cache cache ON cache.key='client-ptr:'||recent.client_ip
+            WHERE cache.key IS NULL OR cache.expires_at<=? LIMIT ?""",(now,limit)).fetchall()
+    finally:c.close()
+    updates=[]
+    for row in rows:
+        try:ip=str(ipaddress.IPv4Address(row['client_ip']))
+        except ValueError:continue
+        name=''
+        try:
+            result=subprocess.run(['/usr/bin/getent','hosts',ip],capture_output=True,text=True,timeout=.5,check=False)
+            fields=result.stdout[:1024].split()
+            if result.returncode==0 and len(fields)>1 and len(fields[1])<=253 and re.fullmatch(r'[A-Za-z0-9_.-]+',fields[1]):name=fields[1]
+        except (OSError,subprocess.TimeoutExpired):pass
+        updates.append(('client-ptr:'+ip,json.dumps({'hostname':name}),now+(3600 if name else 600)))
+    c=connect()
+    try:
+        c.executemany("INSERT INTO dashboard_cache(key,payload_json,expires_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET payload_json=excluded.payload_json,expires_at=excluded.expires_at,generated_at=CURRENT_TIMESTAMP",updates)
+        c.execute("DELETE FROM dashboard_cache WHERE key LIKE 'client-ptr:%' AND expires_at<?",(now-86400,));c.commit()
+    finally:c.close()
+    return {'checked':len(updates),'resolved':sum(bool(json.loads(row[1])['hostname']) for row in updates)}
 
 
 def clients(filters=None, limit=500):
@@ -728,7 +766,8 @@ def clients(filters=None, limit=500):
           SUM(CASE WHEN decision='DENY' THEN 1 ELSE 0 END) denied,COUNT(*) requests,
           COALESCE(SUM(bytes),0) bytes,MAX(network_name) network,MAX(vlan_id) vlan_id
           FROM telemetry_events t"""+where+" GROUP BY client_ip ORDER BY requests DESC LIMIT ?",params+[limit])]
-        for r in rows:r["hostname"]=_ptr(r["ip"])
+        names=_cached_hostnames(c,[r["ip"] for r in rows])
+        for r in rows:r["hostname"]=names.get(r["ip"],"")
         return rows
     finally:c.close()
 
@@ -916,8 +955,8 @@ _EXPORT_KEYS=["event_time","client_ip","network_name","vlan_id","decision","appl
 
 
 def export_csv(filters):
-    ensure_fresh();rows=_export_rows(filters);buf=io.StringIO();w=csv.writer(buf);w.writerow(_EXPORT_HEADERS)
-    for r in rows:w.writerow([r.get(k,"") for k in _EXPORT_KEYS])
+    ensure_fresh();rows=_export_rows(filters);buf=io.StringIO();w=csv.writer(buf,quoting=csv.QUOTE_ALL);w.writerow(_EXPORT_HEADERS)
+    for r in rows:w.writerow([csv_cell(r.get(k,"")) for k in _EXPORT_KEYS])
     return buf.getvalue().encode("utf-8-sig")
 
 

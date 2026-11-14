@@ -2,10 +2,10 @@
 
 Create the Access Profile, select/create its VLAN and choose allowed access on **one page with one save**: Profiles & VLANs.
 
-Version 3.12 consolidates websites/domains/IPs under **Access**, separates **Proxy bypass**, groups traffic/health/notifications under **Monitoring**, and uses one profile-or-VLAN selector. Install/upgrade provides an unassigned Google Search starter and no customer-specific application data. Optional read-only SNMPv2c polling/traps are configured with email/Slack; SNMPv3 is not included. See [the access/deployment guide](docs/CONNECTION_AND_LEARNING.md) and [notification/SNMP setup](docs/HEALTH_NOTIFICATIONS.md).
+Version 3.12 consolidates websites/domains/IPs under **Access**, separates **Proxy bypass**, groups traffic/health under **Monitoring**, exposes **Alerts & SNMP** directly, and uses one profile-or-VLAN selector. Install/upgrade provides an unassigned Google Search starter and no customer-specific application data. Optional read-only SNMPv2c polling/traps are configured with email/Slack; SNMPv3 is not included. See [the access/deployment guide](docs/CONNECTION_AND_LEARNING.md) and [notification/SNMP setup](docs/HEALTH_NOTIFICATIONS.md).
 
 
-**Version:** 3.12.3
+**Version:** 3.12.4
 
 **Target:** single-VM, on-prem enterprise appliance  
 **Target OS:** Ubuntu Server 24.04 LTS / 26.04 LTS  
@@ -60,9 +60,16 @@ Sizing should ultimately follow concurrent CONNECT sessions, requests/sec, WAN t
 - Browser discovery rejects private/reserved targets and DNS-rebinding/SSRF-style pivots.
 - PAC supports explicit DIRECT bypasses plus fail-open `PROXY ...; DIRECT` behavior.
 
-## v3.12.3 — health notifications and operational safety
+## v3.12.4 — system review and reliable diagnosis
 
-- **System → Health notifications** configures optional SMTP email and Slack Incoming Webhooks entirely from the GUI, with test buttons and live delivery history.
+- The existing Policy Simulator checks saved proxy policy and PAC routing together, including direct bypasses, optional client-resolved destination IPs and clear pending/historical-policy labels.
+- Health alerts share the notification thresholds; stale samples do not present the gateway as healthy. Dashboard health uses cached sampling.
+- Client reverse DNS runs in a bounded background worker rather than delaying client pages. CSV export text receives formula-prefix protection; XLSX retains explicit text cells.
+- See the [platform review and feature decisions](docs/PLATFORM_REVIEW.md) for findings, validation boundaries and prioritized future work.
+
+## Health notifications and operational safety
+
+- **Alerts & SNMP** configures optional SMTP email and Slack Incoming Webhooks entirely from the GUI, with test buttons and live delivery history.
 - Confirmed incidents, recovery, grouped messages, repeat control and independent retry/backoff run in a low-priority background worker.
 - Secrets are stored in a protected VM-local configuration file and never returned by the GUI or exported with policy state.
 - Policy expiry, concurrent publication, portable backup/restore staging and browser discovery isolation have dedicated regression coverage.
@@ -244,11 +251,11 @@ Keep the repository private unless publication is intentional.
 git add -A
 git status
 git diff --cached
-git commit -m "Security Web Gateway v3.12.3"
+git commit -m "Security Web Gateway v3.12.4"
 git push
 
-git tag -a v3.12.3 -m "Security Web Gateway v3.12.3"
-git push origin v3.12.3
+git tag -a v3.12.4 -m "Security Web Gateway v3.12.4"
+git push origin v3.12.4
 ```
 
 Never stage `.db`, `.sqlite*`, `.env`, TLS/private-key material, HAR files, logs or backups.

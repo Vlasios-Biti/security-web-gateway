@@ -16,15 +16,16 @@ def _manage(request):
 
 @router.get('/simulator',response_class=HTMLResponse)
 def simulator_page(request:Request):
-    return request.app.state.templates.TemplateResponse(request=request,name='intelligence/simulator.html',context={'request':request,'page_title':'Policy Simulator','result':None,'error':None})
+    return request.app.state.templates.TemplateResponse(request=request,name='intelligence/simulator.html',context={'request':request,'page_title':'Policy Simulator','result':None,'error':None,'inputs':{}})
 
 @router.post('/simulator',response_class=HTMLResponse)
 def simulator_run(request:Request,client_ip:str=Form(...),destination:str=Form(...),port:int=Form(443),method:str=Form('CONNECT'),destination_ip:str=Form('')):
+    inputs={'client_ip':client_ip,'destination':destination,'port':port,'method':method,'destination_ip':destination_ip}
     try:
         result=explain_policy(client_ip,destination,port,method,destination_ip)
-        return request.app.state.templates.TemplateResponse(request=request,name='intelligence/simulator.html',context={'request':request,'page_title':'Policy Simulator','result':result,'error':None})
-    except Exception as exc:
-        return request.app.state.templates.TemplateResponse(request=request,name='intelligence/simulator.html',context={'request':request,'page_title':'Policy Simulator','result':None,'error':str(exc)},status_code=400)
+        return request.app.state.templates.TemplateResponse(request=request,name='intelligence/simulator.html',context={'request':request,'page_title':'Policy Simulator','result':result,'error':None,'inputs':inputs})
+    except (ValueError,TypeError) as exc:
+        return request.app.state.templates.TemplateResponse(request=request,name='intelligence/simulator.html',context={'request':request,'page_title':'Policy Simulator','result':None,'error':str(exc),'inputs':inputs},status_code=400)
 
 @router.get('/why-blocked/{event_id}',response_class=HTMLResponse)
 def why_blocked(event_id:int,request:Request):

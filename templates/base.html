@@ -56,6 +56,7 @@
         {% if request.state.user.role in ('admin','operator') %}<span class="nav-count" data-pending-count></span>{% endif %}
       </a>
 
+      {% if request.state.user.role=='admin' %}
       <details class="nav-group" {% if request.url.path in ('/system/storage','/system/backups','/security/users') %}open{% endif %}>
         <summary><span class="nav-summary-main"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="6" rx="2"/><rect x="4" y="14" width="16" height="6" rx="2"/></svg><span>System</span></span><span class="nav-chevron">›</span></summary>
         <div class="nav-children">
@@ -66,6 +67,7 @@
           {% endif %}
         </div>
       </details>
+      {% endif %}
 
       <details class="nav-group nav-advanced" {% if '/bulk/' in request.url.path or '/intelligence/' in request.url.path %}open{% endif %}>
         <summary><span class="nav-summary-main"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18"/></svg><span>Policy &amp; tools</span></span><span class="nav-chevron">›</span></summary>

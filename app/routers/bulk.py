@@ -11,7 +11,7 @@ from app.db import audit, connect
 from app.services.access_choice import choose_access
 from app.services.rules import create_rule, list_networks, list_rules
 from app.services.access_model import list_policy_groups
-from app.security import normalize_domain, normalize_ip
+from app.security import normalize_domain, normalize_ip, csv_cell
 from app.services.apply import save_apply_state,apply_saved_change,apply_message
 router=APIRouter(dependencies=[Depends(policy_guard)],prefix="/bulk")
 def can_manage(u):return u and u["role"] in("admin","operator")
@@ -108,12 +108,12 @@ def apply(batch_id:int,request:Request,csrf_token:str=Form(...)):
     msg=apply_message(applied);key="msg" if applied.get("ok") else "error"
     return RedirectResponse("/bulk/import?"+key+"="+quote_plus(msg),303)
 def _export(kind):
-    output=io.StringIO();writer=csv.writer(output)
+    output=io.StringIO();writer=csv.writer(output,quoting=csv.QUOTE_ALL)
     writer.writerow(["action","destination","protocol","scope_mode","access_profiles","networks","status","reason","change_reference","expires_at"])
     for r in list_rules(kind,management="custom",include_deleted=False,standalone_only=True):
         profiles=";".join(g["name"] for g in r.get("policy_groups",[]))
         networks=";".join((f"VLAN{n['vlan_id']}" if n.get('vlan_id') else n['cidr']) for n in r.get("networks",[]))
-        writer.writerow(["ALLOW",r["destination"],r["protocol"],r.get("scope_mode") or "selected",profiles,networks,r["status"],r.get("reason") or "",r.get("change_reference") or "",r.get("expires_at") or ""])
+        writer.writerow([csv_cell(value) for value in ["ALLOW",r["destination"],r["protocol"],r.get("scope_mode") or "selected",profiles,networks,r["status"],r.get("reason") or "",r.get("change_reference") or "",r.get("expires_at") or ""]])
     return output.getvalue()
 @router.get("/export/domains.csv")
 def export_domains(request:Request):return Response(_export("domain"),media_type="text/csv",headers={"Content-Disposition":"attachment; filename=allowed-domains.csv"})

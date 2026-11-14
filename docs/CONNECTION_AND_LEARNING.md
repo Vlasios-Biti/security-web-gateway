@@ -1,4 +1,4 @@
-# Access and connection guide — 3.12.3
+# Access and connection guide — 3.12.4
 
 ## Profile and VLAN in one save
 
@@ -101,7 +101,7 @@ Connection also offers gateway-specific Microsoft Edge ProxySettings JSON. Deplo
 Availability-first operation requires independent DNS/routing and firewall permission for direct web egress. During fallback traffic has none of this gateway's filtering/telemetry. A policy denial is not treated as a proxy outage. Client timeouts, cached PAC state and existing connections affect transition timing; this is not an instantaneous universal failover guarantee. The existing Windows controller has no background reachability watchdog; clients that mandate remote PAC or ignore normal PAC fallback require their own tested deployment policy. Test both proxy-only failure and complete VM/PAC-server loss on a pilot PC before rollout. Strict firewall prevention of all direct egress conflicts with fail-open internet access unless the network itself also switches policy during an outage.
 
 
-### PAC address and HTTPS (3.12.3)
+### PAC address and HTTPS (3.12.4)
 
 Open **Connection**. Copy the PAC address into Windows Settings → Network & Internet → Proxy → Use setup script. The Windows ZIP and Edge policy JSON use this same saved address. Existing installations keep their installed address until the package/GPO is redeployed. The script URL is not the path of the PowerShell installer.
 

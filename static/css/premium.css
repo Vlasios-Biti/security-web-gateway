@@ -77,3 +77,5 @@ input::placeholder,textarea::placeholder{color:#647084!important;opacity:1}label
 .pac-setup{margin-bottom:24px}.pac-copy-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.pac-copy-row input{flex:1 1 300px;min-width:0}.tls-summary{margin:20px 0;overflow-wrap:anywhere}.pac-setup form+form{margin-top:20px}.slack-topics{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
 
 .channel-settings>label:not(.check){display:grid;gap:6px;margin:14px 0}.channel-settings>label:not(.check)>input{width:100%;min-width:0}
+
+.simulator-form{padding:20px}.simulator-form>details{margin-top:16px}.simulator-message{margin:16px 20px}.integrity-grid b{overflow-wrap:anywhere}.simulator-message p:last-child{margin-bottom:0}

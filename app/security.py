@@ -52,3 +52,13 @@ def expiration_input(value):
     from datetime import datetime
     try:return datetime.fromisoformat(normalize_expiration(value)).strftime('%Y-%m-%dT%H:%M')
     except ValueError:return ''
+
+
+def csv_cell(value):
+    """Keep untrusted export text from starting a spreadsheet formula."""
+    if not isinstance(value,str) or not value:return value
+    import unicodedata
+    probe=unicodedata.normalize('NFKC',value).lstrip()
+    if value[0] in '\t\r\n' or (probe and probe[0] in '=+-@'):
+        return "'"+value
+    return value

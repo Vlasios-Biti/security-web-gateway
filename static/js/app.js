@@ -201,3 +201,8 @@ document.addEventListener("DOMContentLoaded",()=>{
  setupNavigation();setupCommandPalette();setupCardFilters();setupLiveTrafficRefresh();setupApplicationActivityPoll();setupNotificationStatus();refreshCharts();drawSystemPerformance();if(document.getElementById("traffic-chart"))setInterval(refreshCharts,15000);
 });
 window.addEventListener("resize",()=>{clearTimeout(window.__pmResize);window.__pmResize=setTimeout(()=>{refreshCharts();drawSystemPerformance()},160)});
+
+// Form changes remain compatible with the management CSP (no inline handlers).
+document.addEventListener('change',event=>{
+ if(event.target.matches('[data-auto-submit]')&&event.target.form)event.target.form.requestSubmit();
+});

@@ -13,7 +13,7 @@ def event_topic(code):
     if code in ('disk','memory','cpu'):return 'resources'
     if code.startswith('certificate'):return 'certificate'
     if code.startswith('worker_'):return 'workers'
-    return {'backup':'backup','dns':'dns','ntp':'clock','telemetry':'traffic','sampler':'traffic','policy_drift':'policy'}.get(code,'services')
+    return {'backup':'backup','dns':'dns','ntp':'clock','telemetry':'traffic','sampler':'traffic','policy_drift':'policy','expiry':'policy'}.get(code,'services')
 
 PATH=Path('/etc/security-web-gateway/notifications.json')
 DEFAULTS={'enabled':False,'email_enabled':False,'slack_enabled':False,'smtp_host':'','smtp_port':587,'smtp_tls':'starttls',

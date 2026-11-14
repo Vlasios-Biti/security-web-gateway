@@ -1,7 +1,9 @@
 {% extends "base.html" %}{% block content %}
-<section class="ops-health-hero {{ 'healthy' if squid_status=='active' and app_status=='active' and nginx_status=='active' and port_ok else 'attention' }}">
-  <div><span class="ops-kicker">Security posture</span><h2>{{ 'Gateway operational' if squid_status=='active' and app_status=='active' and nginx_status=='active' and port_ok else 'Gateway needs attention' }}</h2><p>{{ 'Core services healthy · policy synchronized' if squid_status=='active' and nginx_status=='active' and app_status=='active' and port_ok and drift.state=='clean' else 'One or more operational controls require review.' }}</p></div>
+{% set gateway_ready = squid_status=='active' and app_status=='active' and nginx_status=='active' and port_ok and drift.state=='clean' and not health_cache.cache_stale %}
+<section class="ops-health-hero {{ 'healthy' if gateway_ready else 'attention' }}">
+  <div><span class="ops-kicker">Security posture</span><h2>{{ 'Gateway operational' if gateway_ready else 'Gateway needs attention' }}</h2><p>{{ 'Core services healthy · policy synchronized' if gateway_ready else 'One or more operational controls require review.' }}</p></div>
   <div class="hero-state-pills">
+    {% if health_cache.cache_stale %}<span class="status-pill warning">Health sample is stale</span>{% endif %}
     <span class="status-pill {{ 'healthy' if squid_status=='active' else 'danger' }}">Squid {{ squid_status }}</span>
     <span class="status-pill {{ 'healthy' if drift.state=='clean' else 'danger' }}">Config {{ drift.state }}</span>
     <span class="status-pill {{ 'healthy' if pending_count==0 else 'warning' }}">{{ pending_count }} approval{{ '' if pending_count==1 else 's' }}</span>

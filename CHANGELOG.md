@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.12.4
+
+- Updates the audited HTTP/upload stack to FastAPI 0.162.7, Starlette 1.3.1 and python-multipart 0.0.33. Install/upgrade updates pip to 26.3; CI checks known installed-package advisories.
+- Reviewed access/VLAN onboarding, discovery/capture isolation, policy publication/expiry/rollback, PAC/HTTPS deployment, alerts/SNMP, authentication, telemetry/storage/export and release checks.
+- Corrects saved-policy simulation for Squid safe ports/methods, literal IPv4 rules, diagnostic sources and legacy overlapping source scopes. Adds PAC bypass/fallback diagnosis without server DNS calls; full website URLs are accepted and invalid inputs retained.
+- Clearly separates saved-policy preview from deployed behavior and historical Squid log evidence. No extra primary menu or duplicated policy editor.
+- Uses shared configured alert thresholds on Health, places expiry failures in Slack's policy category, hides empty administrator navigation from other roles and avoids a healthy overview with stale samples.
+- Fixes the client time-range selector blocked by CSP by using an external event handler.
+- Removes blocking reverse-DNS requests from client pages. A bounded worker resolves up to eight recent clients per run with per-query timeout and persistent positive/negative caches. Health API reads cached samples.
+- Protects formula-like CSV text cells in policy/traffic exports, including leading whitespace and full-width prefixes; XLSX remains explicit text. Stored policy/telemetry values are unchanged.
+- Updates the platform review with feature decisions, source comparisons and the remaining VM/client/NMS acceptance checks.
+
 ## 3.12.3
 
 - Connection shows a copyable PAC setup-script URL and one HTTP/HTTPS hostname setting shared by Windows package, installer build and Edge GPO downloads. Existing PCs need the changed address redeployed.

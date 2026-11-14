@@ -20,6 +20,10 @@ jobs:
           cache: 'pip'
       - name: Install Python dependencies
         run: pip install -r requirements-dev.txt
+      - name: Known Python dependency vulnerabilities
+        run: |
+          python -m pip install --upgrade pip==26.3 pip-audit==2.10.1
+          pip-audit --local --progress-spinner off
       - name: Python compile
         run: python -m compileall -q app bin tools privileged tests
       - name: Template syntax
@@ -135,7 +139,7 @@ jobs:
       - name: v3.8 save and apply smoke tests
         run: python tests/smoke_v380.py
       - name: Connection, health notifications and publication safety
-        run: python tests/smoke_v3123.py
+        run: python tests/smoke_v3124.py
       - name: App import
         env:
           SWG_DB_PATH: /tmp/swg-ci.db
@@ -185,4 +189,4 @@ jobs:
           python tests/smoke_v340.py
           python tests/smoke_v370.py
           python tests/smoke_v380.py
-          python tests/smoke_v3123.py
+          python tests/smoke_v3124.py

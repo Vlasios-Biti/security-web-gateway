@@ -114,7 +114,7 @@ find "$REL" -type f -exec chmod 0640 {} +
 find "$REL/bin" "$REL/tools" -type f -name '*.py' -exec chmod 0750 {} +
 
 if [[ ! -x /opt/security-web-gateway/venv/bin/python ]]; then python3 -m venv /opt/security-web-gateway/venv; fi
-/opt/security-web-gateway/venv/bin/pip install --upgrade pip
+/opt/security-web-gateway/venv/bin/python -m pip install --upgrade pip==26.3
 /opt/security-web-gateway/venv/bin/pip install -r "$REL/requirements.txt"
 
 if [[ $SKIP_BROWSER -eq 0 ]]; then

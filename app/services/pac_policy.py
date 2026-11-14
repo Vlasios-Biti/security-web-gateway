@@ -44,6 +44,32 @@ def validate_policy(value):
     return result
 
 
+def explain_routing(policy, host, resolved_ip=''):
+    """Read-only PAC preview; never resolve DNS from the management server."""
+    policy=validate_policy(policy)
+    host=host.lower().rstrip('.')
+    def result(route,reason):
+        return {'route':route,'reason':reason,'fail_open':policy['fail_open']}
+    if policy['internal_direct'] and '.' not in host:
+        return result('DIRECT','Single-label local names bypass the proxy.')
+    networks=[]
+    for entry in policy['bypass']:
+        try:networks.append(ipaddress.ip_network(entry,strict=False));continue
+        except ValueError:pass
+        if host==entry or (entry.startswith('*.') and (host==entry[2:] or host.endswith(entry[1:]))):
+            return result('DIRECT','Matches the explicit domain bypass '+entry+'.')
+    try:literal=ipaddress.IPv4Address(host)
+    except ValueError:literal=None
+    if policy['internal_direct'] and literal and any(literal in ipaddress.ip_network(x) for x in ('10.0.0.0/8','172.16.0.0/12','192.168.0.0/16','127.0.0.0/8')):
+        return result('DIRECT','Private or loopback IPv4 literals bypass the proxy.')
+    address=literal or (ipaddress.IPv4Address(resolved_ip) if resolved_ip else None)
+    if address and any(address in net for net in networks):
+        return result('DIRECT','Matches an explicit IP/subnet bypass.')
+    if networks and not address:
+        return result('DNS_REQUIRED','IP/subnet bypasses depend on the IP resolved by the PC. Enter that destination IP in advanced options to evaluate them.')
+    return result('PROXY','No direct bypass matches. Proxy ALLOW rules apply while the proxy is reachable.')
+
+
 def render_pac(policy, proxy_ip, proxy_port):
     policy = validate_policy(policy)
     address = ipaddress.ip_address(proxy_ip)

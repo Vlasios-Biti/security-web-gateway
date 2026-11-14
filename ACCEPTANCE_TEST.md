@@ -1,7 +1,7 @@
-# Security Web Gateway v3.12.1 Acceptance Test
+# Security Web Gateway v3.12.2 Acceptance Test
 
-1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.12.1`.
-2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.12.1`, mode `production`.
+1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.12.2`.
+2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.12.2`, mode `production`.
 3. `SELECT MAX(version) FROM schema_migrations` returns `017`; `PRAGMA integrity_check` returns `ok`; `PRAGMA foreign_key_check` returns no rows.
 4. `squid -k parse` and `nginx -t` succeed.
 5. `security-web-gateway.service`, `squid.service`, `nginx.service`, and `security-web-gateway-deploy-helper.socket` are active.
@@ -78,10 +78,17 @@
 - Pilot Windows package/GPO deployment and Edge JSON. Verify fail-open with both Squid-only loss and full VM/PAC loss, independent DNS/routing and direct egress. Do not infer universal behavior for independent application proxy stacks.
 
 
-## 3.12.1 combined profile/VLAN acceptance
+## 3.12.2 combined profile/VLAN acceptance
 
 - Create a profile, enter a new subnet/VLAN and select Google Search on one page; verify both records and their membership are saved and applied with one operation.
 - Repeat with an existing VLAN using the prefilled shortcut; confirm no duplicate network is created.
 - Try a duplicate profile name, overlapping subnet and invalid membership; confirm no orphan VLAN/profile is inserted and entered data stays visible.
 - Add a VLAN while editing a profile and keep an existing VLAN checked; verify both memberships remain.
 - Verify operator/viewer and CSRF boundaries, Copy preview without mutation, and a new copy requires its own selected/new VLAN.
+
+
+## 3.12.2 navigation regression
+
+- Verify Profiles & VLANs, Proxy bypass and Alerts & SNMP fit on one line on desktop and in the mobile drawer, including browser zoom.
+- Verify Alerts & SNMP appears exactly once as a direct primary entry for Admin, with channel links that scroll to the correct Email/Slack/SNMP cards.
+- Run `python -m playwright install --with-deps chromium` and `python tests/browser_navigation_layout.py` for the real-browser layout regression included in CI.

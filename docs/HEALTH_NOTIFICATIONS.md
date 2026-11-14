@@ -2,7 +2,7 @@
 
 ## Configure everything from the GUI
 
-Open **Monitoring → Alerts & SNMP** as an Administrator. Email and Slack are independent options; both and the global notification switch are off by default. No credentials are supplied with the source code.
+Open **Alerts & SNMP** as an Administrator. Email and Slack are independent options; both and the global notification switch are off by default. No credentials are supplied with the source code.
 
 1. For email, enter SMTP hostname, port, STARTTLS/implicit TLS, optional username/password, sender address and up to twenty recipients. Certificate verification is mandatory. Use an organisation-approved SMTP relay or an SMTP/app password supported by your provider; OAuth-only mail providers require an appropriate relay or a future OAuth integration.
 2. For Slack, create an Incoming Webhook for the desired Slack channel and paste its secret URL. The channel is selected when the webhook is authorised in Slack. Only HTTPS webhooks on hooks.slack.com or hooks.slack-gov.com are accepted; redirects are not followed.
@@ -75,3 +75,5 @@ The default numeric base is `1.3.6.1.4.1.32473.42`, an example enterprise branch
 Standard sysDescr.0, sysName.0 and agent-process sysUpTime.0 are also readable. Metric snapshots refresh about every five seconds from existing health/performance data; use health/stale indicators before interpreting zero resource values. Notification OID is base.0.1 with message at base.10.0 and severity at base.11.0. These scalar/OID conventions are documented for manual configuration in your NMS; no vendor MIB or automatic NMS provisioning is implied.
 
 Local tests exchange real SNMP packets over loopback and verify read-only responses, wrong-community/source rejection, bounded bulk responses and trap decoding. Actual remote NMS receipt, polling, UDP firewall behavior and service installation need a target-VM acceptance check. See [Net-SNMP notification semantics](https://www.net-snmp.org/tutorial/tutorial-5/commands/snmptrap-v3.html) for the distinction between traps and acknowledged informs.
+
+In 3.12.2, Alerts & SNMP is a direct primary navigation entry. Channel links at the top jump directly to Email, Slack or SNMP, without opening the Monitoring submenu. Administrator access remains required.

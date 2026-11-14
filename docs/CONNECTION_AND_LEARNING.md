@@ -1,4 +1,4 @@
-# Access and connection guide — 3.12.1
+# Access and connection guide — 3.12.2
 
 ## Profile and VLAN in one save
 

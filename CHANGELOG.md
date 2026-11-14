@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.12.2 — readable navigation and discoverable SNMP
+
+- Corrects the legacy fixed icon width being applied to menu text. Primary labels stay on one line and inherit the correct active color; numeric badges retain their own sizing.
+- Profile header status badges stay compact instead of stretching to the description height.
+- Alerts & SNMP is a direct primary menu entry, with channel jump links inside the settings page. Admin-only permissions and opt-in settings remain unchanged.
+- All shared stylesheet URLs are versioned to avoid stale cached navigation styles.
+
+
 ## 3.12.1 — profile and VLAN in one save
 
 - One Profiles & VLANs entry and combined editor for profile name, existing/new VLAN and allowed applications/domains/IPs. New network names are automatic; notes remain optional.

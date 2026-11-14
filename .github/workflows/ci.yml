@@ -144,6 +144,10 @@ jobs:
           SWG_FQDN: proxy.test.local
           SWG_PROXY_IP: 127.0.0.1
         run: python -c 'from app.main import app; print(app.title, len(app.routes))'
+      - name: Install browser for navigation layout regression
+        run: python -m playwright install --with-deps chromium
+      - name: Navigation fit and SNMP discoverability
+        run: python tests/browser_navigation_layout.py
       - name: Forbidden product-name scan
         run: |
           forbidden="$(printf '\147\162\157\167\151\156')"

@@ -6,10 +6,10 @@
   <meta name="color-scheme" content="light">
   <title>{{ page_title }} | Security Web Gateway</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-  <link rel="stylesheet" href="/static/css/app.css">
-  <link rel="stylesheet" href="/static/css/ui-v36.css">
-  <link rel="stylesheet" href="/static/css/ui-v37.css">
-  <link rel="stylesheet" href="/static/css/ui-v39.css">
+  <link rel="stylesheet" href="/static/css/app.css?v={{ request.app.state.version }}">
+  <link rel="stylesheet" href="/static/css/ui-v36.css?v={{ request.app.state.version }}">
+  <link rel="stylesheet" href="/static/css/ui-v37.css?v={{ request.app.state.version }}">
+  <link rel="stylesheet" href="/static/css/ui-v39.css?v={{ request.app.state.version }}">
   <link rel="stylesheet" href="/static/css/premium.css?v={{ request.app.state.version }}">
   <script defer src="/static/js/app.js?v={{ request.app.state.version }}"></script>
 </head>
@@ -33,14 +33,18 @@
 
       <a href="/policies/groups" class="nav-primary {% if request.url.path.startswith('/policies/') %}active{% endif %}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v6M5 15v-4h14v4M12 11v4"/><rect x="8" y="3" width="8" height="5" rx="1"/><rect x="2" y="15" width="6" height="5" rx="1"/><rect x="9" y="15" width="6" height="5" rx="1"/><rect x="16" y="15" width="6" height="5" rx="1"/></svg><span>Profiles &amp; VLANs</span></a>
 
-      <details class="nav-group" {% if '/traffic/' in request.url.path or request.url.path in ('/system/health','/system/notifications','/system/performance') %}open{% endif %}>
+      <details class="nav-group" {% if '/traffic/' in request.url.path or request.url.path in ('/system/health','/system/performance') %}open{% endif %}>
         <summary><span class="nav-summary-main"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17h2.5l3-7 4 10 3-7 2 4H21"/></svg><span>Monitoring</span></span><span class="nav-chevron">›</span></summary>
         <div class="nav-children">
           <a href="/traffic/live" class="{% if request.url.path in ('/traffic/live','/traffic/explorer') %}active{% endif %}">Live traffic &amp; search</a>
           <a href="/traffic/clients" class="{% if request.url.path.startswith('/traffic/clients') %}active{% endif %}">Clients</a>
-          <a href="/system/health">Health &amp; performance</a>{% if request.state.user.role=='admin' %}<a href="/system/notifications">Alerts &amp; SNMP</a>{% endif %}
+          <a href="/system/health">Health &amp; performance</a>
         </div>
       </details>
+
+      {% if request.state.user.role=='admin' %}
+      <a href="/system/notifications" class="nav-primary {% if request.url.path=='/system/notifications' %}active{% endif %}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span>Alerts &amp; SNMP</span></a>
+      {% endif %}
 
       {% if request.state.user.role=='admin' %}
       <a href="/connection" class="nav-primary {% if request.url.path=='/connection' %}active{% endif %}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v5M17 3v5M5 8h14v3a7 7 0 0 1-14 0V8ZM12 18v3"/></svg><span>Connection</span></a>

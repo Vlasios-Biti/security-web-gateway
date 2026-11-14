@@ -1,10 +1,11 @@
 {% extends "base.html" %}{% block content %}
 <div class="page-head"><div><span class="section-kicker">System monitoring</span><h2>Alerts &amp; SNMP</h2><p>Choose email, Slack, or both for service alerts and recovery updates.</p></div><span class="status-pill {{ 'healthy' if cfg.enabled else 'warning' }}">{{ 'Notifications enabled' if cfg.enabled else 'Notifications off' }}</span></div>
+<nav class="channel-jumps" aria-label="Notification channels"><a href="#email">Email</a><a href="#slack">Slack</a><a href="#snmp">SNMP</a></nav>
 <form method="post" action="/system/notifications" class="notification-form">
   <input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}">
   <article class="settings-card"><label class="setting-switch"><span><strong>Enable health notifications</strong><small>Monitor services, proxy listener, disk, memory, CPU, backup age, DNS, clock, certificate, telemetry, workers and configuration drift.</small></span><input type="checkbox" name="enabled" value="true" {% if cfg.enabled %}checked{% endif %}><span class="switch-track" aria-hidden="true"></span></label></article>
   <div class="notification-channels">
-    <article class="settings-card"><label class="setting-switch"><span><strong>Email</strong><small>Use your organisation's SMTP server with verified TLS.</small></span><input type="checkbox" data-channel-toggle name="email_enabled" value="true" {% if cfg.email_enabled %}checked{% endif %}><span class="switch-track" aria-hidden="true"></span></label>
+    <article class="settings-card" id="email"><label class="setting-switch"><span><strong>Email</strong><small>Use your organisation's SMTP server with verified TLS.</small></span><input type="checkbox" data-channel-toggle name="email_enabled" value="true" {% if cfg.email_enabled %}checked{% endif %}><span class="switch-track" aria-hidden="true"></span></label>
       <details class="channel-settings" {% if cfg.email_enabled %}open{% endif %}><summary>Configure email</summary>
       <div class="form-grid"><label>SMTP server<input name="smtp_host" value="{{ cfg.smtp_host }}" placeholder="smtp.example.com" autocomplete="off"></label><label>Port<input name="smtp_port" type="number" min="1" max="65535" value="{{ cfg.smtp_port }}"></label>
       <label>Connection security<select name="smtp_tls"><option value="starttls" {% if cfg.smtp_tls=='starttls' %}selected{% endif %}>STARTTLS · usually 587</option><option value="ssl" {% if cfg.smtp_tls=='ssl' %}selected{% endif %}>TLS from connection · usually 465</option></select></label><label>Username<input name="smtp_username" value="{{ cfg.smtp_username }}" autocomplete="off" placeholder="Optional for a trusted TLS relay"></label>
@@ -12,7 +13,7 @@
       <label class="full">Sender address<input name="sender" type="email" value="{{ cfg.sender }}" placeholder="gateway@example.com"></label><label class="full">Recipients<textarea name="recipients" rows="3" placeholder="it@example.com&#10;operations@example.com">{{ cfg.recipients|join('\n') }}</textarea></label></div>
       <label class="check"><input type="checkbox" name="clear_smtp_password" value="true">Remove saved SMTP password</label></details>
     </article>
-    <article class="settings-card"><label class="setting-switch"><span><strong>Slack</strong><small>Connect a channel using its Incoming Webhook URL.</small></span><input type="checkbox" data-channel-toggle name="slack_enabled" value="true" {% if cfg.slack_enabled %}checked{% endif %}><span class="switch-track" aria-hidden="true"></span></label>
+    <article class="settings-card" id="slack"><label class="setting-switch"><span><strong>Slack</strong><small>Connect a channel using its Incoming Webhook URL.</small></span><input type="checkbox" data-channel-toggle name="slack_enabled" value="true" {% if cfg.slack_enabled %}checked{% endif %}><span class="switch-track" aria-hidden="true"></span></label>
       <details class="channel-settings" {% if cfg.slack_enabled %}open{% endif %}><summary>Configure Slack</summary>
       <label>Incoming Webhook URL<input class="full-width" name="slack_webhook" type="password" value="" autocomplete="new-password" placeholder="{{ 'Saved — leave blank to keep' if cfg.slack_webhook_configured else 'https://hooks.slack.com/services/…' }}"></label>
       <p class="field-help">Create an Incoming Webhook for the Slack channel you choose, then paste its secret URL here. The channel is selected in Slack when the webhook is authorised.</p>
@@ -21,7 +22,7 @@
       <div class="telemetry-note space-top">Credentials are stored in a protected configuration file on this VM. Existing passwords and webhook URLs are never returned in the form and are excluded from policy-state exports.</div>
     </article>
   </div>
-  <article class="settings-card"><h3>SNMP monitoring</h3><p class="field-help">SNMPv2c for a private management network. Community strings are not encrypted on the network. Polling is read-only and independent of the notification master switch.</p>
+  <article class="settings-card" id="snmp"><h3>SNMP monitoring</h3><p class="field-help">SNMPv2c for a private management network. Community strings are not encrypted on the network. Polling is read-only and independent of the notification master switch.</p>
 <label class="setting-switch"><span><strong>Send SNMP notifications</strong><small>Send incident and recovery traps to your monitoring server.</small></span><input type="checkbox" data-channel-toggle name="snmp_enabled" value="true" {% if cfg.snmp_enabled %}checked{% endif %}><span class="switch-track"></span></label>
 <label class="setting-switch"><span><strong>Allow SNMP polling</strong><small>Let permitted monitoring servers read gateway health.</small></span><input type="checkbox" data-channel-toggle name="snmp_agent_enabled" value="true" {% if cfg.snmp_agent_enabled %}checked{% endif %}><span class="switch-track"></span></label>
 <details class="channel-settings" {% if cfg.snmp_enabled or cfg.snmp_agent_enabled %}open{% endif %}><summary>Configure SNMP</summary><div class="form-grid">

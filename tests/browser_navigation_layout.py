@@ -15,11 +15,14 @@ def render_pages(folder):
     from app.config import SESSION_COOKIE
     from starlette.testclient import TestClient
     from starlette.requests import Request
+    from app.services.access_model import create_application
     c=connect();uid=c.execute("INSERT INTO users(username,password_hash,role,enabled) VALUES('layout-admin','unused-test-hash','admin',1)").lastrowid;c.execute("INSERT INTO telemetry_events(epoch,event_time,client_ip,decision,event_hash,destination_host,destination_port) VALUES(?,CURRENT_TIMESTAMP,'10.20.0.10','ALLOW','layout-fixture','www.google.com',443)",(time.time(),));c.commit();c.close()
+    aid=create_application('Example workflow','Test','','portal.example.test','manual','',False,'layout-admin')
+    c=connect();c.execute("INSERT INTO application_dependency_candidates(application_id,destination,confidence,confidence_score,request_count,client_count) VALUES(?,'api.portal.example.test','high',90,12,2)",(aid,));c.commit();c.close()
     token=create_session(uid,Request({'type':'http','headers':[],'client':('127.0.0.1',1)}))
     with TestClient(app,base_url='https://localhost') as client:
         client.cookies.set(SESSION_COOKIE,token)
-        for name,url in [('profiles','/policies/groups'),('notifications','/system/notifications'),('connection','/connection'),('simulator','/intelligence/simulator'),('traffic-clients','/traffic/clients'),('pc-detail','/traffic/clients/10.20.0.10')]:
+        for name,url in [('dependency-review','/intelligence/dependency-candidates'),('profiles','/policies/groups'),('notifications','/system/notifications'),('connection','/connection'),('simulator','/intelligence/simulator'),('traffic-clients','/traffic/clients'),('pc-detail','/traffic/clients/10.20.0.10')]:
             response=client.get(url);assert response.status_code==200,(url,response.status_code)
             html=response.text.replace('/static/',(ROOT/'static').as_uri()+'/')
             (folder/(name+'.html')).write_text(html,encoding='utf-8')
@@ -52,12 +55,16 @@ def check(folder,executable=None):
         page.get_by_role('link',name='SNMP',exact=True).click()
         position=page.locator('#snmp h3').bounding_box()
         assert position and 0<=position['y']<900,'SNMP jump link must bring configuration into view'
-        for name in ('connection','notifications','simulator','simulator-result','traffic-clients','pc-detail'):
+        for name in ('dependency-review','connection','notifications','simulator','simulator-result','traffic-clients','pc-detail'):
             for width in (1440,920,390):
                 page.set_viewport_size({'width':width,'height':1000})
                 page.goto((folder/(name+'.html')).resolve().as_uri())
                 page.locator('main details').evaluate_all('nodes=>nodes.forEach(e=>e.open=true)')
                 assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),('Form overflow',name,width)
+                if name=='dependency-review':
+                    controls=page.locator('.candidate-filters input,.candidate-filters select').evaluate_all('nodes=>nodes.map(e=>({width:e.getBoundingClientRect().width,left:e.getBoundingClientRect().left,right:e.getBoundingClientRect().right}))')
+                    assert len(controls)==4
+                    assert all(e['width']>=100 and e['left']>=0 and e['right']<=width for e in controls),('Candidate filter fit',width,controls)
                 if name=='connection':
                     form_width=page.locator('#blocked-page form').bounding_box()['width']
                     for field in ('message','contact','logo'):

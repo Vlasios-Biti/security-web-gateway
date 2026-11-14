@@ -88,3 +88,10 @@ input::placeholder,textarea::placeholder{color:#647084!important;opacity:1}label
 .branding-logo-preview{display:block;max-width:240px;max-height:100px;object-fit:contain;margin:16px 0}
 #blocked-page form>label:not(.check){display:flex;flex-direction:column;gap:8px;margin:16px 0;font-weight:600}
 #blocked-page form>label>input,#blocked-page form>label>textarea{display:block;width:100%;min-width:0;font-weight:400}
+.candidate-filter-area{padding:20px 24px;border-bottom:1px solid var(--v39-border)}
+.candidate-filters{display:grid;grid-template-columns:minmax(160px,1.4fr) minmax(180px,1.5fr) minmax(140px,1fr) minmax(120px,.8fr) auto;gap:14px;align-items:end}
+.candidate-filters>label{display:flex;flex-direction:column;gap:7px;min-width:0;font-weight:600}
+.candidate-filters input,.candidate-filters select{width:100%;min-width:0;color:#17233b;background:#fff}
+.candidate-filter-actions{display:flex;gap:8px;align-items:center}
+@media(max-width:1200px){.candidate-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.candidate-filter-actions{grid-column:1/-1}}
+@media(max-width:600px){.candidate-filters{grid-template-columns:minmax(0,1fr)}.candidate-filter-area{padding:18px}.candidate-filter-actions>*{flex:1}}

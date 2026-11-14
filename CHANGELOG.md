@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.12.9
+
+- Adds application, literal domain search, status and confidence filters to Dependency Candidates. Filtering runs against the entire stored dataset before pagination; results are shown 50 per page with counts and a reset action.
+- Preserves filters/page after Approve or Ignore, clamps pages when the result count shrinks, and offers read-only approved/ignored history. Review permissions, CSRF checks and explicit allow publication remain unchanged.
+- Clarifies that time-correlated candidates are suggestions, not proof of application dependencies. Adds regression coverage for filtering beyond the former 500-row cutoff, literal search, pagination, review continuity and malformed inputs.
+
 ## 3.12.8
 
 - Adds Connection → Blocked page with company name, bounded PNG logo, title, message, IT contact and authenticated preview. Only administrators can save; production publication accepts validated settings, never arbitrary HTML or paths. Branding stays local to the VM across policy imports/upgrades.

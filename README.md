@@ -5,7 +5,7 @@ Create the Access Profile, select/create its VLAN and choose allowed access on *
 Version 3.12 consolidates websites/domains/IPs under **Access**, separates **Proxy bypass**, groups traffic/health under **Monitoring**, exposes **Alerts & SNMP** directly, and uses one profile-or-VLAN selector. Install/upgrade provides an unassigned Google Search starter and no customer-specific application data. Optional read-only SNMPv2c polling/traps are configured with email/Slack; SNMPv3 is not included. See [the access/deployment guide](docs/CONNECTION_AND_LEARNING.md) and [notification/SNMP setup](docs/HEALTH_NOTIFICATIONS.md).
 
 
-**Version:** 3.12.8
+**Version:** 3.12.9
 
 **Target:** single-VM, on-prem enterprise appliance  
 **Target OS:** Ubuntu Server 24.04 LTS / 26.04 LTS  
@@ -59,6 +59,10 @@ Sizing should ultimately follow concurrent CONNECT sessions, requests/sec, WAN t
 - Operator changes remain pending for Admin approval. Advanced manual/HAR discovery remains available for authenticated or unusual workflows.
 - Browser discovery rejects private/reserved targets and DNS-rebinding/SSRF-style pivots.
 - PAC supports explicit DIRECT bypasses plus fail-open `PROXY ...; DIRECT` behavior.
+
+## v3.12.9 — dependency review filters
+
+Dependency Candidates can be filtered by application, destination, status and confidence. Filters search the full dataset with 50 results per page and stay selected after Approve/Ignore. Approved and ignored history is read-only. Traffic-time correlation remains a suggestion for manual review, not proof that the application needs the domain.
 
 ## v3.12.8 — visible PC setup and readable PAC delivery
 

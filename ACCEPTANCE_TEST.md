@@ -1,8 +1,10 @@
-# Security Web Gateway v3.12.4 Acceptance Test
+# Security Web Gateway v3.12.9 Acceptance Test
 
-1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.12.4`.
-2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.12.4`, mode `production`.
-3. `SELECT MAX(version) FROM schema_migrations` returns `017`; `PRAGMA integrity_check` returns `ok`; `PRAGMA foreign_key_check` returns no rows.
+Dependency review: choose an application and optionally a domain substring, status or confidence, then press Filter. Counts/pagination must cover all matching stored candidates, including rows beyond the old 500-result cutoff. Approve/Ignore must return to the same filter selection; completed rows show their status without review buttons. Reset returns to all applications with pending status. Filtering/history views must not change access policy. Verify the filter controls remain readable on mobile and desktop.
+
+1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.12.9`.
+2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.12.9`, mode `production`.
+3. `SELECT MAX(version) FROM schema_migrations` returns `018`; `PRAGMA integrity_check` returns `ok`; `PRAGMA foreign_key_check` returns no rows.
 4. `squid -k parse` and `nginx -t` succeed.
 5. `security-web-gateway.service`, `squid.service`, `nginx.service`, and `security-web-gateway-deploy-helper.socket` are active.
 6. Telemetry, storage-maintenance, discovery, source-sync and **performance** timers are enabled/active.

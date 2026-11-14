@@ -139,7 +139,7 @@ jobs:
       - name: v3.8 save and apply smoke tests
         run: python tests/smoke_v380.py
       - name: Connection, health notifications and publication safety
-        run: python tests/smoke_v3128.py
+        run: python tests/smoke_v3129.py
       - name: Windows backup validation without machine changes
         run: pwsh -NoProfile -NonInteractive -File tests/windows_backup_contract.ps1
       - name: Public PAC access without exposing private configuration
@@ -198,4 +198,4 @@ jobs:
           python tests/smoke_v340.py
           python tests/smoke_v370.py
           python tests/smoke_v380.py
-          python tests/smoke_v3128.py
+          python tests/smoke_v3129.py

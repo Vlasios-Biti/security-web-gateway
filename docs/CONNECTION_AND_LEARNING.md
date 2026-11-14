@@ -1,4 +1,4 @@
-# Access and connection guide — 3.12.8
+# Access and connection guide — 3.12.10
 
 ## Company block page and allowed-only access
 
@@ -24,9 +24,11 @@ VLAN ID is a descriptive identifier. The source subnet/IP determines proxy match
 
 ## One place to grant access
 
-Open **Access → Add access**. Enter a website/domain or an IPv4 address/subnet and select **Access profile** or **VLAN / network**. Only the selected method's controls are displayed. A website/domain starts public browser dependency discovery; an IP/subnet becomes an explicit HTTP/HTTPS destination rule without a website scan. All applications and standalone rules appear in Access. A successful public scan is evidence from visited pages, not a guarantee of every login/button workflow; selected-tab and HAR capture remain available inside the application's page.
+Open **Access → Add access**. Enter a website/domain or an IPv4 address/subnet and check the existing Access Profiles that should receive it. Each profile shows its inherited VLANs/subnets; there is no separate direct VLAN selector or profile creation field. Create/change profiles and their VLANs in **Profiles & VLANs**. A website/domain starts public browser dependency discovery; an IP/subnet becomes an explicit HTTP/HTTPS destination rule without a website scan. All applications and standalone rules appear in Access. A successful public scan is evidence from visited pages, not a guarantee of every login/button workflow; selected-tab and HAR capture remain available inside the application's page.
 
-Existing entries with both profile and direct-network assignments show **Keep existing access**. Saving that choice preserves the existing union. Selecting a new method intentionally replaces the previous assignments. Old API/import payloads remain compatible. New GUI forms cannot accidentally submit hidden selections from the other method.
+Application discovery, HAR import and manual application editors use the same profile list. Leaving it empty in discovery/manual forms saves an unassigned application; Add access requires a selected profile. Profiles without VLANs are labeled accordingly and grant no network access until configured. Adding an application never creates a new Access Profile.
+
+Existing applications with direct network assignments show a collapsed **Existing direct VLAN assignments** section. Its default preserves the older direct memberships while allowing profile selections to change. **Use selected profiles only · remove direct assignments** explicitly removes the older direct memberships. Nothing migrates or revokes them automatically. Legacy API methods and standalone domain/IP editors remain compatible.
 
 **Proxy bypass** is separate: destinations there always use DIRECT, following endpoint routing/DNS. Connection saves preserve the bypass list. **Monitoring** groups traffic, health, and Alerts & SNMP. **Connection** contains deployment, fail-open behavior and optional Windows services. Profile deletion is confirmed and audited; it archives the profile and removes only its memberships, preserving shared networks, applications and rules. Admin approval/pending-change rules still apply.
 

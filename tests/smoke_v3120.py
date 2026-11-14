@@ -12,7 +12,7 @@ class AccessWorkflows(prior.SimpleWorkflows):
         client,csrf=self.client_for('admin')
         data={'name':'Learning App','seed_domain':'portal.example.com','source_kind':'observed','source_ref':'https://portal.example.com','csrf_token':csrf}
         with client,patch('app.routers.applications.apply_saved_change',return_value={'ok':True,'applied':True}):
-            self.assertIn('value="keep" selected',client.get('/applications/'+str(aid)+'/edit').text)
+            self.assertIn('value="profiles_keep_networks" selected',client.get('/applications/'+str(aid)+'/edit').text)
             self.assertEqual(client.post('/applications/'+str(aid)+'/edit',data={**data,'access_mode':'keep'},follow_redirects=False).status_code,303)
             self.assertEqual(get_application(aid)['group_ids'],[gid]);self.assertEqual(get_application(aid)['network_ids'],[1])
             client.post('/applications/'+str(aid)+'/edit',data={**data,'access_mode':'profiles','policy_group_ids':str(gid),'network_ids':'1'})

@@ -2,6 +2,9 @@
 def choose_access(mode, network_ids, group_ids, existing=None, scope_mode="selected", allow_all=False):
     networks=list(dict.fromkeys(network_ids or []));groups=list(dict.fromkeys(group_ids or []))
     if not mode:return networks,groups,scope_mode
+    if mode=="profiles_optional":return [],groups,"selected"
+    if mode=="profiles_keep_networks" and existing:
+        return list(existing.get("network_ids",[])),groups,"selected"
     if mode=="profiles":
         if not groups:raise ValueError("Select an access profile.")
         return [],groups,"selected"

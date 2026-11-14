@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.12.10
+
+- Removes the profile-versus-direct-VLAN method selector from Add access, application discovery, HAR import and application create/edit. Select existing Access Profiles once; their names and inherited VLAN/subnet details are shown together. Profile creation stays in Profiles & VLANs and adding an application never creates another profile.
+- Existing direct application memberships remain active by default in an advanced legacy section; replacing them with the selected profiles requires an explicit choice. Unassigned discovery/manual applications remain possible by leaving profiles unchecked; Add access requires a selected profile. Legacy API methods stay compatible.
+- Adds tests for all application forms, profile-only assignments, no implicit profile creation and preservation/explicit removal of older direct memberships. Schema remains 018.
+
 ## 3.12.9
 
 - Adds application, literal domain search, status and confidence filters to Dependency Candidates. Filtering runs against the entire stored dataset before pagination; results are shown 50 per page with counts and a reset action.

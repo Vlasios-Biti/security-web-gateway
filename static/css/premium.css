@@ -95,3 +95,4 @@ input::placeholder,textarea::placeholder{color:#647084!important;opacity:1}label
 .candidate-filter-actions{display:flex;gap:8px;align-items:center}
 @media(max-width:1200px){.candidate-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.candidate-filter-actions{grid-column:1/-1}}
 @media(max-width:600px){.candidate-filters{grid-template-columns:minmax(0,1fr)}.candidate-filter-area{padding:18px}.candidate-filter-actions>*{flex:1}}
+.application-profile-picker{min-width:0}.application-profile-options>.check{align-items:flex-start}.application-profile-options>.check>span{min-width:0}.application-profile-options .profile-network-hint{display:block;margin-top:5px;line-height:1.6;overflow-wrap:anywhere;color:#536580;font-weight:400}

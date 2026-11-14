@@ -3,5 +3,5 @@
 <section class="form-panel simple-editor">{% if error %}<div class="flash danger-box" role="alert">{{ error }}</div>{% endif %}<form method="post" action="/applications/allow">
 <input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}">
 <div class="form-grid"><label class="full">Website, domain or IP<input name="destination" value="{{ draft_destination|default('') }}" required autofocus placeholder="https://www.google.com or 203.0.113.10" spellcheck="false"></label><label class="full">Name <span class="optional">optional</span><input name="name" value="{{ draft_name|default('') }}" placeholder="Filled from the website if blank"></label>
-{% set allow_unassigned = false %}{% include 'components/access_choice.html' %}</div><div class="form-actions"><button class="btn primary">Add &amp; discover</button></div>
+{% set allow_unassigned = false %}{% include 'components/application_access.html' %}</div><div class="form-actions"><button class="btn primary">Add &amp; discover</button></div>
 </form></section>{% endblock %}

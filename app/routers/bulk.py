@@ -1,3 +1,5 @@
+from fastapi import Depends
+from app.services.policy_lock import policy_guard
 import csv, io, json
 from urllib.parse import quote_plus
 from datetime import datetime, timezone, timedelta
@@ -6,11 +8,12 @@ from fastapi.responses import HTMLResponse, Response, RedirectResponse
 from app import auth
 from app.config import MAX_IMPORT_BYTES, MAX_IMPORT_ROWS
 from app.db import audit, connect
+from app.services.access_choice import choose_access
 from app.services.rules import create_rule, list_networks, list_rules
 from app.services.access_model import list_policy_groups
-from app.security import normalize_domain, normalize_ip
+from app.security import normalize_domain, normalize_ip, csv_cell
 from app.services.apply import save_apply_state,apply_saved_change,apply_message
-router=APIRouter(prefix="/bulk")
+router=APIRouter(dependencies=[Depends(policy_guard)],prefix="/bulk")
 def can_manage(u):return u and u["role"] in("admin","operator")
 def _parse(content):
     lines=[x for x in content.splitlines() if x.strip() and not x.lstrip().startswith("#")]
@@ -44,7 +47,7 @@ def page(request:Request):
     if not can_manage(request.state.user):return HTMLResponse("Forbidden",403)
     return request.app.state.templates.TemplateResponse(request=request,name="bulk/import.html",context={"request":request,"page_title":"Bulk Import","networks":list_networks(),"groups":list_policy_groups(),"result":None,"error":None,"batch":None})
 @router.post("/import",response_class=HTMLResponse)
-async def preview(request:Request,file:UploadFile=File(...),kind:str=Form(...),protocol:str=Form("HTTPS"),management_type:str=Form("custom"),category_slug:str=Form(""),scope_mode:str=Form("selected"),network_ids:list[int]=Form(default=[]),policy_group_ids:list[int]=Form(default=[]),reason:str=Form(...),change_reference:str=Form(""),csrf_token:str=Form(...)):
+async def preview(request:Request,file:UploadFile=File(...),kind:str=Form(...),protocol:str=Form("HTTPS"),management_type:str=Form("custom"),category_slug:str=Form(""),scope_mode:str=Form("selected"),network_ids:list[int]=Form(default=[]),policy_group_ids:list[int]=Form(default=[]),reason:str=Form(""),change_reference:str=Form(""),csrf_token:str=Form(...),access_mode:str=Form("")):
     u=request.state.user
     if not can_manage(u):return HTMLResponse("Forbidden",403)
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
@@ -53,6 +56,8 @@ async def preview(request:Request,file:UploadFile=File(...),kind:str=Form(...),p
     raw=await file.read(MAX_IMPORT_BYTES+1);error=None;result=None;batch=None
     try:
         if len(raw)>MAX_IMPORT_BYTES:raise ValueError("Import file is larger than 2 MB.")
+        network_ids,policy_group_ids,scope_mode=choose_access(access_mode,network_ids,policy_group_ids,scope_mode=scope_mode,allow_all=True)
+        reason=reason.strip() or "Imported access rules"
         rows=_parse(raw.decode("utf-8-sig"))
         if len(rows)>MAX_IMPORT_ROWS:raise ValueError(f"Import limit is {MAX_IMPORT_ROWS} entries per batch.")
         nets,m=_maps();groups,gm=_group_map();accepted=[];rejected=[]
@@ -103,12 +108,12 @@ def apply(batch_id:int,request:Request,csrf_token:str=Form(...)):
     msg=apply_message(applied);key="msg" if applied.get("ok") else "error"
     return RedirectResponse("/bulk/import?"+key+"="+quote_plus(msg),303)
 def _export(kind):
-    output=io.StringIO();writer=csv.writer(output)
+    output=io.StringIO();writer=csv.writer(output,quoting=csv.QUOTE_ALL)
     writer.writerow(["action","destination","protocol","scope_mode","access_profiles","networks","status","reason","change_reference","expires_at"])
     for r in list_rules(kind,management="custom",include_deleted=False,standalone_only=True):
         profiles=";".join(g["name"] for g in r.get("policy_groups",[]))
         networks=";".join((f"VLAN{n['vlan_id']}" if n.get('vlan_id') else n['cidr']) for n in r.get("networks",[]))
-        writer.writerow(["ALLOW",r["destination"],r["protocol"],r.get("scope_mode") or "selected",profiles,networks,r["status"],r.get("reason") or "",r.get("change_reference") or "",r.get("expires_at") or ""])
+        writer.writerow([csv_cell(value) for value in ["ALLOW",r["destination"],r["protocol"],r.get("scope_mode") or "selected",profiles,networks,r["status"],r.get("reason") or "",r.get("change_reference") or "",r.get("expires_at") or ""]])
     return output.getvalue()
 @router.get("/export/domains.csv")
 def export_domains(request:Request):return Response(_export("domain"),media_type="text/csv",headers={"Content-Disposition":"attachment; filename=allowed-domains.csv"})

@@ -1,0 +1,18 @@
+CREATE TABLE health_incidents(
+ code TEXT PRIMARY KEY,severity TEXT NOT NULL,title TEXT NOT NULL,detail TEXT NOT NULL,
+ active INTEGER NOT NULL DEFAULT 0,bad_samples INTEGER NOT NULL DEFAULT 0,good_samples INTEGER NOT NULL DEFAULT 0,
+ generation INTEGER NOT NULL DEFAULT 0,changed_epoch REAL NOT NULL,updated_epoch REAL NOT NULL
+);
+CREATE TABLE health_delivery_state(
+ code TEXT NOT NULL,channel TEXT NOT NULL,generation INTEGER NOT NULL DEFAULT 0,revision INTEGER NOT NULL DEFAULT 0,
+ last_active INTEGER NOT NULL DEFAULT 0,last_sent_epoch REAL NOT NULL DEFAULT 0,next_attempt_epoch REAL NOT NULL DEFAULT 0,
+ failures INTEGER NOT NULL DEFAULT 0,attempt_generation INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(code,channel)
+);
+CREATE TABLE health_deliveries(
+ id INTEGER PRIMARY KEY AUTOINCREMENT,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ channel TEXT NOT NULL,kind TEXT NOT NULL,result TEXT NOT NULL,event_count INTEGER NOT NULL,error_code TEXT
+);
+CREATE TABLE health_test_queue(
+ id INTEGER PRIMARY KEY AUTOINCREMENT,channel TEXT NOT NULL,requested_by TEXT NOT NULL,revision INTEGER NOT NULL,
+ requested_epoch REAL NOT NULL,status TEXT NOT NULL DEFAULT 'pending'
+);

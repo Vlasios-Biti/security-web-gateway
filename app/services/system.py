@@ -88,7 +88,12 @@ def certificate_health(path=MANAGEMENT_CERT):
         if not raw:return {"ok":False,"days_remaining":None,"expires_at":None,"state":"unknown"}
         expires=datetime.strptime(raw,"%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc)
         days=(expires-datetime.now(timezone.utc)).total_seconds()/86400
-        return {"ok":days>14,"days_remaining":round(days,1),"expires_at":expires.isoformat(),"state":"healthy" if days>30 else ("warning" if days>14 else "critical")}
+        def display_name(items):
+            fields={key:value for group in items for key,value in group}
+            return fields.get('commonName') or fields.get('organizationName') or 'Not available'
+        return {"ok":days>14,"days_remaining":round(days,1),"expires_at":expires.isoformat(),"state":"healthy" if days>30 else ("warning" if days>14 else "critical"),
+                'subject':display_name(data.get('subject',())), 'issuer':display_name(data.get('issuer',())),
+                'self_signed':data.get('subject')==data.get('issuer'),'names':[value for kind,value in data.get('subjectAltName',()) if kind in ('DNS','IP Address')]}
     except Exception:
         return {"ok":False,"days_remaining":None,"expires_at":None,"state":"unknown"}
 
@@ -97,6 +102,8 @@ def worker_health():
     names={
       "telemetry":"security-web-gateway-telemetry.timer",
       "performance":"security-web-gateway-performance.timer",
+      "health_monitor":"security-web-gateway-health-monitor.timer",
+      "snmp_agent":"security-web-gateway-snmp.service",
       "discovery":"security-web-gateway-discovery.timer",
       "source_sync":"security-web-gateway-source-sync.timer",
       "storage":"security-web-gateway-storage-maintenance.timer",

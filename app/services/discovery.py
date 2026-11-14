@@ -1,4 +1,4 @@
-import csv,hashlib,http.client,ipaddress,io,json,os,re,socket,ssl,time,uuid
+import csv,hashlib,http.client,ipaddress,io,json,os,re,socket,ssl,time,uuid,threading
 from datetime import datetime,timedelta
 from html import unescape
 from urllib.parse import urlparse,urljoin
@@ -8,7 +8,8 @@ from app.security import normalize_domain,normalize_ip
 
 MAX_FETCH=2*1024*1024
 UA="Security-Web-Gateway-Discovery/3.1"
-HOST_RE=re.compile(r"(?i)(?:\*\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}")
+HOST_RE=re.compile(r"(?i)[a-z0-9*][a-z0-9.*-]*")
+FETCH_TOTAL_SECONDS=20
 IPCIDR_RE=re.compile(r"(?<![0-9.])(?:\d{1,3}\.){3}\d{1,3}(?:/\d{1,2})?(?![/0-9])")
 URL_RE=re.compile(r"(?i)https?://[^\s\"'<>]+")
 
@@ -65,43 +66,59 @@ class _PinnedHTTPSConnection(http.client.HTTPSConnection):
         self._pinned_ip=pinned_ip
     def connect(self):
         sock=socket.create_connection((self._pinned_ip,443),self.timeout,self.source_address)
+        remaining=getattr(self,'_deadline',time.monotonic()+self.timeout)-time.monotonic()
+        if remaining<=0:
+            sock.close();raise TimeoutError('Discovery HTTP deadline exceeded.')
+        sock.settimeout(remaining)
         self.sock=self._context.wrap_socket(sock,server_hostname=self.host)
 
 
-def _fetch_once(url):
+def _fetch_once(url,deadline=None):
+    deadline=deadline or time.monotonic()+FETCH_TOTAL_SECONDS
     p=urlparse(url);addresses=_public_addresses(p.hostname,443)
     path=p.path or "/"
     if p.query:path+="?"+p.query
     last=None
     for addr in addresses:
-        conn=None
+        conn=None;timer=None
         try:
-            conn=_PinnedHTTPSConnection(p.hostname,addr,timeout=12)
+            remaining=deadline-time.monotonic()
+            if remaining<=0:raise ValueError('Discovery source exceeded the total HTTP time limit.')
+            conn=_PinnedHTTPSConnection(p.hostname,addr,timeout=min(12,remaining))
+            conn._deadline=deadline
+            def cancel(connection=conn):
+                try:
+                    if connection.sock:connection.sock.shutdown(socket.SHUT_RDWR)
+                except OSError:pass
+                finally:connection.close()
+            timer=threading.Timer(remaining,cancel);timer.daemon=True;timer.start()
             conn.request("GET",path,headers={"Host":p.hostname,"User-Agent":UA,"Accept":"application/json,text/plain,text/html;q=0.8,*/*;q=0.2","Connection":"close"})
             resp=conn.getresponse()
             if resp.status in (301,302,303,307,308):
                 location=resp.getheader("Location")
-                resp.read(min(MAX_FETCH,65536));conn.close()
+                conn.close()
                 if not location:raise ValueError("Discovery source redirect omitted Location header.")
                 return None,None,urljoin(url,location),True
             if resp.status<200 or resp.status>=300:
-                body=resp.read(min(MAX_FETCH,65536));raise ValueError(f"Discovery source returned HTTP {resp.status}.")
+                raise ValueError(f"Discovery source returned HTTP {resp.status}.")
             data=resp.read(MAX_FETCH+1)
             if len(data)>MAX_FETCH:raise ValueError("Discovery response exceeds 2 MiB safety limit.")
+            if time.monotonic()>=deadline:raise ValueError('Discovery source exceeded the total HTTP time limit.')
             ctype=(resp.getheader("Content-Type") or "").lower();final=url
             conn.close();return data,ctype,final,False
         except (OSError,ssl.SSLError,http.client.HTTPException) as exc:
             last=exc
-            if conn:
-                try:conn.close()
-                except Exception:pass
+        finally:
+            if timer:timer.cancel()
+            if conn:conn.close()
     raise ValueError("Discovery source connection failed.") from last
 
 
 def safe_fetch(url):
     current=_assert_public_https(url)
+    deadline=time.monotonic()+FETCH_TOTAL_SECONDS
     for _ in range(6):
-        data,ctype,target,redirect=_fetch_once(current)
+        data,ctype,target,redirect=_fetch_once(current,deadline=deadline)
         if not redirect:return data,ctype,target
         current=_assert_public_https(target)
     raise ValueError("Discovery source exceeded the redirect limit.")
@@ -191,6 +208,8 @@ def discover_official_url(url):
             h=_clean_host(u)
             if h and h!=source_host:items.append({"endpoint_type":"domain","destination":h,"protocol":"HTTPS","required":True,"source":"official-feed" if structured else "official-doc","confidence":dconf,"metadata":{"source_url":final}})
         for h0 in HOST_RE.findall(value):
+            h0=h0.rstrip('.')
+            if len(h0)>255 or not re.fullmatch(r'[a-zA-Z]{2,63}',h0.rsplit('.',1)[-1]):continue
             h=_clean_host(h0)
             if h and h!=source_host:items.append({"endpoint_type":"domain","destination":h,"protocol":"HTTPS","required":True,"source":"official-feed" if structured else "official-doc","confidence":dconf,"metadata":{"source_url":final}})
         for ip0 in IPCIDR_RE.findall(value):
@@ -290,7 +309,8 @@ def _public_request_host(url):
         ip=ipaddress.ip_address(host)
         if not ip.is_global:return None
     except ValueError:
-        pass
+        try:host=normalize_domain(host,allow_wildcard=False)
+        except ValueError:return None
     return host
 
 
@@ -342,9 +362,10 @@ def discover_browser(target_url,max_pages=None):
             if u not in m["sample_urls"]:m["sample_urls"].append(u)
         if context_name not in m["contexts"]:m["contexts"].append(context_name)
 
-    with sync_playwright() as pw:
-        browser=pw.chromium.launch(headless=True,args=["--disable-dev-shm-usage"])
-        context=browser.new_context(ignore_https_errors=False,service_workers="allow")
+    from app.services.discovery_proxy import discovery_egress_proxy
+    with discovery_egress_proxy() as proxy, sync_playwright() as pw:
+        browser=pw.chromium.launch(headless=True,args=["--disable-dev-shm-usage","--disable-quic","--proxy-bypass-list=<-loopback>","--force-webrtc-ip-handling-policy=disable_non_proxied_udp"])
+        context=browser.new_context(ignore_https_errors=False,service_workers="block",proxy=proxy)
         current_context={"name":"initial-page"}
         def route_handler(route,request):
             if request.url.startswith(("data:","about:","blob:")):
@@ -390,7 +411,7 @@ def discover_browser(target_url,max_pages=None):
         row["classification"]=cls;row["recommendation"]=rec;row["request_count"]=hits
         row["first_seen_context"]=(row["metadata"].get("contexts") or [None])[0]
         row["required"] = row["destination"]==seed_host or cls in ("authentication","api","realtime")
-        row["selected"] = rec=="allow" or row["required"]
+        row["selected"] = rec!="ignore"
         row["confidence"] = "high" if row["required"] or hits>=2 else "medium"
         items.append(row)
     if seed_host not in {x["destination"] for x in items}:
@@ -416,15 +437,16 @@ def discover_har(raw_bytes,seed_domain=None):
         except Exception:continue
         if not host:continue
         scheme=urlparse(url).scheme.lower();proto="HTTPS" if scheme in ("https","wss") else "HTTP"
+        try:
+            if urlparse(url).port not in (None,443 if proto=='HTTPS' else 80):continue
+        except ValueError:continue
         key=("domain",host,proto)
         z=seen.setdefault(key,{"endpoint_type":"domain","destination":host,"protocol":proto,"required":False,"source":"har-session",
-            "confidence":"medium","selected":False,"metadata":{"hits":0,"methods":[],"sample_urls":[]}})
+            "confidence":"medium","selected":False,"metadata":{"hits":0,"methods":[]}})
         z["metadata"]["hits"]+=1
         method=str(req.get("method") or "GET").upper()
+        if method not in ('GET','HEAD','POST','PUT','PATCH','DELETE','OPTIONS','CONNECT','TRACE'):method='OTHER'
         if method not in z["metadata"]["methods"]:z["metadata"]["methods"].append(method)
-        if len(z["metadata"]["sample_urls"])<3:
-            clean=url.split("?",1)[0][:512]
-            if clean not in z["metadata"]["sample_urls"]:z["metadata"]["sample_urls"].append(clean)
     items=[]
     for z in seen.values():
         cls,rec=_classify_endpoint(z["destination"],None,seed)
@@ -438,6 +460,9 @@ def discover_har(raw_bytes,seed_domain=None):
 
 def _persist_candidates(c,run_id,items):
     for x in items:
+        kind=x['endpoint_type']
+        if kind not in ('domain','ip') or x['protocol'] not in ('HTTP','HTTPS','BOTH'):raise ValueError('Invalid discovery endpoint.')
+        x={**x,'destination':normalize_domain(x['destination']) if kind=='domain' else normalize_ip(x['destination'])}
         present=c.execute("SELECT id FROM rules WHERE rule_type=? AND destination=? AND status!='deleted'",(x["endpoint_type"],x["destination"])).fetchone()
         selected=1 if x.get("selected",x.get("required",True)) else 0
         c.execute("""INSERT OR IGNORE INTO discovery_candidates(
@@ -463,15 +488,14 @@ def _execute_run(c,run_id,application_id,query,method,source_ref,client_ip,windo
     c.commit()
 
 
-def create_run(application_id,query,method,actor,source_ref=None,client_ip=None,window_minutes=None,catalog_key=None,auto_approve=False,auto_apply=False,baseline_dirty=False):
+def create_run(application_id,query,method,actor,source_ref=None,client_ip=None,window_minutes=None,catalog_key=None,auto_approve=False,auto_apply=False,baseline_dirty=False,defer=False):
     c=connect();run_id=None
     try:
-        cur=c.execute("""INSERT INTO discovery_runs(application_id,query,method,status,source_ref,client_ip,window_minutes,started_by,auto_approve,auto_apply,baseline_dirty)
-          VALUES(?,?,?,'running',?,?,?,?,?,?,?)""",(application_id,query or None,method,source_ref or None,client_ip or None,window_minutes,actor,1 if auto_approve else 0,1 if auto_apply else 0,1 if baseline_dirty else 0));run_id=cur.lastrowid;c.commit()
-        # Browser execution is deliberately deferred to the systemd worker so a
-        # Chromium session can never hold an Nginx/GUI request open long enough
-        # to produce a 504. The review page can be refreshed while status=running.
-        if method=="browser_auto":
+        cur=c.execute("""INSERT INTO discovery_runs(application_id,query,method,status,source_ref,client_ip,window_minutes,started_by,auto_approve,auto_apply,baseline_dirty,queued)
+          VALUES(?,?,?,'running',?,?,?,?,?,?,?,?)""",(application_id,query or None,method,source_ref or None,client_ip or None,window_minutes,actor,1 if auto_approve else 0,1 if auto_apply else 0,1 if baseline_dirty else 0,1 if method=='browser_auto' or defer else 0));run_id=cur.lastrowid;c.commit()
+        # GUI discovery runs in the worker outside the policy edit lock. Explicit
+        # queue state keeps synchronous source-sync jobs owned by their producer.
+        if method=="browser_auto" or defer:
             return run_id
         _execute_run(c,run_id,application_id,query,method,source_ref,client_ip,window_minutes,catalog_key)
         return run_id
@@ -489,7 +513,7 @@ def process_browser_queue(max_runs=1):
         c=connect()
         try:
             run=c.execute("""SELECT * FROM discovery_runs
-              WHERE method='browser_auto' AND status='running' AND completed_at IS NULL
+              WHERE queued=1 AND status='running' AND completed_at IS NULL
               ORDER BY id ASC LIMIT 1""").fetchone()
             if not run:break
             run=dict(run)
@@ -499,46 +523,54 @@ def process_browser_queue(max_runs=1):
         try:
             c=connect()
             try:
+                from app.services.resource_permissions import actor_role,require_application_write
+                actor=run.get('started_by') or ''
+                if actor_role(c,actor) not in ('admin','operator'):raise ValueError('Discovery actor is disabled or no longer allowed to manage access.')
+                require_application_write(c,run.get('application_id'),actor)
                 _execute_run(c,run['id'],run.get('application_id'),run.get('query'),run['method'],run.get('source_ref'),run.get('client_ip'),run.get('window_minutes'))
             finally:
                 c.close()
 
-            if bool(run.get('auto_approve')):
-                ready=get_run(run['id'])
-                ids=[x['id'] for x in ready.get('candidates',[])] if ready else []
-                if ids:
-                    actor=run.get('started_by') or 'system'
-                    approve_run(run['id'],ids,actor)
-                    apply_result=None
-                    if bool(run.get('auto_apply')):
-                        from app.services.apply import apply_saved_change
-                        apply_result=apply_saved_change(
-                            actor,
-                            None,
-                            f"Automatic application dependency update for application {run.get('application_id')}",
-                            preexisting_dirty=bool(run.get('baseline_dirty')),
-                        )
-                        if apply_result and not apply_result.get('ok'):
-                            c=connect()
-                            try:
-                                c.execute("UPDATE discovery_runs SET error_text=? WHERE id=?",(apply_result.get('error') or 'Production apply failed; previous policy remains active.',run['id']))
-                                c.commit()
-                            finally:
-                                c.close()
-                    processed.append({'id':run['id'],'status':'approved','auto_approved':len(ids),'apply':apply_result})
+            from app.services.policy_lock import policy_edit_lock
+            from app.services.deployment import effective_policy_changed
+            with policy_edit_lock():
+                dirty_before_approval=effective_policy_changed()
+                if bool(run.get('auto_approve')):
+                    ready=get_run(run['id'])
+                    ids=[x['id'] for x in ready.get('candidates',[]) if x.get('selected') and x.get('recommendation')!='ignore'] if ready else []
+                    if ids:
+                        actor=run.get('started_by') or 'system'
+                        approve_run(run['id'],ids,actor)
+                        apply_result=None
+                        if bool(run.get('auto_apply')):
+                            from app.services.apply import apply_saved_change
+                            apply_result=apply_saved_change(
+                                actor,
+                                None,
+                                f"Automatic application dependency update for application {run.get('application_id')}",
+                                preexisting_dirty=bool(run.get('baseline_dirty')) or dirty_before_approval,
+                            )
+                            if apply_result and not apply_result.get('ok'):
+                                c=connect()
+                                try:
+                                    c.execute("UPDATE discovery_runs SET error_text=? WHERE id=?",(apply_result.get('error') or 'Production apply failed; previous policy remains active.',run['id']))
+                                    c.commit()
+                                finally:
+                                    c.close()
+                        processed.append({'id':run['id'],'status':'approved','auto_approved':len(ids),'apply':apply_result})
+                    else:
+                        apply_result=None
+                        if bool(run.get('auto_apply')):
+                            from app.services.apply import apply_saved_change
+                            apply_result=apply_saved_change(
+                                run.get('started_by') or 'system',
+                                None,
+                                f"Save application {run.get('application_id')} after empty discovery",
+                                preexisting_dirty=bool(run.get('baseline_dirty')) or dirty_before_approval,
+                            )
+                        processed.append({'id':run['id'],'status':'ready','auto_approved':0,'apply':apply_result})
                 else:
-                    apply_result=None
-                    if bool(run.get('auto_apply')):
-                        from app.services.apply import apply_saved_change
-                        apply_result=apply_saved_change(
-                            run.get('started_by') or 'system',
-                            None,
-                            f"Save application {run.get('application_id')} after empty discovery",
-                            preexisting_dirty=bool(run.get('baseline_dirty')),
-                        )
-                    processed.append({'id':run['id'],'status':'ready','auto_approved':0,'apply':apply_result})
-            else:
-                processed.append({'id':run['id'],'status':'ready'})
+                    processed.append({'id':run['id'],'status':'ready'})
         except Exception as exc:
             c=connect()
             try:
@@ -605,17 +637,23 @@ def _merge_protocol(a,b):
 def approve_run(run_id,selected_ids,actor):
     c=connect()
     try:
+        c.execute('BEGIN IMMEDIATE')
         run=c.execute("SELECT * FROM discovery_runs WHERE id=? AND status='ready'",(run_id,)).fetchone()
         if not run:raise ValueError("Discovery run is not ready for approval.")
         if not run["application_id"]:raise ValueError("Discovery run is not attached to an application policy.")
         app=c.execute("SELECT * FROM applications WHERE id=? AND status!='deleted'",(run["application_id"],)).fetchone()
         if not app:raise ValueError("Application policy not found.")
+        from app.services.resource_permissions import actor_role,require_application_write
+        if actor_role(c,actor) not in ('admin','operator'):raise ValueError('Current access management permission is required.')
+        require_application_write(c,run['application_id'],actor)
         ids={int(x) for x in selected_ids};rows=[x for x in c.execute("SELECT * FROM discovery_candidates WHERE run_id=?",(run_id,)) if x["id"] in ids]
         if not rows:raise ValueError("Select at least one discovered endpoint.")
         created=0;linked=0;updated=0
-        c.execute("BEGIN IMMEDIATE")
         cid=_category_for_app(c,app)
         for x in rows:
+            x=dict(x)
+            if x['endpoint_type'] not in ('domain','ip') or x['protocol'] not in ('HTTP','HTTPS','BOTH'):raise ValueError('Invalid discovered endpoint.')
+            x['destination']=normalize_domain(x['destination']) if x['endpoint_type']=='domain' else normalize_ip(x['destination'])
             existing=c.execute("SELECT * FROM rules WHERE rule_type=? AND destination=? AND status!='deleted'",(x["endpoint_type"],x["destination"])).fetchone()
             if existing:
                 rid=existing["id"]

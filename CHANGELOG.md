@@ -1,5 +1,149 @@
 # Changelog
 
+## 3.12.13
+
+- Adds a visible Connection → HTTPS certificate card with issuer/subject/names/expiry, public certificate download and one import form for PEM or password-protected Windows PFX/PKCS#12. File limits are 64 KB; hidden format inputs are disabled. Private keys/passwords are never exposed through download or audit.
+- Adds GUI renewal of an existing self-signed certificate for 90/365 days, retaining its subject/key and covering current configured names/IP. The root helper verifies the existing self-signature and refuses CA-issued certificates; CA renewal remains an issuer operation followed by import.
+- Reuses fixed-path validation/publication and rollback on nginx validation/reload failure. PFX passwords go through standard input and temporary material remains private. Tests cover real PFX parsing, wrong passwords, CA refusal, repeat self-renewal, public-only export and rollback. No real VM certificates are changed during tests. Schema stays 019.
+
+## 3.12.12
+
+- Identifies the expiring certificate as the admin-panel/HTTPS-PAC certificate in Health, Connection and notifications. Health badge color now follows its warning/critical state instead of showing a near-expiry certificate as green. HTTPS traffic inspection remains separate and is not enabled.
+- Shows new/unassigned applications immediately in the Dependency Candidates application filter, even when no traffic-derived candidates exist. Archived applications remain available only when they have review history and are labeled accordingly.
+- Adds selected-application discovery status, configured dependency count and a link to the application/scan results. Clarifies that this page contains traffic-correlated suggestions, not the separate website/capture discovery results; zero traffic suggestions does not imply a failed scan.
+- Adds regression coverage for visibility before any scan/candidate exists and running/completed discovery with zero traffic candidates. Schema remains 019; access policies are unchanged.
+
+## 3.12.11
+
+- Adds explicit domain membership moves between applications, pending-candidate reassignment/merge, and suggestions based on configured primary domains or known memberships. Corrections guide future timing correlation; suggestions do not publish access. Timing-only scores are capped Low/review and migration 019 downgrades existing pending scores without changing approved access.
+- Adds admin-managed current PC display labels with automatic cached DNS/PTR fallback. IP, label and DNS hostname stay separate in the GUI/API, with DHCP/NAT identity limits stated.
+- Adds System → Integrations API: expiring, revocable, hashed read-only Bearer tokens, inventory/per-PC traffic endpoints, scope checks, HTTPS requirement, owner revalidation, bounded pages and per-token rate limiting. Portable exports strip tokens, restores revoke imports and retain target PC labels. No endpoint agent or API policy writer is installed.
+- Clarifies recovered health notifications by separating the cleared condition from the previous alert, instead of repeating a stale failure detail as current. No live channel messages are sent during tests.
+
+## 3.12.10
+
+- Removes the profile-versus-direct-VLAN method selector from Add access, application discovery, HAR import and application create/edit. Select existing Access Profiles once; their names and inherited VLAN/subnet details are shown together. Profile creation stays in Profiles & VLANs and adding an application never creates another profile.
+- Existing direct application memberships remain active by default in an advanced legacy section; replacing them with the selected profiles requires an explicit choice. Unassigned discovery/manual applications remain possible by leaving profiles unchecked; Add access requires a selected profile. Legacy API methods stay compatible.
+- Adds tests for all application forms, profile-only assignments, no implicit profile creation and preservation/explicit removal of older direct memberships. Schema remains 018.
+
+## 3.12.9
+
+- Adds application, literal domain search, status and confidence filters to Dependency Candidates. Filtering runs against the entire stored dataset before pagination; results are shown 50 per page with counts and a reset action.
+- Preserves filters/page after Approve or Ignore, clamps pages when the result count shrinks, and offers read-only approved/ignored history. Review permissions, CSRF checks and explicit allow publication remain unchanged.
+- Clarifies that time-correlated candidates are suggestions, not proof of application dependencies. Adds regression coverage for filtering beyond the former 500-row cutoff, literal search, pagination, review continuity and malformed inputs.
+
+## 3.12.8
+
+- Adds Connection → Blocked page with company name, bounded PNG logo, title, message, IT contact and authenticated preview. Only administrators can save; production publication accepts validated settings, never arbitrary HTML or paths. Branding stays local to the VM across policy imports/upgrades.
+- Denied HTTP requests redirect to a fixed public local branded page; denied HTTPS CONNECT remains 403 and allowed policy rules keep priority. HTTPS browser errors cannot display this HTML without managed TLS inspection. Install/upgrade configures nginx/Squid and validates both; upgrade rollback restores the previous Squid base configuration.
+- Repairs nginx PAC 403 responses during install/upgrade by permitting traversal to the public PAC file while retaining private env/notification/TLS permissions. A disposable-file test verifies reads as an unprivileged UID and checks that private files remain inaccessible.
+- Adds an administrator Overview shortcut, Connect a PC, linking directly to the existing PAC setup card.
+- Makes Connection's configured PAC URL prominent with a Script address label, high-contrast selectable field, primary Copy action and inline Windows setup instructions. Address/certificate changes remain collapsed below it; the existing shared PAC configuration and endpoint downloads remain authoritative.
+
+## 3.12.7
+
+- Prevents an in-flight login from overwriting a newer password reset; session insertion checks the verified credential under a write transaction. Failed-login counters update atomically without overwriting a changed credential.
+- Enforces protected application/profile membership permissions across name-based discovery, dependency review, service helpers and deferred approval; queued work rechecks current enabled actor authority. Candidate review joins the policy edit lock.
+- Fixes Add access passing FastAPI Form objects into real SQLite discovery creation. GUI source discovery is explicitly queued outside the request/edit lock, with migration 018 preserving old queued browser runs and separating synchronous source-sync ownership.
+- Normalizes HAR/discovery destinations before storage and again at approval. Generic hostname tokenization avoids repeated suffix matching; HTTP response work has a shared redirect deadline and closes timed-out connections.
+- Creates portable exports privately from the first write and atomically replaces their destination. Restore retains target pac_endpoint alongside connection_policy, including absence/default semantics.
+- Upgrade rollback uses a new snapshot after writers stop, preserves late credential changes and clears sessions. Fresh install gives the appliance data parent root ownership.
+- Windows controller validates backup identity and fixed registry targets, rejects untrusted/reparse storage and replaces directory ACLs explicitly. No live Windows registry/ACL or VM changes were made during review.
+- Disables the Cloudflare security-audit skill at the user's request and records ordinary review results and remaining operational checks separately.
+
+## 3.12.6
+
+- Adds a detailed functional review and catalog of 405 application functions, with measured execution coverage and explicit deployment-validation limits.
+- Adds a 116-endpoint role/CSRF/anonymous matrix plus login/logout, malformed-hash, lockout, session-revocation and concurrent-last-admin regressions.
+- Makes Activity GET read-only and accessible to viewers/auditors; separates failed apply attempts from successful deployment baselines.
+- Serializes administrator changes before the last-enabled-admin check; rejects malformed stored hashes without a server error and prevents reactivation of archived profiles.
+- Rejects malformed/out-of-range traffic filters with HTTP 400, removes blocking DNS from domain saves and sanitizes XML-invalid XLSX text characters.
+- Bounds new HAR uploads before creating application state and includes the privileged TLS module in fresh-install release payloads.
+- Records the user's security-audit skill preference in AGENTS.md. A reconnaissance-only security run remains explicitly incomplete; functional tests are not a clean-audit claim.
+
+## 3.12.5
+
+- Makes Monitoring → PC activity the entry point for identifying recorded source IPs, current DNS names, observed networks/VLANs, request/decision/byte totals and distinct destinations.
+- Adds server-side PC search and inventory pagination. Per-PC domain/decision/date filters, paginated request history and scoped exports preserve the selected IP and traffic context.
+- Corrects per-PC first/last matching timestamps and latest network/VLAN metadata to use the same filtered window, rather than all retained events or lexicographic MAX labels.
+- Explains NAT/DHCP, current-DNS vs historical identity, HTTPS CONNECT visibility and DIRECT logging boundaries. Documents optional AD/GPO deployment and explicitly distinguishes unimplemented AD authentication/group-policy mapping.
+- Adds request-isolation, export, pagination, name-search and historical-metadata regressions plus browser checks for PC views.
+
+## 3.12.4
+
+- Updates the audited HTTP/upload stack to FastAPI 0.162.7, Starlette 1.3.1 and python-multipart 0.0.33. Install/upgrade updates pip to 26.3; CI checks known installed-package advisories.
+- Reviewed access/VLAN onboarding, discovery/capture isolation, policy publication/expiry/rollback, PAC/HTTPS deployment, alerts/SNMP, authentication, telemetry/storage/export and release checks.
+- Corrects saved-policy simulation for Squid safe ports/methods, literal IPv4 rules, diagnostic sources and legacy overlapping source scopes. Adds PAC bypass/fallback diagnosis without server DNS calls; full website URLs are accepted and invalid inputs retained.
+- Clearly separates saved-policy preview from deployed behavior and historical Squid log evidence. No extra primary menu or duplicated policy editor.
+- Uses shared configured alert thresholds on Health, places expiry failures in Slack's policy category, hides empty administrator navigation from other roles and avoids a healthy overview with stale samples.
+- Fixes the client time-range selector blocked by CSP by using an external event handler.
+- Removes blocking reverse-DNS requests from client pages. A bounded worker resolves up to eight recent clients per run with per-query timeout and persistent positive/negative caches. Health API reads cached samples.
+- Protects formula-like CSV text cells in policy/traffic exports, including leading whitespace and full-width prefixes; XLSX remains explicit text. Stored policy/telemetry values are unchanged.
+- Updates the platform review with feature decisions, source comparisons and the remaining VM/client/NMS acceptance checks.
+
+## 3.12.3
+
+- Connection shows a copyable PAC setup-script URL and one HTTP/HTTPS hostname setting shared by Windows package, installer build and Edge GPO downloads. Existing PCs need the changed address redeployed.
+- HTTPS PAC is served as a static anonymous nginx location; upgrades preserve the existing nginx configuration and restore it on cutover failure.
+- Admin/CSRF-protected PEM certificate renewal validates key pairing, validity and management/HTTPS PAC hostname coverage. Fixed root-managed destinations, nginx validation, reload and rollback; custom nginx TLS paths remain managed externally. CA trust and DNS must be deployed to PCs separately.
+- Slack has independent event categories, urgency, recovery, repeat interval, compact/detailed messages and explicit member/user-group mentions. Tests and recovery never mention people; changing a channel label does not reroute its webhook.
+- Adds workflow tests for endpoint parity, permissions, Slack filters/mention handling and TLS rollback. Notification tests mock remote delivery.
+
+## 3.12.2 — readable navigation and discoverable SNMP
+
+- Corrects the legacy fixed icon width being applied to menu text. Primary labels stay on one line and inherit the correct active color; numeric badges retain their own sizing.
+- Profile header status badges stay compact instead of stretching to the description height.
+- Alerts & SNMP is a direct primary menu entry, with channel jump links inside the settings page. Admin-only permissions and opt-in settings remain unchanged.
+- All shared stylesheet URLs are versioned to avoid stale cached navigation styles.
+
+
+## 3.12.1 — profile and VLAN in one save
+
+- One Profiles & VLANs entry and combined editor for profile name, existing/new VLAN and allowed applications/domains/IPs. New network names are automatic; notes remain optional.
+- Atomic combined save rolls back network/profile/membership creation together on validation failure, preserves failed input and invokes one normal Save & Apply. Existing role/CSRF/pending-approval controls remain.
+- Profile Copy prepares access selections without silently copying production network assignments. Unassigned existing VLANs have a prefilled Create profile shortcut and reference-protected cleanup. The combined page is a primary menu entry; secondary labels/icons and long option lists were checked for readability.
+- Existing standalone network routes remain compatible; no database migration beyond 017.
+
+
+## 3.12.0 — unified access and monitoring
+
+- One Access inventory/add flow for websites, domains and IPs; one profile-or-VLAN selector across application discovery/editing, standalone rules and bulk defaults. Existing mixed assignments can be preserved explicitly.
+- Dedicated proxy bypass page, grouped Monitoring menu, confirmed/audited profile deletion and readable responsive login.
+- Transactional unassigned Google Search starter on install/upgrade; configured applications remain untouched. No organization-specific starter data.
+- Optional SNMPv2c read-only polling and incident/recovery traps, configured alongside email/Slack; source/community checks, bounded responses and loopback transport tests. SNMPv3 and INFORM acknowledgements are not included.
+- Optional Edge PAC policy JSON and GPO deployment guidance; no new schema migration beyond 017.
+
+
+## 3.11.1 — simpler administration and readable surfaces
+
+- Network creation needs only a name and subnet; VLAN ID and access profiles are optional. Proxy membership defaults to enabled. Optional notes/reference live under More options; audit notes are generated when omitted.
+- A Copy action prepares a network with the source profiles/direct application and rule scopes. New subnet/VLAN identifiers are required where applicable; the original is unchanged. Explicit profile deselection is respected, and failed network forms retain input.
+- Simplified profile/application/rule editors, shorter save feedback and dismissible success messages. Optional channel/service configuration expands on demand. Error and pending-approval feedback stays visible.
+- Unified legacy light surfaces, readable VLAN badges, checkbox sizing, secondary text/link contrast and responsive action layouts. Versioned UI asset URLs avoid stale stylesheet/script caches.
+- No database migration beyond 017; existing policy, credentials and audit history remain compatible.
+
+
+## 3.11.0
+
+- Added Administrator-only GUI configuration for health email/Slack notifications, protected credential storage, explicit channel tests and live delivery status.
+- Added an independent monitor with incident confirmation/recovery, digesting, repeat control, per-channel retry/backoff and resource/service/backup-age checks.
+- Enforced expired grants in generation/simulation and added deployed-snapshot expiry without publishing pending changes.
+- Serialized GUI/background policy editing, froze publication snapshots, retained concurrent pending work and added base-hash/managed-grammar validation in the privileged helper.
+- Hardened browser discovery with blocked Service Workers and an authenticated, public-IP-pinned loopback proxy.
+- Fixed portable backup manifests, added safe legacy archive staging, quiesced restore writers, atomic database cutover and rollback.
+- Added migration 017, health-monitor systemd units and regression tests.
+
+## 3.10.0
+
+- Refined console spacing, typography, cards and responsive layouts; combined live/search traffic navigation and kept audit access under Activity.
+- Added Administrator-only Connection settings for fail-open, local routing and exact/wildcard domain plus IPv4/CIDR DIRECT bypasses.
+- Added structured, validated, atomic static PAC publishing with backup through the restricted helper. Fresh installs omit legacy customer-specific bypass IPs; upgrades preserve existing PAC.
+- Added gateway-configured Windows source/controller packages with setup instructions and an optional GUI build helper.
+- Replaced IP-based automatic grants with an optional selected-tab Chrome/Edge recorder and privacy-preserving, review-only import. Legacy active sessions are stopped without changing policy.
+- Added optional Windows Update, Defender security updates and connectivity-check presets, scoped to Access Profiles with source guidance and shared-rule safeguards.
+- Browser auto-approval now honours selected/ignored candidates; classified analytics are excluded.
+- Added schema migration 016, regression tests and deployment acceptance checks. Policy rollback and cross-host restore stop learning; cross-host restore retains target PAC settings.
+
 ## 3.9.0
 
 - Rebuilt the management experience around a professional enterprise operations-console design created in Figma.

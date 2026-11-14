@@ -71,15 +71,15 @@ def apply_saved_change(actor,source_ip=None,description="Saved policy change",pr
 
 def apply_message(result):
     if result.get("applied"):
-        return "Saved and applied to production"
+        return "Saved and applied"
     if result.get("no_effective_change"):
         return "Saved"
     if result.get("candidate_only"):
         return "Saved in candidate preview"
     if result.get("pending_approval"):
         if result.get("reason")=="existing unapplied policy changes":
-            return "Saved. Existing unapplied changes require one-time Admin review before direct Save can resume"
-        return "Saved. Administrator approval required"
+            return "Saved. Review pending changes in Activity to apply."
+        return "Saved. Waiting for administrator approval."
     if not result.get("ok"):
-        return "Saved, but production apply failed; previous policy remains active"
+        return "Could not apply. Previous policy is still active; see Activity."
     return "Saved"

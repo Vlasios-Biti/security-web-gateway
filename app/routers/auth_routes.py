@@ -10,10 +10,11 @@ def login_page(request:Request):
 @router.post("/login")
 def login_submit(request:Request,username:str=Form(...),password:str=Form(...)):
     user=auth.authenticate(username,password,request)
-    if not user:
+    token=auth.create_session(user["id"],request,verified_password_hash=user["password_hash"]) if user else None
+    if not token:
         return request.app.state.templates.TemplateResponse(request=request,name="login.html",
             context={"request":request,"error":"Invalid username or password."},status_code=401)
-    token=auth.create_session(user["id"],request);resp=RedirectResponse("/",303)
+    resp=RedirectResponse("/",303)
     resp.set_cookie(SESSION_COOKIE,token,max_age=8*3600,httponly=True,secure=True,samesite="strict",path="/")
     return resp
 @router.post("/logout")

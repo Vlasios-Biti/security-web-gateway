@@ -35,3 +35,30 @@ def resolve_domain(domain):
         for r in socket.getaddrinfo(domain,None,type=socket.SOCK_STREAM): out.add(r[4][0])
     except socket.gaierror: return []
     return sorted(out)
+
+
+def normalize_expiration(value):
+    from datetime import datetime,timezone
+    if not value or not str(value).strip():return None
+    try:
+        date=datetime.fromisoformat(str(value).strip().replace('Z','+00:00'))
+        if date.tzinfo is None:date=date.replace(tzinfo=timezone.utc)
+        return date.astimezone(timezone.utc).isoformat()
+    except (ValueError,TypeError) as exc:raise ValueError('Use a valid expiration date/time in UTC.') from exc
+
+
+def expiration_input(value):
+    if not value:return ''
+    from datetime import datetime
+    try:return datetime.fromisoformat(normalize_expiration(value)).strftime('%Y-%m-%dT%H:%M')
+    except ValueError:return ''
+
+
+def csv_cell(value):
+    """Keep untrusted export text from starting a spreadsheet formula."""
+    if not isinstance(value,str) or not value:return value
+    import unicodedata
+    probe=unicodedata.normalize('NFKC',value).lstrip()
+    if value[0] in '\t\r\n' or (probe and probe[0] in '=+-@'):
+        return "'"+value
+    return value

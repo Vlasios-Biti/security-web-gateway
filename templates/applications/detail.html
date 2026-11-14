@@ -1,5 +1,6 @@
 {% extends "base.html" %}{% block content %}
 {% set can_change = request.state.user.role == 'admin' or (request.state.user.role == 'operator' and not application.system_managed) %}
+{% set pc_service = application.source_ref and application.source_ref.startswith('pc-service:') %}
 <div class="page-head simple-page-head">
   <div><span class="section-kicker">Application</span><h2>{{ application.name }}</h2><p>{{ application.description or 'Managed web application' }}</p></div>
   <div class="head-actions">{% if can_change %}<a class="btn ghost" href="/applications/{{ application.id }}/edit">Edit</a>{% endif %}<a class="btn ghost" href="/applications">Back</a></div>
@@ -13,18 +14,19 @@
 </section>
 
 {% if runs and runs[0].status=='running' %}
-<div class="flash info-box space-top" data-application-activity data-activity-url="/applications/{{ application.id }}/activity"><b>Discovering dependencies…</b> SWG is checking the application in the background. Results will appear automatically when discovery finishes.</div>
+<div class="flash info-box space-top" data-application-activity data-activity-url="/applications/{{ application.id }}/activity"><b>Discovering dependencies…</b> Results will appear here automatically.</div>
 {% elif runs and runs[0].error_text %}
 <div class="flash danger-box space-top"><b>Save could not be fully applied.</b> {{ runs[0].error_text }} The previous production policy remains active.</div>
-{% elif runs and runs[0].status=='approved' and not application.pending %}
-<div class="flash success-box space-top"><b>Saved and applied.</b> The application and its discovered dependencies are synchronized with production.</div>
+
 {% elif application.pending %}
 <div class="flash warning-box space-top"><b>Approval required.</b> This change is saved but is not yet active in production.</div>
 {% endif %}
 
-{% if can_change %}
+{% if pc_service %}
+<section class="primary-action-card space-top"><div><span class="section-kicker">Optional PC service</span><h3>Managed in Connection</h3><p>Enable, disable and scope this curated service profile from the central connection settings.</p></div><a class="btn primary" href="/connection#pc-services">Open service settings</a></section>
+{% elif can_change %}
 <section class="primary-action-card space-top">
-  <div><span class="section-kicker">Automatic dependency management</span><h3>Refresh application access</h3><p>SWG will revisit the website, discover current public dependencies, validate the resulting policy and apply it automatically.</p></div>
+  <div><span class="section-kicker">Automatic dependency management</span><h3>Refresh application access</h3><p>Check the public website for updated domain dependencies.</p></div>
   {% if application.source_ref and application.source_ref.startswith('https://') or application.seed_domain %}
   <form method="post" action="/applications/{{ application.id }}/discover">
     <input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}">
@@ -41,12 +43,25 @@
 </section>
 {% endif %}
 
+{% if can_change and not pc_service %}
+<section class="settings-card space-top">
+  <div class="settings-heading"><span class="step-mark">↗</span><div><span class="section-kicker">Capture the actual workflow</span><h3>Find domains used after a click</h3><p>Choose the browser recorder or import a HAR from this application's tab. Both discover destinations used during login and button-driven workflows; review them before allowing access.</p></div></div>
+  <div class="capture-choice-grid"><div><span class="section-kicker">Option 1 · Browser recorder</span>
+  <div class="capture-actions"><a class="btn ghost" href="/applications/capture/extension.zip">Download Chrome / Edge recorder</a><span class="field-help">Optional local extension · selected tab only</span></div>
+  <form class="capture-import" method="post" action="/applications/{{ application.id }}/capture" enctype="multipart/form-data"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><label>Exported tab capture<input name="capture_file" type="file" accept=".json,application/json" required></label><button class="btn primary">Import &amp; review domains</button></form>
+  </div><div><span class="section-kicker">Option 2 · HAR import</span><p class="field-help">Use the browser's Network tools. No extension is needed.</p>
+  <form class="capture-import" method="post" action="/applications/{{ application.id }}/capture/har" enctype="multipart/form-data"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><label>HAR workflow capture<input name="har_file" type="file" accept=".har,application/json" required></label><button class="btn primary">Import &amp; review HAR</button></form>
+  <p class="field-help">Open DevTools → Network, preserve the log, exercise the application's buttons, then export the HAR from that tab. Use a sanitized export when available. Only endpoint evidence is retained in the application.</p></div></div>
+  <details class="learning-guidance"><summary>How to capture</summary><ol><li>Extract the recorder and load its folder using Load unpacked in Chrome/Edge Extensions (Developer mode), subject to your organisation's policy.</li><li>Open this application's seed domain, start capture, then sign in and exercise its buttons in that same tab.</li><li>Stop and export the JSON. Upload it here, review the candidates and approve the intended dependencies. Retry blocked actions and capture again if they reveal more domains.</li></ol><p>The recorder excludes other tabs, native PC services and requests with no tab ID. New popup windows require a separate capture. Selected-tab traffic can still include analytics and embedded content; it is evidence, not proof that every domain is required. IP-based correlation never automatically grants access. HAR import is available alongside the recorder above.</p></details>
+</section>
+{% endif %}
+
 <details class="advanced-card space-top" open>
   <summary>Dependencies <span>{{ application.dependencies|length }}</span></summary>
   <div class="advanced-body">
-    <div class="table-tools"><input class="search" data-filter-table="app-deps" placeholder="Search dependencies..."><span>Admin-initiated discovery is validated and applied automatically. Operator changes remain pending for Admin approval.</span></div>
+    <div class="table-tools"><input class="search" data-filter-table="app-deps" placeholder="Search dependencies..."><span></span></div>
     <div class="table-wrap"><table class="table" id="app-deps"><thead><tr><th>Destination</th><th>Protocol</th><th>Source</th><th>Status</th>{% if can_change %}<th></th>{% endif %}</tr></thead><tbody>
-    {% for r in application.dependencies %}<tr class="{{ 'muted-row' if not r.dependency_enabled else '' }}"><td><code class="strong">{{ r.destination }}</code></td><td>{{ r.protocol }}</td><td>{{ r.source }}</td><td><span class="badge {{ 'ok' if r.dependency_enabled and r.status=='active' else 'off' }}">{{ 'Enabled' if r.dependency_enabled and r.status=='active' else 'Disabled' }}</span></td>{% if can_change %}<td><form method="post" action="/applications/{{ application.id }}/dependency/{{ r.id }}/status" data-confirm="Remove this dependency from {{ application.name }}?"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><input type="hidden" name="status" value="deleted"><button class="btn ghost small danger-text">Remove</button></form></td>{% endif %}</tr>{% else %}<tr><td colspan="5" class="empty">Dependency discovery is still running or no endpoints were found.</td></tr>{% endfor %}
+    {% for r in application.dependencies %}<tr class="{{ 'muted-row' if not r.dependency_enabled else '' }}"><td><code class="strong">{{ r.destination }}</code></td><td>{{ r.protocol }}</td><td>{{ r.source }}</td><td><span class="badge {{ 'ok' if r.dependency_enabled and r.status=='active' else 'off' }}">{{ 'Enabled' if r.dependency_enabled and r.status=='active' else 'Disabled' }}</span></td>{% if can_change %}<td>{% if r.rule_type=='domain' %}<a class="btn ghost small" href="/applications/{{ application.id }}/dependency/{{ r.id }}/move">Move</a>{% endif %}<form method="post" action="/applications/{{ application.id }}/dependency/{{ r.id }}/status" data-confirm="Remove this dependency from {{ application.name }}?"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><input type="hidden" name="status" value="deleted"><button class="btn ghost small danger-text">Remove</button></form></td>{% endif %}</tr>{% else %}<tr><td colspan="5" class="empty">Dependency discovery is still running or no endpoints were found.</td></tr>{% endfor %}
     </tbody></table></div>
   </div>
 </details>
@@ -61,7 +76,7 @@
     </section>
     <section class="advanced-section">
       <h3>Discovery history</h3>
-      <table class="table"><thead><tr><th>Started</th><th>Method</th><th>Status</th><th></th></tr></thead><tbody>{% for r in runs %}<tr><td>{{ r.started_at }}</td><td>{{ r.method|replace('_',' ')|title }}</td><td>{{ r.status|upper }}</td><td><a class="text-link" href="/applications/discovery/{{ r.id }}">Details</a></td></tr>{% else %}<tr><td colspan="4" class="empty">No history.</td></tr>{% endfor %}</tbody></table>
+      <table class="table"><thead><tr><th>Started</th><th>Method</th><th>Status</th><th></th></tr></thead><tbody>{% for r in runs %}<tr><td>{{ r.started_at }}</td><td>{{ 'Selected tab' if r.source_ref=='browser-selected-tab' else r.method|replace('_',' ')|title }}</td><td>{{ r.status|upper }}</td><td><a class="text-link" href="/applications/discovery/{{ r.id }}">Details</a></td></tr>{% else %}<tr><td colspan="4" class="empty">No history.</td></tr>{% endfor %}</tbody></table>
     </section>
   </div>
 </details>

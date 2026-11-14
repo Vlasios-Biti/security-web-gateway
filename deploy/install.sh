@@ -98,6 +98,7 @@ if ! id proxy-mgmt >/dev/null 2>&1; then
   }
 fi
 usermod -a -G proxy proxy-mgmt
+install -d -o root -g proxy-mgmt -m 0750 /var/lib/security-web-gateway
 install -d -o root -g proxy-mgmt -m 0750 /opt/security-web-gateway/releases /etc/security-web-gateway /etc/security-web-gateway/tls
 install -d -o proxy-mgmt -g proxy-mgmt -m 0750 /var/lib/security-web-gateway/prod /var/lib/security-web-gateway/staging /var/lib/security-web-gateway/playwright /var/log/security-web-gateway
 install -d -o root -g proxy -m 0750 /var/lib/security-web-gateway/backups /etc/squid/managed
@@ -107,14 +108,14 @@ REL="/opt/security-web-gateway/releases/$SWG_VERSION"
 rm -rf "$REL"; install -d -o root -g proxy-mgmt -m 0750 "$REL"
 rsync -a --delete \
   --exclude '__pycache__' --exclude '*.pyc' \
-  "$ROOT/app" "$ROOT/bin" "$ROOT/migrations" "$ROOT/static" "$ROOT/templates" "$ROOT/tools" "$ROOT/requirements.txt" "$ROOT/VERSION" "$REL/"
+  "$ROOT/app" "$ROOT/bin" "$ROOT/migrations" "$ROOT/static" "$ROOT/templates" "$ROOT/tools" "$ROOT/privileged" "$ROOT/requirements.txt" "$ROOT/VERSION" "$REL/"
 chown -R root:proxy-mgmt "$REL"
 find "$REL" -type d -exec chmod 0750 {} +
 find "$REL" -type f -exec chmod 0640 {} +
 find "$REL/bin" "$REL/tools" -type f -name '*.py' -exec chmod 0750 {} +
 
 if [[ ! -x /opt/security-web-gateway/venv/bin/python ]]; then python3 -m venv /opt/security-web-gateway/venv; fi
-/opt/security-web-gateway/venv/bin/pip install --upgrade pip
+/opt/security-web-gateway/venv/bin/python -m pip install --upgrade pip==26.3
 /opt/security-web-gateway/venv/bin/pip install -r "$REL/requirements.txt"
 
 if [[ $SKIP_BROWSER -eq 0 ]]; then
@@ -208,6 +209,8 @@ ln -sfn "$REL" /opt/security-web-gateway/current
 echo "===== 7. DATABASE ====="
 runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH="$REL" \
   /opt/security-web-gateway/venv/bin/python "$REL/tools/migrate.py" --db /var/lib/security-web-gateway/prod/swg.db --root "$REL"
+runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH="$REL" \
+  /opt/security-web-gateway/venv/bin/python "$REL/bin/setup_defaults.py"
 chown proxy-mgmt:proxy-mgmt /var/lib/security-web-gateway/prod/swg.db; chmod 0640 /var/lib/security-web-gateway/prod/swg.db
 
 echo "===== 8. INITIAL MANAGED POLICY ====="
@@ -225,12 +228,14 @@ chown root:proxy /etc/squid/squid.conf; chmod 0640 /etc/squid/squid.conf
 
 sed -e "s|__PROXY_IP__|$BIND_IP|g" -e "s|__PROXY_PORT__|$PROXY_PORT|g" -e "s|__INTERNAL_DOMAIN_SUFFIX__|$INTERNAL_DOMAIN_SUFFIX|g" "$ROOT/pac/proxy.pac.tpl" > /etc/security-web-gateway/proxy.pac
 chown root:proxy-mgmt /etc/security-web-gateway/proxy.pac; chmod 0644 /etc/security-web-gateway/proxy.pac
+python3 "$ROOT/tools/ensure_pac_access.py"
 
 sed -e "s|__FQDN__|$FQDN|g" -e "s|__BIND_IP__|$BIND_IP|g" \
     -e "s|__TLS_CERT__|/etc/security-web-gateway/tls/management.crt|g" -e "s|__TLS_KEY__|/etc/security-web-gateway/tls/management.key|g" \
   "$ROOT/deploy/templates/nginx.conf.tpl" > /etc/nginx/sites-available/security-web-gateway
 ln -sfn /etc/nginx/sites-available/security-web-gateway /etc/nginx/sites-enabled/security-web-gateway
 rm -f /etc/nginx/sites-enabled/default
+python3 "$ROOT/tools/configure_block_page.py"
 
 /usr/sbin/squid -k parse
 /usr/sbin/nginx -t
@@ -245,7 +250,7 @@ echo "===== 10. PRIVILEGED HELPER + SYSTEMD ====="
 install -o root -g root -m 0750 "$ROOT/privileged/security-web-gateway-deploy-helper.py" /usr/local/sbin/security-web-gateway-deploy-helper
 install -o root -g root -m 0644 "$ROOT/privileged/security-web-gateway-deploy-helper.socket" /etc/systemd/system/security-web-gateway-deploy-helper.socket
 install -o root -g root -m 0644 "$ROOT/privileged/security-web-gateway-deploy-helper@.service" /etc/systemd/system/security-web-gateway-deploy-helper@.service
-for f in security-web-gateway.service security-web-gateway-source-sync.service security-web-gateway-source-sync.timer security-web-gateway-telemetry.service security-web-gateway-telemetry.timer security-web-gateway-storage-maintenance.service security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.service security-web-gateway-discovery.timer security-web-gateway-performance.service security-web-gateway-performance.timer; do
+for f in security-web-gateway-snmp.service security-web-gateway.service security-web-gateway-source-sync.service security-web-gateway-source-sync.timer security-web-gateway-telemetry.service security-web-gateway-telemetry.timer security-web-gateway-storage-maintenance.service security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.service security-web-gateway-discovery.timer security-web-gateway-performance.service security-web-gateway-performance.timer security-web-gateway-health-monitor.service security-web-gateway-health-monitor.timer; do
   install -o root -g root -m 0644 "$ROOT/systemd/$f" "/etc/systemd/system/$f"
 done
 install -d -o root -g root -m 0755 /etc/systemd/system/squid.service.d
@@ -254,7 +259,8 @@ systemctl daemon-reload
 systemctl restart squid
 systemctl enable --now security-web-gateway-deploy-helper.socket
 systemctl enable --now security-web-gateway.service
-systemctl enable --now security-web-gateway-source-sync.timer security-web-gateway-telemetry.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer security-web-gateway-performance.timer
+systemctl enable --now security-web-gateway-snmp.service
+systemctl enable --now security-web-gateway-source-sync.timer security-web-gateway-telemetry.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer security-web-gateway-performance.timer security-web-gateway-health-monitor.timer
 
 for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8200/healthz >/tmp/security-web-gateway-health.json 2>/dev/null && break; sleep 1; done
 cat /tmp/security-web-gateway-health.json

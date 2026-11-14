@@ -16,12 +16,9 @@ function FindProxyForURL(url, host) {
         return "DIRECT";
     }
 
-    // Business destinations explicitly required to bypass Squid.
-    var directIPs = {
-        "49.12.132.214": true,
-        "65.108.9.79": true,
-        "178.63.88.53": true
-    };
+    // Fresh installations have no customer-specific bypasses.
+    // Manage direct domains/IPs/networks in Connection after installation.
+    var directIPs = {};
 
     if (directIPs[host]) {
         return "DIRECT";

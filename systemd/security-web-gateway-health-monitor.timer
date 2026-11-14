@@ -1,0 +1,9 @@
+[Unit]
+Description=Security Web Gateway Health Notification Timer
+[Timer]
+OnBootSec=90s
+OnUnitInactiveSec=60s
+AccuracySec=5s
+Persistent=true
+[Install]
+WantedBy=timers.target

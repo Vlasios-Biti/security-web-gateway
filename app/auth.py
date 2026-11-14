@@ -4,7 +4,7 @@ import time
 from datetime import datetime, timezone, timedelta
 
 from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError, VerificationError
+from argon2.exceptions import VerifyMismatchError, VerificationError, InvalidHashError
 
 from app.config import (
     SESSION_COOKIE,
@@ -105,16 +105,13 @@ def authenticate(username, password, request):
 
         try:
             PH.verify(r["password_hash"], password)
-        except (VerifyMismatchError, VerificationError):
+        except (VerifyMismatchError, VerificationError, InvalidHashError):
             attempts = int(r["failed_attempts"] or 0) + 1
-            lock = (
-                (utcnow() + timedelta(minutes=LOGIN_LOCK_MINUTES)).isoformat()
-                if attempts >= LOGIN_MAX_ATTEMPTS
-                else None
-            )
             c.execute(
-                "UPDATE users SET failed_attempts=?,locked_until=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
-                (attempts, lock, r["id"]),
+                """UPDATE users SET failed_attempts=failed_attempts+1,
+                   locked_until=CASE WHEN failed_attempts+1>=? THEN ? ELSE locked_until END,
+                   updated_at=CURRENT_TIMESTAMP WHERE id=? AND enabled=1 AND password_hash=?""",
+                (LOGIN_MAX_ATTEMPTS,(utcnow()+timedelta(minutes=LOGIN_LOCK_MINUTES)).isoformat(),r["id"],r["password_hash"]),
             )
             c.commit()
             audit(
@@ -129,19 +126,23 @@ def authenticate(username, password, request):
         h = r["password_hash"]
         if PH.check_needs_rehash(h):
             h = PH.hash(password)
-        c.execute(
+        changed=c.execute(
             """UPDATE users SET failed_attempts=0,locked_until=NULL,last_login_at=?,password_hash=?,
-               updated_at=CURRENT_TIMESTAMP WHERE id=?""",
-            (utcnow().isoformat(), h, r["id"]),
+               updated_at=CURRENT_TIMESTAMP WHERE id=? AND enabled=1 AND password_hash=?""",
+            (utcnow().isoformat(), h, r["id"],r["password_hash"]),
         )
+        if changed.rowcount!=1:
+            c.rollback()
+            audit(username,"LOGIN","FAILED",source_ip=client_ip(request),details_json='{"reason":"credentials_changed"}')
+            return None
         c.commit()
         audit(username, "LOGIN", "SUCCESS", source_ip=client_ip(request))
-        return dict(r)
+        return {**dict(r),"password_hash":h}
     finally:
         c.close()
 
 
-def create_session(user_id, request):
+def create_session(user_id, request, *, verified_password_hash=None):
     token = secrets.token_urlsafe(48)
     digest = hashlib.sha256(token.encode()).hexdigest()
     csrf = secrets.token_urlsafe(32)
@@ -149,6 +150,11 @@ def create_session(user_id, request):
     exp = now + timedelta(hours=SESSION_HOURS)
     c = connect()
     try:
+        c.execute('BEGIN IMMEDIATE')
+        current=c.execute('SELECT password_hash,enabled FROM users WHERE id=?',(user_id,)).fetchone()
+        if not current or not current['enabled'] or (verified_password_hash is not None and not secrets.compare_digest(current['password_hash'],verified_password_hash)):
+            c.rollback()
+            return None
         c.execute(
             """INSERT INTO sessions(user_id,token_hash,csrf_token,source_ip,user_agent,created_at,expires_at,last_seen_at)
                VALUES(?,?,?,?,?,?,?,?)""",

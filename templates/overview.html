@@ -1,27 +1,27 @@
 {% extends "base.html" %}{% block content %}
-<section class="ops-health-hero {{ 'healthy' if squid_status=='active' and app_status=='active' and nginx_status=='active' and port_ok else 'attention' }}">
-  <div><span class="ops-kicker">Security posture</span><h2>{{ 'Gateway operational' if squid_status=='active' and app_status=='active' and nginx_status=='active' and port_ok else 'Gateway needs attention' }}</h2><p>{{ 'All core services healthy · policy synchronized · telemetry current' if squid_status=='active' and app_status=='active' and port_ok and drift.state=='clean' else 'One or more operational controls require review.' }}</p></div>
+{% set gateway_ready = squid_status=='active' and app_status=='active' and nginx_status=='active' and port_ok and drift.state=='clean' and not health_cache.cache_stale %}
+<section class="ops-health-hero {{ 'healthy' if gateway_ready else 'attention' }}">
+  <div><span class="ops-kicker">Security posture</span><h2>{{ 'Gateway operational' if gateway_ready else 'Gateway needs attention' }}</h2><p>{{ 'Core services healthy · policy synchronized' if gateway_ready else 'One or more operational controls require review.' }}</p></div>
   <div class="hero-state-pills">
+    {% if health_cache.cache_stale %}<span class="status-pill warning">Health sample is stale</span>{% endif %}
     <span class="status-pill {{ 'healthy' if squid_status=='active' else 'danger' }}">Squid {{ squid_status }}</span>
     <span class="status-pill {{ 'healthy' if drift.state=='clean' else 'danger' }}">Config {{ drift.state }}</span>
     <span class="status-pill {{ 'healthy' if pending_count==0 else 'warning' }}">{{ pending_count }} approval{{ '' if pending_count==1 else 's' }}</span>
   </div>
 </section>
 
-<section class="ops-metrics six">
+<section class="ops-metrics four">
   <article><span>ACTIVE CLIENTS</span><strong>{{ traffic.clients }}</strong><small>Last 60 minutes</small></article>
   <article><span>REQUESTS</span><strong class="accent-blue-text">{{ traffic.allowed + traffic.denied }}</strong><small>{{ traffic.allowed }} allowed</small></article>
   <article><span>BLOCKED</span><strong class="{{ 'bad' if traffic.denied else 'good' }}">{{ traffic.denied }}</strong><small>Denied · last 60 min</small></article>
   <article><span>TRANSFERRED</span><strong class="accent-violet-text">{{ "%.1f"|format((traffic.bytes or 0)/1048576) }} MB</strong><small>Logged Squid traffic</small></article>
-  <article><span>PROXY P95</span><strong>{{ perf.proxy_p95_ms if perf and perf.proxy_p95_ms is not none else '—' }}{% if perf and perf.proxy_p95_ms is not none %} ms{% endif %}</strong><small>{{ perf.proxy_connections if perf else 0 }} connections</small></article>
-  <article><span>TELEMETRY LAG</span><strong class="{{ 'good' if perf and perf.telemetry_lag_seconds is not none and perf.telemetry_lag_seconds < 30 else 'warn' }}">{{ (perf.telemetry_lag_seconds|round(1)) if perf and perf.telemetry_lag_seconds is not none else '—' }}{% if perf and perf.telemetry_lag_seconds is not none %} s{% endif %}</strong><small>{{ telemetry_health.events }} indexed events</small></article>
 </section>
 
 <section class="overview-quick-actions">
   <a href="/traffic/explorer"><b>Investigate traffic</b><small>Search clients, domains and decisions</small><span>→</span></a>
   {% if request.state.user.role in ('admin','operator') %}<a href="/applications/discover"><b>Add application</b><small>Automatic dependency discovery</small><span>＋</span></a>{% endif %}
   <a href="/intelligence/simulator"><b>Simulate policy</b><small>Explain a decision before Save</small><span>⌕</span></a>
-  <a href="/changes/review"><b>Activity</b><small>Audit, approvals and rollback</small><span>→</span></a>
+  {% if request.state.user.role=='admin' %}<a href="/connection#device-setup"><b>Connect a PC</b><small>Find and copy the PAC URL</small><span>→</span></a>{% else %}<a href="/changes/review"><b>Activity</b><small>Audit, approvals and rollback</small><span>→</span></a>{% endif %}
 </section>
 
 <section class="ops-grid primary">

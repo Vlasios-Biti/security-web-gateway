@@ -1,0 +1,24 @@
+[Unit]
+Description=Security Web Gateway Optional Read-only SNMP Agent
+After=network-online.target security-web-gateway.service
+[Service]
+Type=simple
+User=proxy-mgmt
+Group=proxy-mgmt
+WorkingDirectory=/opt/security-web-gateway/current
+EnvironmentFile=/etc/security-web-gateway/production.env
+Environment=PYTHONPATH=/opt/security-web-gateway/current
+ExecStart=/opt/security-web-gateway/venv/bin/python /opt/security-web-gateway/current/bin/snmp_agent.py
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/security-web-gateway/prod
+RestrictAddressFamilies=AF_INET AF_UNIX
+MemoryMax=128M
+CPUQuota=10%
+[Install]
+WantedBy=multi-user.target

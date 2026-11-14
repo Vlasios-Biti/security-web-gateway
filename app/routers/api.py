@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Query
 from app.services.traffic import dashboard_payload
-from app.services.system import disk_usage, memory_usage, service_status, dns_health
-from app.config import SERVICE_NAME
+from app.services.system import cached_system_health
 
 router = APIRouter(prefix="/api")
 
@@ -13,11 +12,10 @@ def dashboard_traffic(minutes: int = Query(60, ge=15, le=1440)):
 
 @router.get("/dashboard/health")
 def dashboard_health():
+    health=cached_system_health()
     return {
-        "squid": service_status("squid"),
-        "nginx": service_status("nginx"),
-        "proxy_manager": service_status(SERVICE_NAME),
-        "disk": disk_usage(),
-        "memory": memory_usage(),
-        "dns": dns_health(),
+        'squid':health['squid_status'],'nginx':health['nginx_status'],
+        'proxy_manager':health['app_status'],'disk':health['disk'],
+        'memory':health['memory'],'dns':health['dns'],
+        'cache_stale':health.get('cache_stale',True),'generated_at':health.get('generated_at'),
     }

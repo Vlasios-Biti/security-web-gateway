@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% block content %}
 <div class="ops-page-head">
-  <div><span class="ops-kicker">Access management</span><h2>Managed applications</h2><p>Allow a service once. Discovery maintains its public dependency graph automatically.</p></div>
-  {% if request.state.user.role in ['admin','operator'] %}<a class="btn primary" href="/applications/discover">+ Add application</a>{% endif %}
+  <div><span class="ops-kicker">Access management</span><h2>Access</h2><p>Websites, domains and IPs allowed through the proxy.</p></div>
+  {% if request.state.user.role in ['admin','operator'] %}<a class="btn primary" href="/applications/allow">Add access</a>{% endif %}
 </div>
 
 <section class="apps-summary">
@@ -9,15 +9,13 @@
   <div><span>Dependencies</span><strong class="accent-blue-text">{{ stats.dependencies }}</strong><small>Managed endpoints</small></div>
   <div><span>Auto-discovery</span><strong class="{{ 'good' if stats.discovery=='active' else 'warn' }}">{{ stats.discovery|capitalize }}</strong><small>Discovery worker</small></div>
   <div><span>Needs attention</span><strong class="{{ 'warn' if stats.attention else 'good' }}">{{ stats.attention }}</strong><small>Candidates / failed runs</small></div>
-  <div><span>Access profiles</span><strong class="accent-violet-text">{{ stats.profiles }}</strong><small>Reusable scopes</small></div>
-  <div><span>Last apply</span><strong>{{ stats.last_apply.status|capitalize if stats.last_apply else 'None' }}</strong><small>{{ stats.last_apply.deployed_at if stats.last_apply else 'Not initialized' }}</small></div>
 </section>
 
 <section class="ops-card application-search-card">
-  <div class="app-search-row"><input class="search" data-filter-cards="application-card-grid" placeholder="Search applications, provider, profile or dependency count…"><span class="status-pill healthy">{{ stats.active }} active</span><span class="status-pill {{ 'warning' if stats.attention else 'healthy' }}">{{ stats.attention }} attention</span></div>
+  <div class="app-search-row"><input class="search" data-filter-cards="access-inventory" placeholder="Search access…"><span class="status-pill healthy">{{ stats.active }} active</span><span class="status-pill {{ 'warning' if stats.attention else 'healthy' }}">{{ stats.attention }} attention</span></div>
 </section>
 
-<div class="app-grid-v39" id="application-card-grid">
+<div id="access-inventory"><div class="app-grid-v39" id="application-card-grid">
 {% for a in applications %}
   {% set run = latest_runs.get(a.id) %}
   <article class="app-card-v39" data-card-search="{{ a.name }} {{ a.provider }} {{ a.description }} {% for g in a.groups %}{{ g.name }} {% endfor %}">
@@ -25,11 +23,11 @@
     <h3>{{ a.name }}</h3><p>{{ a.description or 'Managed web application' }}</p>
     <div class="app-meta-v39">
       <span><b>{{ a.dependency_count }}</b> dependencies</span>
-      <span>{% if a.groups %}{{ a.groups|map(attribute='name')|join(', ') }}{% elif a.direct_network_count %}Direct network scope{% else %}No access scope{% endif %}</span>
+      <span>{% if a.groups %}{{ a.groups|map(attribute='name')|join(', ') }}{% elif a.direct_network_count %}Direct network scope{% else %}Not assigned{% endif %}</span>
       <span>Last checked {{ a.last_discovery_at or 'never' }}</span>
       {% if run and run.status=='failed' %}<span class="bad">Latest discovery failed</span>{% elif run and run.status=='running' %}<span class="accent-blue-text">Discovery running…</span>{% endif %}
     </div>
-    <footer><span class="status-pill {{ 'warning' if a.pending else 'healthy' }}">{{ 'Approval required' if a.pending else 'Synchronized' }}</span><a class="btn ghost small" href="/applications/{{ a.id }}">Open</a></footer>
+    <footer><span class="status-pill {{ 'warning' if a.pending else 'healthy' }}">{{ 'Approval required' if a.pending else 'Synchronized' }}</span>{% if request.state.user.role=='admin' or (request.state.user.role=='operator' and not a.system_managed) %}<a class="btn ghost small" href="/applications/{{ a.id }}/edit">{{ 'Assign access' if not a.groups and not a.direct_network_count else 'Edit' }}</a>{% endif %}<a class="btn ghost small" href="/applications/{{ a.id }}">Open</a></footer>
   </article>
 {% else %}
   <section class="empty-state-card"><div class="empty-orb">＋</div><h3>No applications yet</h3><p>Add the first website or service you want users to access.</p><a class="btn primary" href="/applications/discover">Add application</a></section>
@@ -44,4 +42,5 @@
   {% else %}<div><span>No discovery activity yet.</span><b class="status-pill healthy">Ready</b></div>{% endfor %}
   </div>
 </section>
-{% endblock %}
+{% if standalone %}<section class="ops-card space-top"><header><div><h3>Individual domains &amp; IPs</h3></div></header><div class="table-wrap"><table class="table"><thead><tr><th>Destination</th><th>Type</th><th>Status</th><th></th></tr></thead><tbody>{% for rule in standalone if rule.status!='deleted' %}<tr data-card-search="{{ rule.destination }} {{ rule.rule_type }} {{ rule.status }} {{ rule.reason or '' }}"><td><code>{{ rule.destination }}</code>{% if rule.reason and rule.reason.startswith('Access label: ') %}<small class="cell-sub">{{ rule.reason[14:] }}</small>{% endif %}</td><td>{{ 'Domain' if rule.rule_type=='domain' else 'IP' }}</td><td>{{ rule.status|capitalize }}</td><td>{% if request.state.user.role in ('admin','operator') %}<a class="btn ghost small" href="/rules/{{ 'domains' if rule.rule_type=='domain' else 'ips' }}/{{ rule.id }}/edit">Edit</a><form class="inline" method="post" action="/rules/{{ 'domains' if rule.rule_type=='domain' else 'ips' }}/{{ rule.id }}/status"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><input type="hidden" name="status" value="{{ 'disabled' if rule.status=='active' else 'active' }}"><button class="btn ghost small">{{ 'Disable' if rule.status=='active' else 'Enable' }}</button></form><form class="inline" method="post" action="/rules/{{ 'domains' if rule.rule_type=='domain' else 'ips' }}/{{ rule.id }}/status" data-confirm="Delete access to {{ rule.destination }}?"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><input type="hidden" name="status" value="deleted"><button class="btn danger small">Delete</button></form>{% endif %}</td></tr>{% endfor %}</tbody></table></div></section>{% endif %}
+</div>{% endblock %}

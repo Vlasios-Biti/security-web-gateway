@@ -1,7 +1,7 @@
 import hashlib
 import ipaddress
 from app.db import connect
-from app.security import normalize_domain, normalize_ip, resolve_domain
+from app.security import normalize_domain, normalize_ip, normalize_expiration
 
 
 def list_networks(enabled_only=True):
@@ -32,6 +32,7 @@ def get_network(network_id):
 def _validate_network(name,cidr,vlan_id=None):
     name=name.strip()
     if len(name)<2:raise ValueError("Network name is required.")
+    if any(ord(ch)<32 or ord(ch)==127 for ch in name):raise ValueError("Network name cannot contain control characters.")
     try:net=ipaddress.ip_network(cidr.strip(),strict=False)
     except ValueError as exc:raise ValueError("Invalid IPv4 network/CIDR.") from exc
     if net.version!=4:raise ValueError("Only IPv4 network scopes are supported.")
@@ -40,10 +41,11 @@ def _validate_network(name,cidr,vlan_id=None):
     return name,str(net),vlan_id,net
 
 
-def create_network(name,cidr,actor,reason,change_reference="",vlan_id=None,description="",proxy_enabled=True,clone_from_network_id=None,policy_group_ids=None):
+def create_network(name,cidr,actor,reason,change_reference="",vlan_id=None,description="",proxy_enabled=True,clone_from_network_id=None,policy_group_ids=None,c=None):
     name,cidr,vlan_id,net=_validate_network(name,cidr,vlan_id)
     if len(reason.strip())<3:raise ValueError("A change reason is required.")
-    c=connect()
+    own=c is None
+    c=c or connect()
     try:
         if c.execute("SELECT 1 FROM networks WHERE name=? OR cidr=?",(name,cidr)).fetchone():raise ValueError("A network with this name or CIDR already exists.")
         if vlan_id is not None and c.execute("SELECT 1 FROM networks WHERE vlan_id=?",(vlan_id,)).fetchone():raise ValueError("This VLAN ID is already assigned to another network policy.")
@@ -58,11 +60,16 @@ def create_network(name,cidr,actor,reason,change_reference="",vlan_id=None,descr
             for x in c.execute("SELECT rule_id FROM rule_networks WHERE network_id=?",(src,)):
                 c.execute("INSERT OR IGNORE INTO rule_networks(rule_id,network_id) VALUES(?,?)",(x["rule_id"],nid));c.execute("UPDATE rules SET pending=1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",(actor,x["rule_id"]));cloned+=1
             for x in c.execute("SELECT application_id FROM application_networks WHERE network_id=?",(src,)):c.execute("INSERT OR IGNORE INTO application_networks VALUES(?,?)",(x["application_id"],nid))
-            for x in c.execute("SELECT group_id FROM policy_group_networks WHERE network_id=?",(src,)):c.execute("INSERT OR IGNORE INTO policy_group_networks VALUES(?,?)",(x["group_id"],nid))
+            if policy_group_ids is None:
+                for x in c.execute("SELECT group_id FROM policy_group_networks WHERE network_id=?",(src,)):c.execute("INSERT OR IGNORE INTO policy_group_networks VALUES(?,?)",(x["group_id"],nid))
         for gid in {int(x) for x in (policy_group_ids or [])}:c.execute("INSERT OR IGNORE INTO policy_group_networks(group_id,network_id) VALUES(?,?)",(gid,nid))
-        c.commit();return {"id":nid,"name":name,"vlan_id":vlan_id,"cidr":cidr,"proxy_enabled":bool(proxy_enabled),"cloned_rules":cloned,"policy_groups":len(set(policy_group_ids or []))}
-    except Exception:c.rollback();raise
-    finally:c.close()
+        if own:c.commit()
+        return {"id":nid,"name":name,"vlan_id":vlan_id,"cidr":cidr,"proxy_enabled":bool(proxy_enabled),"cloned_rules":cloned,"policy_groups":len(set(policy_group_ids or []))}
+    except Exception:
+        if own:c.rollback()
+        raise
+    finally:
+        if own:c.close()
 
 
 def update_network(network_id,name,cidr,actor,reason,change_reference="",vlan_id=None,description="",proxy_enabled=True,policy_group_ids=None):
@@ -164,7 +171,8 @@ def _fingerprint(kind,destination,protocol,management,category_id):return hashli
 
 
 def create_rule(kind,destination,protocol,network_ids,actor,reason,change_reference="",expires_at="",management_type="custom",category_slug=None,scope_mode="selected",policy_group_ids=None):
-    destination=normalize_domain(destination) if kind=="domain" else normalize_ip(destination);resolved=resolve_domain(destination) if kind=="domain" else []
+    expires_at=normalize_expiration(expires_at)
+    destination=normalize_domain(destination) if kind=="domain" else normalize_ip(destination);resolved=[]
     protocol=protocol.upper()
     if protocol not in("HTTP","HTTPS","BOTH"):raise ValueError("Invalid protocol.")
     if scope_mode not in("selected","all_proxy"):raise ValueError("Invalid scope mode.")
@@ -174,6 +182,8 @@ def create_rule(kind,destination,protocol,network_ids,actor,reason,change_refere
     c=connect()
     try:
         if c.execute("SELECT 1 FROM rules WHERE rule_type=? AND destination=? AND status!='deleted'",(kind,destination)).fetchone():raise ValueError("A rule for this destination already exists.")
+        from app.services.resource_permissions import check_profile_membership_changes
+        check_profile_membership_changes(c,[],policy_group_ids or [],actor)
         cid=_system_category(c,category_slug) if management_type=="system" else _category(c,kind);fp=_fingerprint(kind,destination,protocol,management_type,cid)
         cur=c.execute("""INSERT INTO rules(rule_type,destination,protocol,category_id,management_type,status,pending,reason,change_reference,expires_at,fingerprint,created_by,updated_by,scope_mode)
           VALUES(?,?,?,?,?,'active',1,?,?,?,?,?,?,?)""",(kind,destination,protocol,cid,management_type,reason.strip(),change_reference or None,expires_at or None,fp,actor,actor,scope_mode));rid=cur.lastrowid
@@ -185,12 +195,16 @@ def create_rule(kind,destination,protocol,network_ids,actor,reason,change_refere
 
 
 def update_rule(rule_id,destination,protocol,network_ids,actor,reason,change_reference="",expires_at="",allow_system=False,category_slug=None,scope_mode="selected",policy_group_ids=None):
+    expires_at=normalize_expiration(expires_at)
     c=connect()
     try:
         r=c.execute("SELECT * FROM rules WHERE id=?",(rule_id,)).fetchone()
         if not r or r["status"]=="deleted":raise ValueError("Rule cannot be edited.")
         if r["management_type"]=="system" and not allow_system:raise ValueError("System rule requires administrator privileges.")
-        destination=normalize_domain(destination) if r["rule_type"]=="domain" else normalize_ip(destination);resolved=resolve_domain(destination) if r["rule_type"]=="domain" else []
+        from app.services.resource_permissions import check_profile_membership_changes
+        old_groups={x['group_id'] for x in c.execute('SELECT group_id FROM policy_group_rules WHERE rule_id=?',(rule_id,))}
+        check_profile_membership_changes(c,old_groups,policy_group_ids or [],actor)
+        destination=normalize_domain(destination) if r["rule_type"]=="domain" else normalize_ip(destination);resolved=[]
         if c.execute("SELECT 1 FROM rules WHERE rule_type=? AND destination=? AND id!=? AND status!='deleted'",(r["rule_type"],destination,rule_id)).fetchone():raise ValueError("Another rule for this destination already exists.")
         protocol=protocol.upper()
         if protocol not in("HTTP","HTTPS","BOTH"):raise ValueError("Invalid protocol.")

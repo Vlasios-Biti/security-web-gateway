@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="color-scheme" content="light dark"><title>Sign in | Security Web Gateway</title>
+<meta name="color-scheme" content="light"><title>Sign in | Security Web Gateway</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-<link rel="stylesheet" href="/static/css/app.css"><link rel="stylesheet" href="/static/css/ui-v36.css"><link rel="stylesheet" href="/static/css/ui-v37.css"></head>
+<link rel="stylesheet" href="/static/css/app.css?v={{ request.app.state.version }}"><link rel="stylesheet" href="/static/css/ui-v36.css?v={{ request.app.state.version }}"><link rel="stylesheet" href="/static/css/ui-v37.css?v={{ request.app.state.version }}"><link rel="stylesheet" href="/static/css/premium.css?v={{ request.app.state.version }}"></head>
 <body class="login-body"><div class="login-shell">
 <section class="login-brand-panel"><img src="/static/favicon.svg" class="login-brand-logo" alt=""><span class="eyebrow">Security Web Gateway</span><h1>Simple web access control.</h1><p>Allow applications, monitor traffic and deploy reviewed policy changes from one console.</p><div class="login-feature-list"><span><i></i>Default deny</span><span><i></i>Automatic application discovery</span><span><i></i>Audited deployments</span></div></section>
 <section class="login-panel"><div class="login-heading"><span>Administrator access</span><h2>Sign in</h2><p>Use your Security Web Gateway account.</p></div>{% if error %}<div class="flash danger-box">{{ error }}</div>{% endif %}<form method="post" action="/login"><label>Username<input name="username" autocomplete="username" required autofocus></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button class="btn primary full">Sign in</button></form><small class="login-security-note">Restricted management interface · HTTPS only</small></section>

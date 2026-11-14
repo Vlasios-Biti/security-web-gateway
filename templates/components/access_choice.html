@@ -1,0 +1,16 @@
+{% set selected_groups = access_groups|default([]) %}
+{% set selected_networks = access_networks|default([]) %}
+{% set access_method = 'all' if access_all|default(false) else ('keep' if selected_groups and selected_networks else ('profiles' if selected_groups else ('networks' if selected_networks else ('none' if allow_unassigned|default(true) else ('profiles' if groups|selectattr('network_count','gt',0)|list else ('networks' if networks else 'profiles')))))) %}
+<div class="access-choice full" data-access-choice>
+<label>Who can use this?<select name="access_mode" data-access-method>
+{% if allow_unassigned|default(true) %}<option value="none" {% if access_method=='none' %}selected{% endif %}>Assign later</option>{% endif %}
+<option value="profiles" {% if access_method=='profiles' %}selected{% endif %}>Access profile</option>
+<option value="networks" {% if access_method=='networks' %}selected{% endif %}>VLAN / network</option>
+{% if allow_all|default(false) %}<option value="all" {% if access_method=='all' %}selected{% endif %}>All proxy networks (including future networks)</option>{% endif %}
+{% if access_method=='keep' %}<option value="keep" selected>Keep existing access</option>{% endif %}
+</select></label>
+<div data-access-panel="profiles" {% if access_method!='profiles' %}hidden{% endif %}><div class="checks">{% for g in groups %}<label class="check"><input type="checkbox" name="policy_group_ids" value="{{ g.id }}" {% if g.id in selected_groups %}checked{% endif %} {% if access_method!='profiles' %}disabled{% endif %}>{{ g.name }}</label>{% else %}<p class="field-help">No profiles yet. Choose VLAN / network instead.</p>{% endfor %}</div></div>
+<div data-access-panel="networks" {% if access_method!='networks' %}hidden{% endif %}><div class="checks">{% for n in networks %}<label class="check"><input type="checkbox" name="network_ids" value="{{ n.id }}" {% if n.id in selected_networks %}checked{% endif %} {% if access_method!='networks' %}disabled{% endif %}>{% if n.vlan_id %}VLAN {{ n.vlan_id }} · {% endif %}{{ n.name }} <small>{{ n.cidr }}</small></label>{% else %}<p class="field-help">Add a network in Networks &amp; VLANs first.</p>{% endfor %}</div></div>
+{% if access_method=='keep' %}<p class="field-help" data-access-panel="keep">Existing access: {{ selected_groups|length }} profile(s) and {{ selected_networks|length }} network(s). Choose another method only to replace it.</p>{% endif %}
+<noscript><p>Enable JavaScript to change the access method.</p></noscript>
+</div>

@@ -1,4 +1,10 @@
 "use strict";
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-copy-target]');if(!button)return;
+ const input=document.getElementById(button.dataset.copyTarget);if(!input)return;
+ try{await navigator.clipboard.writeText(input.value);button.textContent='Copied';}
+ catch(error){input.focus();input.select();button.textContent='Selected — press Ctrl+C';}
+});
 
 function css(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim()}
 function fitCanvas(canvas){const r=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1;canvas.width=Math.max(1,Math.floor(r.width*dpr));canvas.height=Math.max(1,Math.floor(r.height*dpr));const c=canvas.getContext("2d");c.setTransform(dpr,0,0,dpr,0,0);return {ctx:c,w:r.width,h:r.height}}
@@ -152,6 +158,27 @@ function setupApplicationActivityPoll(){
  window.setTimeout(poll,1200);
 }
 
+function setupNotificationStatus(){
+ const root=document.querySelector('[data-notification-status]');if(!root)return;
+ const tick=async()=>{
+  if(!document.hidden)try{
+   const response=await fetch(root.dataset.notificationStatus,{credentials:'same-origin',headers:{Accept:'application/json'}});
+   if(!response.ok)throw new Error('Status unavailable');
+   const data=await response.json(),tbody=root.querySelector('[data-delivery-body]'),last=root.querySelector('[data-last-monitor]');
+   if(last)last.textContent=data.last_run;
+   if(tbody){
+    tbody.replaceChildren();
+    for(const entry of data.deliveries){const row=document.createElement('tr');
+     for(const value of [entry.created_at,entry.channel,entry.kind,entry.result,entry.event_count,entry.error_code||'—']){const cell=document.createElement('td');cell.textContent=String(value);row.appendChild(cell)}
+     tbody.appendChild(row);
+    }
+    if(!data.deliveries.length){const row=document.createElement('tr'),cell=document.createElement('td');cell.colSpan=6;cell.className='empty';cell.textContent='No notifications sent yet.';row.appendChild(cell);tbody.appendChild(row)}
+   }
+  }catch(error){/* Keep the last result while the management plane reconnects. */}
+  setTimeout(tick,5000);
+ };setTimeout(tick,3000);
+}
+
 document.addEventListener("DOMContentLoaded",()=>{
  document.querySelectorAll("[data-confirm]").forEach(el=>el.addEventListener("submit",e=>{if(!confirm(el.dataset.confirm))e.preventDefault()}));
  document.querySelectorAll("[data-filter-table]").forEach(i=>{const t=document.getElementById(i.dataset.filterTable);if(!t)return;i.addEventListener("input",()=>{const q=i.value.toLowerCase().trim();t.querySelectorAll("tbody tr").forEach(r=>r.style.display=r.textContent.toLowerCase().includes(q)?"":"none")})});
@@ -163,6 +190,19 @@ document.addEventListener("DOMContentLoaded",()=>{
    master.addEventListener("change",()=>{boxes.forEach(x=>x.checked=master.checked);sync()});
    boxes.forEach(x=>x.addEventListener("change",sync));sync();
  });
- setupNavigation();setupCommandPalette();setupCardFilters();setupLiveTrafficRefresh();setupApplicationActivityPoll();refreshCharts();drawSystemPerformance();if(document.getElementById("traffic-chart"))setInterval(refreshCharts,15000);
+ document.querySelectorAll("[data-dismiss-message]").forEach(button=>button.addEventListener("click",()=>button.closest("[data-success-message]").remove()));
+ document.querySelectorAll("[data-channel-toggle]").forEach(input=>input.addEventListener("change",()=>{const details=input.closest(".settings-card").querySelector(".channel-settings");if(details&&input.checked)details.open=true}));
+ document.querySelectorAll('[data-access-choice]').forEach(picker=>{
+  const select=picker.querySelector('[data-access-method]');
+  const sync=()=>picker.querySelectorAll('[data-access-panel]').forEach(panel=>{const active=panel.dataset.accessPanel===select.value;panel.hidden=!active;panel.querySelectorAll('input').forEach(input=>input.disabled=!active)});
+  select.addEventListener('change',sync);sync();
+ });
+ document.querySelectorAll('[data-filter-options]').forEach(input=>{const root=document.getElementById(input.dataset.filterOptions);if(root)input.addEventListener('input',()=>{const query=input.value.trim().toLowerCase();root.querySelectorAll('.check').forEach(option=>option.hidden=!option.textContent.toLowerCase().includes(query))})});
+ setupNavigation();setupCommandPalette();setupCardFilters();setupLiveTrafficRefresh();setupApplicationActivityPoll();setupNotificationStatus();refreshCharts();drawSystemPerformance();if(document.getElementById("traffic-chart"))setInterval(refreshCharts,15000);
 });
 window.addEventListener("resize",()=>{clearTimeout(window.__pmResize);window.__pmResize=setTimeout(()=>{refreshCharts();drawSystemPerformance()},160)});
+
+// Form changes remain compatible with the management CSP (no inline handlers).
+document.addEventListener('change',event=>{
+ if(event.target.matches('[data-auto-submit]')&&event.target.form)event.target.form.requestSubmit();
+});

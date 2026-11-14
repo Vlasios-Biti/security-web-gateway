@@ -52,7 +52,7 @@
       {% for d in dns %}
       <div><span>{{ 'Local DNS cache' if d.role=='local-cache' else 'Enterprise DNS' }} <code>{{ d.server }}</code></span><b class="status-pill {{ 'healthy' if d.ok else 'danger' }}">{{ (d.latency_ms|string ~ ' ms') if d.ok else 'Failed' }}</b></div>
       {% endfor %}
-      <div><span>TLS certificate</span><b class="status-pill {{ 'healthy' if health.certificate.ok else 'warning' }}">{{ (health.certificate.days_remaining|string ~ ' days') if health.certificate.days_remaining is not none else 'Unknown' }}</b></div>
+      <div><span>{% if request.state.user.role=='admin' %}<a class="text-link" href="/connection#https-certificate" title="Certificate for this admin panel and HTTPS PAC">Panel HTTPS certificate</a>{% else %}Panel HTTPS certificate{% endif %}</span><b class="status-pill {{ 'healthy' if health.certificate.state=='healthy' else ('danger' if health.certificate.state=='critical' else 'warning') }}">{{ (health.certificate.days_remaining|string ~ ' days') if health.certificate.days_remaining is not none else 'Unknown' }}</b></div>
       <div><span>NTP synchronization</span><b class="status-pill {{ 'healthy' if health.ntp.ok else 'warning' }}">{{ health.ntp.state|capitalize }}</b></div>
       <div><span>Host uptime</span><b>{{ '%.1f'|format((health.uptime_seconds or 0)/86400) }} days</b></div>
     </div>
@@ -84,7 +84,7 @@
 </section>
 
 <section class="ops-card alerts-card">
-  <header><div><h3>System events &amp; alerts</h3><p>Only operational issues requiring attention appear here.</p></div></header>
+  <header><div><h3>System events &amp; alerts</h3><p>Checks use the same thresholds configured in Alerts &amp; SNMP. Delivery severity and confirmation control notifications separately.</p></div></header>
   {% if alerts %}
   <div class="ops-alerts">{% for a in alerts %}<div class="ops-alert {{ a.severity }}"><span></span><div><b>{{ a.title }}</b><small>{{ a.detail }}</small></div></div>{% endfor %}</div>
   {% else %}

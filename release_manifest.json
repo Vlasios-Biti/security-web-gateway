@@ -1,7 +1,7 @@
 {
   "product": "Security Web Gateway",
-  "version": "3.9.0",
-  "schema_migration": "015",
+  "version": "3.12.13",
+  "schema_migration": "019",
   "target_os": "Ubuntu 24.04 LTS / Ubuntu 26.04 LTS",
   "deployment_model": "single-vm-on-prem-appliance",
   "management_backend": "127.0.0.1:8200",
@@ -28,10 +28,23 @@
   "why_blocked": true,
   "dependency_candidates": "review-only-no-auto-allow",
   "application_discovery_auto_stage": true,
-  "primary_navigation": "overview-applications-traffic-activity-system-policy-tools",
+  "primary_navigation": "overview-access-profiles-monitoring-alerts-snmp-connection-bypass-activity-system-tools",
   "ui_theme": "enterprise-operations-light-workspace-graphite-sidebar",
   "save_behavior": "admin-save-validate-apply-rollback",
   "operator_save_behavior": "pending-admin-approval",
   "system_console": "unified-health-performance-dns-tls-storage-recovery-alerts",
-  "live_traffic_auto_refresh_seconds": 10
+  "live_traffic_auto_refresh_seconds": 10,
+  "health_notifications": "optional-gui-smtp-tls-and-slack-webhook",
+  "network_copy": true,
+  "access_assignment": "exclusive-profile-or-network-with-explicit-legacy-preservation",
+  "snmp": "optional-readonly-v2c-and-traps",
+  "default_application": "unassigned-google-search-starter",
+  "profile_network_onboarding": "one-page-one-transaction-one-apply",
+  "pac_distribution": {
+    "http_port": 8081,
+    "https_port": 443,
+    "path": "/proxy.pac",
+    "shared_endpoint_downloads": true
+  },
+  "certificate_management": "admin-fixed-path-pem-renewal-with-nginx-validation-and-rollback"
 }

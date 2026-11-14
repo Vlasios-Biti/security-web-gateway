@@ -38,7 +38,7 @@
 <div class="table-wrap traffic-table-wrap"><table class="table traffic-table"><thead><tr><th>TIME</th><th>CLIENT</th><th>NETWORK / VLAN</th><th>ACTION</th><th>APPLICATION / PROFILE</th><th>METHOD</th><th>DESTINATION</th><th>DEST IP</th><th>PORT</th><th>RESULT</th><th>BYTES</th><th>DURATION</th><th>UPSTREAM</th><th>EXPLAIN</th></tr></thead><tbody>
 {% for l in result.rows %}<tr>
 <td class="muted nowrap">{{ l.event_time }}</td>
-<td><a class="table-link" href="/traffic/clients/{{ l.client_ip }}"><code class="strong">{{ l.client_ip }}</code></a>{% if l.is_system %}<small class="cell-sub">Gateway appliance</small>{% endif %}</td>
+<td><a class="table-link" href="/traffic/clients/{{ l.client_ip }}?{{ export_query }}"><code class="strong">{{ l.client_ip }}</code></a>{% if l.is_system %}<small class="cell-sub">Gateway appliance</small>{% endif %}</td>
 <td><b>{{ 'System appliance' if l.is_system else (l.network_name or 'Unmapped') }}</b><small class="cell-sub">{% if l.is_system %}Internal / diagnostic{% elif l.vlan_id %}VLAN {{ l.vlan_id }}{% else %}No VLAN metadata{% endif %}</small></td>
 <td><span class="badge {% if l.decision=='ALLOW' %}ok{% elif l.decision=='DENY' %}danger{% else %}system{% endif %}">{{ l.decision }}</span><small class="cell-sub">{{ 'SYSTEM' if l.is_system else l.traffic_path }}</small></td>
 <td>{% if l.application_names %}<b>{{ l.application_names }}</b>{% else %}<span class="muted">Unattributed</span>{% endif %}<small class="cell-sub">{{ l.access_profile_names or '—' }}</small></td>

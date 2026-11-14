@@ -1,4 +1,4 @@
-# Security Web Gateway — Security Model 3.8
+# Security Web Gateway — Security Model 3.11
 
 ## Operating model
 
@@ -94,6 +94,10 @@ Availability is part of the security model. Resource starvation of the proxy can
 
 ## Telemetry boundary
 
+IP-based automatic learning is disabled. Correlation candidates are review-only; legacy active sessions are stopped without applying policy. The optional selected-tab recorder uses Chromium tab IDs to exclude unrelated tabs/native PC traffic, retains hostname-level evidence locally and imports it for explicit review. Captures are untrusted evidence; embedded third-party resources may be unnecessary. Import alone never publishes ALLOW rules. Optional PC service profiles require Administrator access and selected Access Profiles and share atomic destination rules without globally disabling them when a service is turned off. See `docs/CONNECTION_AND_LEARNING.md`.
+
+Connection policy publishing accepts structured domain/IP/CIDR and boolean settings only. The privileged helper revalidates input and renders a fixed PAC program from root-owned release code; callers cannot supply arbitrary PAC JavaScript, shell commands or paths. Static PAC remains available through Nginx independently of the management process.
+
 Telemetry indexes only requests that traverse Squid. PAC `DIRECT` traffic never reaches Squid and must not be inferred. Whole-network direct-path visibility requires an independent router source such as Traffic Flow/IPFIX.
 
 Telemetry ingestion runs unprivileged with read-only Squid log visibility, uses bounded batches, persists rotation-aware checkpoints and writes only to the managed data root.
@@ -105,3 +109,13 @@ No arbitrary terminal, shell, raw SQL console, arbitrary Python execution, unres
 ## Release safety
 
 Fresh installation and upgrades are deterministic and versioned. Generic in-place upgrade performs a shadow database migration/validation, creates rollback state, then cuts over application code transactionally. A failed cutover restores the previous database/release/unit state and worker timers. Pending Squid policy is never auto-deployed merely by an application upgrade.
+
+
+## Health channel credentials
+
+Health email and Slack settings are Administrator-only and CSRF-protected. Production credentials are written by the root helper to a mode-0640 VM-local file outside Git/policy exports. They are not encrypted by the application and require appropriate VM/root protection. Secrets are never rendered back to the client. SMTP uses verified TLS; Slack endpoints are restricted and redirects are rejected. Background delivery uses per-channel state/backoff and explicit test queues. Candidate mode disables outbound delivery. See docs/HEALTH_NOTIFICATIONS.md.
+
+Managed Squid candidates are constrained to a narrow ACL/access grammar and immutable validated bytes. Publications bind to an expected live hash and a frozen database snapshot; concurrent desired work is not marked applied. Browser discovery uses a public-IP-pinned authenticated egress proxy and blocked Service Workers rather than relying only on browser route interception.
+
+
+SNMP in 3.12 is explicitly optional SNMPv2c on a private management network: community authentication without encryption, IPv4 source restrictions, read-only GET/GETNEXT/bounded GETBULK and denied SET. The service runs as proxy-mgmt on an unprivileged UDP port and starts without a listener until configured. Secrets are protected/masked like other notification channels. UDP traps are unacknowledged; local delivery history does not establish remote receipt. This release makes no SNMPv3 claim. The generic Google starter is initialized transactionally and unassigned; it never turns a previously empty profile placeholder into an automatic grant.

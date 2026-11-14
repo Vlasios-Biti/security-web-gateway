@@ -1,0 +1,15 @@
+{% set selected_groups = access_groups|default([]) %}
+{% set selected_networks = access_networks|default([]) %}
+<div class="application-profile-picker full">
+<span class="label">Access profiles</span>
+<p class="field-help">Choose the profiles that can use this application. Their VLANs apply automatically; configure profiles and VLANs together in <a href="/policies/groups">Profiles &amp; VLANs</a>.</p>
+<div class="checks application-profile-options">{% for g in groups if g.status=='active' or g.id in selected_groups %}
+<label class="check"><input type="checkbox" name="policy_group_ids" value="{{ g.id }}" {% if g.id in selected_groups %}checked{% endif %}><span><strong>{{ g.name }}</strong><small class="profile-network-hint">{% for n in g.networks %}{% if not loop.first %} · {% endif %}{% if n.vlan_id %}VLAN {{ n.vlan_id }} · {% endif %}{{ n.name }} ({{ n.cidr }}){% else %}No VLAN assigned yet{% endfor %}</small></span></label>
+{% else %}<p class="field-help">No access profiles yet. <a href="/policies/groups/add">Create a profile with its VLAN</a>, then return here.</p>{% endfor %}</div>
+{% if selected_networks %}
+<details class="form-options legacy-application-access"><summary>Existing direct VLAN assignments</summary>
+<p class="field-help">This application has older direct assignments: {% for n in networks if n.id in selected_networks %}{% if n.vlan_id %}VLAN {{ n.vlan_id }} · {% endif %}{{ n.name }} ({{ n.cidr }}){% if not loop.last %}; {% endif %}{% endfor %}. These remain active until you explicitly remove them below.</p>
+<label>Existing access<select name="access_mode"><option value="profiles_keep_networks" selected>Keep existing direct assignments</option><option value="profiles_optional">Use selected profiles only · remove direct assignments</option></select></label></details>
+{% else %}<input type="hidden" name="access_mode" value="{{ 'profiles_optional' if allow_unassigned|default(true) else 'profiles' }}">{% endif %}
+{% if allow_unassigned|default(true) %}<p class="field-help">Leave profiles unchecked to save without granting new access.</p>{% endif %}
+</div>

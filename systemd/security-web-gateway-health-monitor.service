@@ -1,0 +1,28 @@
+[Unit]
+Description=Security Web Gateway Health Alerts and Deployed Rule Expiry
+After=network-online.target security-web-gateway.service
+Wants=network-online.target
+[Service]
+Type=oneshot
+User=proxy-mgmt
+Group=proxy-mgmt
+SupplementaryGroups=proxy
+WorkingDirectory=/opt/security-web-gateway/current
+EnvironmentFile=/etc/security-web-gateway/production.env
+Environment=PYTHONPATH=/opt/security-web-gateway/current
+ExecStart=/opt/security-web-gateway/venv/bin/python /opt/security-web-gateway/current/bin/monitor_health.py
+TimeoutStartSec=150
+Nice=15
+CPUWeight=10
+IOWeight=10
+MemoryMax=256M
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/security-web-gateway/prod
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+[Install]
+WantedBy=multi-user.target

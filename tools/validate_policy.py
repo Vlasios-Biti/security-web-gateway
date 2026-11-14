@@ -70,6 +70,8 @@ def transformed(base: str, inc: Path) -> str:
     if not matches:
         raise RuntimeError('Final http_access deny all not found.')
     pos = matches[-1].start()
+    branding = text.find('# BEGIN SWG BLOCK PAGE')
+    if 0 <= branding < pos: pos = branding
     block = (
         '# BEGIN SECURITY-WEB-GATEWAY-MANAGED\n'
         f'include {inc}\n'

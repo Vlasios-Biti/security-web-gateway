@@ -1,6 +1,12 @@
 # Security Web Gateway
 
-**Version:** 3.9.0  
+Create the Access Profile, select/create its VLAN and choose allowed access on **one page with one save**: Profiles & VLANs.
+
+Version 3.12 consolidates websites/domains/IPs under **Access**, separates **Proxy bypass**, groups traffic/health under **Monitoring**, exposes **Alerts & SNMP** directly, and assigns new application access through profiles with inherited VLANs. Install/upgrade provides an unassigned Google Search starter and no customer-specific application data. Optional read-only SNMPv2c polling/traps are configured with email/Slack; SNMPv3 is not included. See [the access/deployment guide](docs/CONNECTION_AND_LEARNING.md) and [notification/SNMP setup](docs/HEALTH_NOTIFICATIONS.md).
+
+
+**Version:** 3.12.13
+
 **Target:** single-VM, on-prem enterprise appliance  
 **Target OS:** Ubuntu Server 24.04 LTS / 26.04 LTS  
 **Architecture:** Squid explicit proxy + FastAPI management plane + Nginx TLS + SQLite/WAL policy and telemetry store + isolated background workers + restricted privileged deployment helper.
@@ -53,6 +59,72 @@ Sizing should ultimately follow concurrent CONNECT sessions, requests/sec, WAN t
 - Operator changes remain pending for Admin approval. Advanced manual/HAR discovery remains available for authenticated or unusual workflows.
 - Browser discovery rejects private/reserved targets and DNS-rebinding/SSRF-style pivots.
 - PAC supports explicit DIRECT bypasses plus fail-open `PROXY ...; DIRECT` behavior.
+
+## v3.12.13 — certificate operations in the GUI
+
+Connection has a visible HTTPS certificate card: import PEM or Windows PFX/PKCS#12, renew an existing self-signed certificate and download its public certificate. CA-issued renewals are obtained from the issuer and imported. Fixed-path validation and failure rollback protect publication; client trust is managed separately. See [GUI certificate management](docs/HTTPS_CERTIFICATES.md).
+
+## v3.12.12 — immediate application filter visibility
+
+New applications appear in Dependency Candidates without waiting for traffic suggestions. Selecting an application shows its discovery status and a direct link to its scan results. Website discovery results and timing-based traffic suggestions remain distinct; an empty traffic review list can be normal after a successful scan.
+
+## v3.12.11 — domain corrections and read-only integrations
+
+Move domains or pending suggestions to the intended application, review domain-based owner suggestions, name PCs manually with DNS/PTR fallback, and connect monitoring/AI readers through scoped, expiring API tokens. Timing-based correlation remains Low-confidence evidence and never auto-allows traffic. Schema 019 preserves existing policy while adding local inventory/token/correction state. See [API, PC identity and correction setup](docs/INTEGRATIONS_AND_PC_IDENTITY.md).
+
+## v3.12.10 — one application access path
+
+Add access, application discovery, HAR import and application editors now use one Access Profile list with inherited VLAN/subnet details. Create profiles with their VLANs in Profiles & VLANs. Existing direct application assignments remain preserved in an advanced section until explicitly removed; adding an application does not create another profile.
+
+## v3.12.9 — dependency review filters
+
+Dependency Candidates can be filtered by application, destination, status and confidence. Filters search the full dataset with 50 results per page and stay selected after Approve/Ignore. Approved and ignored history is read-only. Traffic-time correlation remains a suggestion for manual review, not proof that the application needs the domain.
+
+## v3.12.8 — visible PC setup and readable PAC delivery
+
+Overview → **Connect a PC** opens Connection directly at **PAC URL for your PC**. Copy the configured **Script address** into Windows; the same URL remains shared by endpoint downloads. Install/upgrade repairs directory traversal for anonymous nginx PAC delivery without granting access to private configuration files.
+
+**Connection → Blocked page** configures the company name, PNG logo, message and IT contact in one form with a preview. Denied HTTP requests display this page; HTTPS tunnels remain blocked with 403 and the browser displays its own connection error. This feature does not enable TLS interception. See [the block-page and whitelist guide](docs/CONNECTION_AND_LEARNING.md#company-block-page-and-allowed-only-access).
+
+## v3.12.7 — security and recovery corrections
+
+Protects password resets against in-flight login, enforces protected-resource permissions across discovery and candidate review, serializes policy writers, validates imported destinations before approval and runs GUI discovery in an explicit background queue. Private atomic exports, target-local PAC restore, a fresh quiesced upgrade rollback snapshot and Windows backup/path validation strengthen recovery. Schema migration `018` preserves existing queued browser jobs. See [the correction report](docs/SECURITY_CORRECTIONS.md) for evidence and deployment limits. The Cloudflare skill has been disabled at the user's request; ordinary review and tests continue.
+
+## v3.12.6 — detailed functional review
+
+Includes role/CSRF route checks, authentication and concurrent-admin regressions, bounded HAR import, reliable traffic-filter errors, valid XLSX exports and a fresh-install TLS module fix. Activity distinguishes failed attempts from successful baselines. See the [detailed functional review](docs/DETAILED_FUNCTION_AUDIT.md) and [application function inventory](docs/FUNCTION_CATALOG.md) for that version's measured coverage and remaining deployment checks. That functional review is not a completed independent security audit.
+
+## v3.12.5 — PC activity
+
+**Monitoring → PC activity** provides searchable, paginated source-IP inventory and per-PC request history, domain/decision/date filters, destination rankings and scoped CSV/XLSX export. Current DNS names are hints; DHCP/NAT and AD user-identity limits are explicit. AD is optional for IP/VLAN policy; GPO deployment is distinct from AD user authentication. See [PC activity and AD](docs/CLIENT_ACTIVITY.md).
+
+## v3.12.4 — system review and reliable diagnosis
+
+- The existing Policy Simulator checks saved proxy policy and PAC routing together, including direct bypasses, optional client-resolved destination IPs and clear pending/historical-policy labels.
+- Health alerts share the notification thresholds; stale samples do not present the gateway as healthy. Dashboard health uses cached sampling.
+- Client reverse DNS runs in a bounded background worker rather than delaying client pages. CSV export text receives formula-prefix protection; XLSX retains explicit text cells.
+- See the [platform review and feature decisions](docs/PLATFORM_REVIEW.md) for findings, validation boundaries and prioritized future work.
+
+## Health notifications and operational safety
+
+- **Alerts & SNMP** configures optional SMTP email and Slack Incoming Webhooks entirely from the GUI, with test buttons and live delivery history.
+- Confirmed incidents, recovery, grouped messages, repeat control and independent retry/backoff run in a low-priority background worker.
+- Secrets are stored in a protected VM-local configuration file and never returned by the GUI or exported with policy state.
+- Policy expiry, concurrent publication, portable backup/restore staging and browser discovery isolation have dedicated regression coverage.
+- Migration `017` stores health incident/delivery metadata. No real email/Slack destination is enabled by default.
+
+See [Health notifications and safety](docs/HEALTH_NOTIFICATIONS.md) for configuration, guarantees and deployment checks.
+
+## v3.10.0 — simpler console, connection policy and workflow capture
+
+- Refined desktop/mobile interface with clearer typography, quieter cards and fewer duplicate navigation entries.
+- **Connection** manages fail-open, direct domain/IP/CIDR bypasses and a configured Windows package with installation instructions.
+- **Applications → Capture the actual workflow** provides an optional selected-tab Chrome/Edge recorder and a side-by-side HAR import for authenticated/button-driven dependencies. Both imports require review. IP-based automatic grants are disabled.
+- **Connection → Optional PC services** adds scoped, opt-in Windows Update, Defender security updates and connectivity checks.
+- Browser auto-approval honours candidate selection and excludes ignored analytics/background requests.
+- Schema migration `016` retains earlier session history. Legacy active IP-learning sessions are stopped; existing PAC is preserved during upgrade.
+
+Read [Connection and application learning](docs/CONNECTION_AND_LEARNING.md) for workflow, limits and production verification.
 
 ## v3.9.0 — enterprise operations console
 
@@ -199,13 +271,7 @@ PROXY:  <server-ip>:3128
 FAIL:   DIRECT fallback
 ```
 
-Explicit DIRECT business destinations retained in `pac/proxy.pac.tpl`:
-
-```text
-49.12.132.214
-65.108.9.79
-178.63.88.53
-```
+Manage exact domains, wildcard domains, IPv4 addresses and IPv4 CIDRs under **Connection → Always go direct**. Existing business bypasses are imported from legacy PAC on upgrade; fresh installations have none.
 
 Proxy return path:
 
@@ -223,11 +289,11 @@ Keep the repository private unless publication is intentional.
 git add -A
 git status
 git diff --cached
-git commit -m "Security Web Gateway v3.9.0"
+git commit -m "Security Web Gateway v3.12.4"
 git push
 
-git tag -a v3.9.0 -m "Security Web Gateway v3.9.0"
-git push origin v3.9.0
+git tag -a v3.12.4 -m "Security Web Gateway v3.12.4"
+git push origin v3.12.4
 ```
 
 Never stage `.db`, `.sqlite*`, `.env`, TLS/private-key material, HAR files, logs or backups.
@@ -241,6 +307,7 @@ python3 tools/migrate.py --db /tmp/swg-test.db --root .
 python3 tests/smoke_v340.py
 python3 tests/smoke_v370.py
 python3 tests/smoke_v380.py
+python3 tests/smoke_v3121.py
 ```
 
 See `docs/ARCHITECTURE.md`, `docs/DEPLOYMENT.md`, `docs/PERFORMANCE.md`, `docs/OPERATIONS.md`, and `SECURITY_MODEL.md`.

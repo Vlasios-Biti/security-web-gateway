@@ -20,6 +20,15 @@ server {
     access_log /var/log/nginx/security-web-gateway-access.log;
     error_log /var/log/nginx/security-web-gateway-error.log warn;
 
+    # SWG HTTPS PAC: available to clients without an administrator session.
+    location = /proxy.pac {
+        alias /etc/security-web-gateway/proxy.pac;
+        default_type application/x-ns-proxy-autoconfig;
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        add_header Pragma "no-cache" always;
+        expires -1;
+    }
+
     location / {
         proxy_pass http://swg_manager;
         proxy_http_version 1.1;

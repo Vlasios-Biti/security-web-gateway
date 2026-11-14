@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "SWG Selected Tab Capture",
+  "version": "1.0.0",
+  "description": "Locally record destination hosts from one explicitly selected tab for SWG dependency review.",
+  "permissions": ["webRequest", "tabs", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "background": {"service_worker": "background.js"},
+  "action": {"default_popup": "popup.html", "default_title": "SWG tab capture"}
+}

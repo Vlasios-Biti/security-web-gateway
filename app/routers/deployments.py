@@ -1,12 +1,14 @@
+from fastapi import Depends
+from app.services.policy_lock import policy_guard
 from fastapi import APIRouter,Request,Form
 from fastapi.responses import HTMLResponse,RedirectResponse
 from app import auth
 from app.db import connect
 from app.services.rules import pending_count
-from app.services.deployment import preview_diff,rollback_to,drift_status,current_live,reconcile_pending_if_no_diff
+from app.services.deployment import preview_diff,rollback_to,drift_status,current_live
 from app.services.apply import apply_saved_change,apply_message
 from app.config import MODE
-router=APIRouter(prefix="/changes")
+router=APIRouter(dependencies=[Depends(policy_guard)],prefix="/changes")
 @router.get("/deployments",response_class=HTMLResponse)
 def index(request:Request):
     c=connect()
@@ -16,11 +18,10 @@ def index(request:Request):
         context={"request":request,"page_title":"Apply History","rows":rows,"pending_count":pending_count()})
 @router.get("/review",response_class=HTMLResponse)
 def review(request:Request):
-    if request.state.user["role"] not in("admin","operator"):return HTMLResponse("Forbidden",403)
-    reconcile_pending_if_no_diff()
     c=connect()
     try:
         rows=[dict(x) for x in c.execute("SELECT * FROM deployments ORDER BY id DESC LIMIT 12")]
+        baseline=c.execute("SELECT version,deployed_at FROM deployments WHERE status='deployed' ORDER BY id DESC LIMIT 1").fetchone()
         audits=[dict(x) for x in c.execute("SELECT * FROM audit_events ORDER BY id DESC LIMIT 30")]
         failed_applies=c.execute("SELECT COUNT(*) c FROM audit_events WHERE action='SAVE_APPLY' AND result='FAILED'").fetchone()["c"]
         backup_count=c.execute("SELECT COUNT(*) c FROM audit_events WHERE action='SYSTEM_BACKUP' AND result='SUCCESS'").fetchone()["c"]
@@ -30,7 +31,7 @@ def review(request:Request):
     drift=drift_status();pc=pending_count()
     return request.app.state.templates.TemplateResponse(request=request,name="deployments/review.html",
         context={"request":request,"page_title":"Activity","pending_count":pc,"diff":preview_diff(),"rows":rows,"drift":drift,
-        "audit_rows":audits,"failed_applies":failed_applies,"backup_count":backup_count,"last_backup":dict(last_backup) if last_backup else None})
+        "audit_rows":audits,"baseline":dict(baseline) if baseline else None,"failed_applies":failed_applies,"backup_count":backup_count,"last_backup":dict(last_backup) if last_backup else None})
 
 @router.get("/drift",response_class=HTMLResponse)
 def drift(request:Request):

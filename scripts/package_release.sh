@@ -6,7 +6,7 @@ OUT="${1:-$ROOT/dist}"
 NAME="Security-Web-Gateway-v$VERSION"
 mkdir -p "$OUT"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-rsync -a --exclude '.git' --exclude 'dist' --exclude '__pycache__' --exclude '*.pyc' "$ROOT/" "$TMP/$NAME/"
+rsync -a --exclude '.git' --exclude '.venv' --exclude '.venv-linux' --exclude 'runtime' --exclude '*.db*' --exclude '*.har' --exclude 'dist' --exclude '__pycache__' --exclude '*.pyc' "$ROOT/" "$TMP/$NAME/"
 (
  cd "$TMP/$NAME"
  find . -type f ! -name 'CHECKSUMS.sha256' -print0 | sort -z | xargs -0 sha256sum > CHECKSUMS.sha256

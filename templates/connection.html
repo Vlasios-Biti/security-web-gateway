@@ -1,0 +1,54 @@
+{% extends "base.html" %}{% block content %}
+<div class="page-head"><div><span class="section-kicker">Endpoint &amp; routing</span><h2>Connection settings</h2><p>Choose how managed devices connect, handle outages and reach direct destinations.</p></div></div>
+<article class="settings-card pac-setup" id="device-setup"><span class="section-kicker">Connect a PC · start here</span><h3>PAC URL for your PC</h3><p>Copy this complete address into the Windows <strong>Script address</strong> field.</p>
+<label class="label" for="pac-address">Script address</label>
+<div class="pac-copy-row"><input id="pac-address" aria-label="PAC script address" aria-describedby="pac-windows-guide" readonly value="{{ pac_url }}"><button type="button" class="btn primary" data-copy-target="pac-address">Copy address</button><a class="btn ghost" href="{{ pac_url }}" target="_blank" rel="noopener noreferrer">Open PAC</a></div>
+<p class="pac-windows-guide" id="pac-windows-guide">Windows Settings → Network &amp; Internet → Proxy → <strong>Use setup script: On</strong> → paste the address above → <strong>Save</strong>.</p>
+<p class="field-help">The Windows package and Edge policy use this same address. PCs must be on a network assigned to an Access Profile with the required allowed websites.</p>
+<details class="setup-guide"><summary>Change PAC address</summary><form method="post" action="/connection/endpoint"><input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}"><div class="form-grid"><label>Connection<select name="scheme"><option value="http" {% if endpoint.scheme=='http' %}selected{% endif %}>HTTP · port 8081</option><option value="https" {% if endpoint.scheme=='https' %}selected{% endif %}>HTTPS · port 443</option></select></label><label>Gateway hostname / IP<input name="host" value="{{ endpoint.host }}" required placeholder="{{ management_fqdn }}"></label></div><p class="field-help">Changing this address requires updating PCs or redeploying the package/GPO. For HTTPS, use a DNS name covered by the certificate. Management hostname: {{ management_fqdn }}. Every PC must resolve this name and trust its issuing CA. HTTPS protects the PAC download; proxy traffic still uses the configured proxy endpoint.</p><button class="btn ghost">Save PAC address</button></form>
+<p class="field-help"><a class="text-link" href="/connection/preview.pac">Preview generated PAC rules</a></p>
+</details></article>
+{% include "components/https_certificate.html" %}
+<details class="settings-card setup-guide" id="blocked-page"><summary>Blocked page · company logo &amp; message</summary>
+<p>Websites outside the selected profile’s allowed list are denied while the proxy is reachable. Customize the page shown for blocked HTTP requests.</p>
+<p class="field-help"><strong>HTTPS limitation:</strong> HTTPS sites show the browser’s connection error. Displaying a company page inside an HTTPS site requires managed TLS inspection, which this option does not enable. Direct bypasses and outage fallback follow the separate settings below.</p>
+<form method="post" action="/connection/blocked-page" enctype="multipart/form-data">
+<input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}">
+<div class="form-grid"><label>Company name<input name="company" maxlength="100" value="{{ branding.company }}" required></label><label>Page title<input name="title" maxlength="120" value="{{ branding.title }}" required></label></div>
+<label>Message<textarea name="message" maxlength="1500" rows="3" required>{{ branding.message }}</textarea></label>
+<label>IT contact / instructions<input name="contact" maxlength="200" value="{{ branding.contact }}" placeholder="Contact your IT team for access"></label>
+<label>Company logo · PNG, up to 128 KB<input type="file" name="logo" accept="image/png,.png"></label>
+{% if branding.logo %}<img class="branding-logo-preview" src="data:image/png;base64,{{ branding.logo }}" alt="Current company logo"><label class="check"><input type="checkbox" name="remove_logo" value="true">Remove current logo</label>{% endif %}
+<div class="settings-save"><a class="btn ghost" href="/connection/blocked-page/preview" target="_blank" rel="noopener noreferrer">Preview saved page</a><button class="btn primary">{{ 'Save block page' if mode=='production' else 'Save preview' }}</button></div>
+</form></details>
+<section class="connection-layout">
+  <form class="connection-form" method="post" action="/connection">
+    <input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}">
+    <article class="settings-card"><div class="settings-heading"><span class="step-mark">01</span><div><h3>Connection behaviour</h3><p>Proxy endpoint <code>{{ proxy_endpoint }}</code></p></div></div>
+      <label class="setting-switch"><span><strong>Continue if the proxy is unavailable</strong><small>Allow a DIRECT fallback using the device’s existing router and DNS. A blocked request stays blocked.</small></span><input type="checkbox" name="fail_open" value="true" {% if policy.fail_open %}checked{% endif %}><span class="switch-track" aria-hidden="true"></span></label>
+      <label class="setting-switch"><span><strong>Keep local traffic direct</strong><small>Single-label names, private IPv4 addresses and loopback bypass the proxy. Add internal domain suffixes below.</small></span><input type="checkbox" name="internal_direct" value="true" {% if policy.internal_direct %}checked{% endif %}><span class="switch-track" aria-hidden="true"></span></label>
+    </article>
+    <textarea name="bypass" hidden>{{ policy.bypass|join('\n') }}</textarea>
+    <article class="settings-card"><h3>Proxy bypass</h3><p>Manage destinations that always connect directly.</p><a class="btn ghost" href="/connection/bypass">Manage bypasses</a></article>
+    <div class="settings-save"><span>Clients receive updates when their PAC refreshes.</span><button class="btn primary">{{ 'Save & publish' if mode=='production' else 'Save preview' }}</button></div>
+  </form>
+  <aside class="connection-aside"><article class="endpoint-card"><span class="section-kicker">Windows 10 / 11</span><div class="endpoint-symbol" aria-hidden="true">▦</div><h3>Connect your devices</h3><p>Download the package configured for this gateway. Install once, then manage routing here.</p><a class="btn primary" href="/connection/windows.zip">Download Windows package <span aria-hidden="true">↓</span></a></article>
+    <details class="settings-card setup-guide" open><summary>Installation guide</summary><ol><li>Extract the complete package.</li><li>Open Windows PowerShell as Administrator.</li><li>Run <code>.\Install-Managed-Proxy.ps1</code>.</li><li>Verify with <code>.\payload\Proxy-Control-Endpoint.ps1 -Mode Status</code>.</li></ol><p>The optional desktop GUI installer can be built using <code>.\Build-For-This-Gateway.ps1</code>. Standard users can view status; changing or removing the policy requires administrator privileges.</p></details>
+    <details class="settings-card setup-guide"><summary>Deploy to many computers (GPO / Intune)</summary><p>Deploy the Windows package as an elevated startup/install script using your managed software deployment process.</p><p>For Microsoft Edge policy deployment, set <code>ProxySettings</code> using this gateway-specific JSON. When fallback is enabled, <code>ProxyPacMandatory</code> is false, allowing Edge to connect directly if PAC cannot be loaded.</p><a class="btn ghost" href="/connection/edge-policy.json">Download Edge policy</a><p>Router and DNS must work independently of this VM. Other browser/app proxy stacks require their own deployment settings.</p></details>
+    <details class="settings-card setup-guide"><summary>How fallback works</summary><p>DIRECT fallback applies when the proxy cannot be reached. Client timeout and PAC caching affect recovery time. Applications with their own proxy settings need separate configuration. Router rules must permit direct access for fallback and bypasses to work.</p></details>
+  </aside>
+</section>
+<section class="pc-services-section space-top" id="pc-services">
+  <div class="page-head"><div><span class="section-kicker">Optional PC services</span><h2>Windows services</h2><p>Enable only what your devices need, for selected Access Profiles. These are proxy ALLOW policies, separate from DIRECT bypasses.</p></div></div>
+  <div class="pc-services-grid">{% for service in pc_services %}
+    <form class="settings-card" method="post" action="/connection/services/{{ service.key }}">
+      <input type="hidden" name="csrf_token" value="{{ request.state.user.csrf_token }}">
+      <label class="setting-switch"><span><strong>{{ service.name }}</strong><small>{{ service.description }}</small></span><input type="checkbox" data-channel-toggle name="enabled" value="true" {% if service.enabled %}checked{% endif %}><span class="switch-track" aria-hidden="true"></span></label>
+      <details class="channel-settings" {% if service.enabled %}open{% endif %}><summary>Choose profiles &amp; details</summary><span class="label">Access profiles</span><div class="checks">{% for group in groups if group.status=='active' %}<label class="check"><input type="checkbox" name="policy_group_ids" value="{{ group.id }}" {% if group.id in service.group_ids %}checked{% endif %}>{{ group.name }}</label>{% else %}<p class="field-help">Create an Access Profile before enabling this service.</p>{% endfor %}</div>
+      <p class="field-help">{{ service.note }}</p>
+      <details class="setup-guide"><summary>{{ service.endpoints|length }} endpoint patterns · Microsoft guidance</summary><ul>{% for host,protocol in service.endpoints %}<li><code>{{ host }}</code> · {{ protocol }}</li>{% endfor %}</ul><a class="text-link" href="{{ service.source }}" target="_blank" rel="noopener noreferrer">Official source ↗</a><p class="field-help">Reviewed {{ service.reviewed }}. Endpoint requirements can vary by Windows version and management configuration.</p></details>
+      </details><div class="settings-save"><span>{{ 'Pending apply' if service.pending else ('Enabled in desired policy' if service.enabled else 'Off by default') }}</span><button class="btn ghost">Save service</button></div>
+    </form>
+  {% endfor %}</div>
+</section>
+{% endblock %}

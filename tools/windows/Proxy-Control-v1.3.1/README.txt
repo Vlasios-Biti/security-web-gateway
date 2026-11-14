@@ -51,10 +51,10 @@ Ekzekuto Setup v1.3.1 mbi instalimin ekzistues.
 Backup-i fillestar i proxy settings ruhet dhe nuk mbishkruhet.
 
 PAC:
-  http://10.100.254.13:8081/proxy.pac
+  http://proxy.example.internal:8081/proxy.pac
 
 Fail-open vazhdon te menaxhohet nga PAC ne server:
-  PROXY 10.100.254.13:3128; DIRECT
+  PROXY proxy.example.internal:3128; DIRECT
 
 DIRECT bypass IP/domain-et vazhdojne te jene pjese e PAC-it ne server.
 

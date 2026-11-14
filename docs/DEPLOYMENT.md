@@ -1,8 +1,8 @@
-# Deployment Runbook — Security Web Gateway 3.8
+# Deployment Runbook â€” Security Web Gateway 3.8
 
 ## Recommended VM baseline
 
-For a normal 50–250 user office deployment:
+For a normal 50â€“250 user office deployment:
 
 - Ubuntu Server 24.04 LTS or 26.04 LTS
 - 4 vCPU
@@ -11,7 +11,7 @@ For a normal 50–250 user office deployment:
 - VirtIO NIC, 1 Gbps+
 - VirtIO SCSI + I/O thread + discard/TRIM
 - 2 GiB swap as emergency safety net, not steady-state working memory
-- 20–25% normal resource headroom
+- 20â€“25% normal resource headroom
 
 Do not size only by user count. Monitor requests/sec, concurrent CONNECT sessions, WAN throughput, telemetry events/day and Chromium discovery bursts.
 
@@ -70,7 +70,7 @@ systemctl is-active unbound
 
 ### MONITORING
 
-Validate `System → Performance` after several collection intervals. Establish a site baseline for proxy P95/P99, CPU I/O wait, telemetry lag, disk free space and concurrent proxy connections.
+Validate `System â†’ Performance` after several collection intervals. Establish a site baseline for proxy P95/P99, CPU I/O wait, telemetry lag, disk free space and concurrent proxy connections.
 
 ### ROLLBACK
 
@@ -96,10 +96,10 @@ sudo ./deploy/upgrade.sh --confirm
 
 ### VALIDATION
 
-- `/healthz` reports version `3.9.0`
-- schema migration is `015`
+- `/healthz` reports version `3.12.2`
+- schema migration is `018`
 - `PRAGMA integrity_check` returns `ok`
-- all expected timers including `security-web-gateway-performance.timer` are active
+- all expected timers including `security-web-gateway-performance.timer` and `security-web-gateway-health-monitor.timer` are active
 - `squid -k parse` and current client traffic remain healthy
 - the upgrade itself did not auto-publish pre-existing pending policy; subsequent Admin Saves use transactional Save & Apply
 

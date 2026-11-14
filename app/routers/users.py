@@ -53,6 +53,7 @@ def edit_user(user_id:int,request:Request,role:str=Form(...),enabled:bool=Form(F
     if new_password and len(new_password)<14:return HTMLResponse("New password must contain at least 14 characters.",400)
     c=connect();err=None;target=None
     try:
+        c.execute("BEGIN IMMEDIATE")
         target=c.execute("SELECT * FROM users WHERE id=?",(user_id,)).fetchone()
         if not target:err="User not found."
         elif target["id"]==u["id"] and (not enabled or role!="admin"):err="You cannot disable or demote your own active administrator account."

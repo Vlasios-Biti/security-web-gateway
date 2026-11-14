@@ -7,10 +7,10 @@
 <section class="activity-summary-v39">
   <div><span>Approval queue</span><strong class="{{ 'warn' if pending_count else 'good' }}">{{ pending_count }}</strong><small>{{ 'Admin attention required' if pending_count else 'Queue empty' }}</small></div>
   <div><span>Config drift</span><strong class="{{ 'good' if drift.state=='clean' else 'bad' }}">{{ drift.state|capitalize }}</strong><small>{{ drift.message }}</small></div>
-  <div><span>Last apply</span><strong>{{ rows[0].status|capitalize if rows else 'None' }}</strong><small>{{ rows[0].deployed_at if rows else 'Not initialized' }}</small></div>
+  <div><span>Latest attempt</span><strong>{{ rows[0].status|capitalize if rows else 'None' }}</strong><small>{{ rows[0].created_at if rows else 'Not initialized' }}</small></div>
   <div><span>Failed applies</span><strong class="{{ 'bad' if failed_applies else 'good' }}">{{ failed_applies }}</strong><small>Audited Save &amp; Apply failures</small></div>
   <div><span>Backups</span><strong class="accent-blue-text">{{ backup_count }}</strong><small>{{ last_backup.timestamp if last_backup else 'No GUI backup yet' }}</small></div>
-  <div><span>Rollback</span><strong class="{{ 'good' if rows else 'warn' }}">{{ 'Available' if rows else 'Not initialized' }}</strong><small>{{ 'Recent apply points retained' if rows else 'No apply baseline' }}</small></div>
+  <div><span>Successful apply point</span><strong class="{{ 'good' if baseline else 'warn' }}">{{ 'Recorded' if baseline else 'None' }}</strong><small>Review snapshot compatibility in history before rollback.</small></div>
 </section>
 
 {% if diff %}
@@ -42,9 +42,9 @@
     <section class="ops-card">
       <header><div><h3>Recovery posture</h3><p>Recent apply points and rollback readiness.</p></div></header>
       <div class="ops-status-list">
-        <div><span>Current baseline</span><b>{{ rows[0].version if rows else 'None' }}</b></div>
+        <div><span>Last successful baseline</span><b>{{ baseline.version if baseline else 'None' }}</b></div>
         <div><span>Last apply</span><b class="{{ 'good' if rows and rows[0].status=='deployed' else 'warn' }}">{{ rows[0].status|capitalize if rows else 'None' }}</b></div>
-        <div><span>Rollback point</span><b class="{{ 'good' if rows else 'warn' }}">{{ 'Available' if rows else 'Unavailable' }}</b></div>
+        <div><span>Successful apply point</span><b class="{{ 'good' if baseline else 'warn' }}">{{ 'Recorded' if baseline else 'None' }}</b></div>
         <div><span>Latest backup</span><b>{{ last_backup.timestamp if last_backup else 'None' }}</b></div>
         <div><span>Config integrity</span><b class="{{ 'good' if drift.state=='clean' else 'bad' }}">{{ drift.state|capitalize }}</b></div>
       </div>

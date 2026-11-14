@@ -1,12 +1,12 @@
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote_plus
 
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, Response, RedirectResponse
 
 from app import auth
 from app.db import audit
 from app.services.traffic import (
-    list_events, traffic_summary, clients, client_detail, filter_options,
+    list_events, traffic_summary, clients, client_inventory, client_detail, filter_options,
     export_csv, export_xlsx, telemetry_health, update_retention, top_items,
 )
 
@@ -15,6 +15,23 @@ router = APIRouter(prefix="/traffic")
 
 def _filters(request, forced_decision=None, default_range="1h"):
     q = request.query_params
+    import ipaddress
+    from datetime import datetime
+    for key in ('network_id','application_id','port'):
+        value=q.get(key,'').strip()
+        if value:
+            try:number=int(value)
+            except ValueError:raise HTTPException(400,'Invalid '+key+'. Use a positive whole number.') from None
+            if number<1 or number>9223372036854775807 or (key=='port' and number>65535):raise HTTPException(400,'Invalid '+key+'.')
+    if q.get('client_ip','').strip():
+        try:ipaddress.ip_address(q['client_ip'].strip())
+        except ValueError:raise HTTPException(400,'Invalid client IP.') from None
+    dates={}
+    for key in ('date_from','date_to'):
+        if q.get(key):
+            try:dates[key]=datetime.fromisoformat(q[key]).timestamp()
+            except (ValueError,OverflowError):raise HTTPException(400,'Invalid '+key+'.') from None
+    if dates.get('date_from',0)>dates.get('date_to',float('inf')):raise HTTPException(400,'Start date must be before end date.')
     data = {
         "range": q.get("range", default_range),
         "date_from": q.get("date_from", ""),
@@ -84,23 +101,45 @@ def allowed(request: Request):
 
 @router.get("/clients", response_class=HTMLResponse)
 def client_page(request: Request):
-    range_key=request.query_params.get("range","24h")
+    range_key=request.query_params.get('range','24h');search=request.query_params.get('q','').strip()[:200]
+    try:page=max(1,int(request.query_params.get('page','1')))
+    except ValueError:page=1
+    inventory=client_inventory({'range':range_key},page,50,search)
     return request.app.state.templates.TemplateResponse(
-        request=request,name="traffic/clients.html",
-        context={"request":request,"page_title":"Proxy Clients","clients":clients({"range":range_key}),"range_key":range_key,"health":telemetry_health()}
+        request=request,name='traffic/clients.html',
+        context={'request':request,'page_title':'PC activity','clients':inventory['rows'],'inventory':inventory,'search':search,
+                 'range_key':range_key,'nav_query':urlencode({'range':range_key,'q':search}),'health':telemetry_health()}
     )
 
 
 @router.get("/clients/{client_ip}", response_class=HTMLResponse)
 def client_detail_page(request: Request, client_ip: str):
-    range_key=request.query_params.get("range","24h")
-    try: detail=client_detail(client_ip,range_key)
-    except Exception:
-        return RedirectResponse("/traffic/clients?error=Invalid+client+IP",303)
+    import ipaddress
+    try:client_ip=str(ipaddress.ip_address(client_ip))
+    except ValueError:return RedirectResponse('/traffic/clients?error=Invalid+client+IP',303)
+    filters=_filters(request,default_range='24h');filters['client_ip']=client_ip
+    try:page=max(1,int(request.query_params.get('page','1')))
+    except ValueError:page=1
+    try:page_size=max(25,min(500,int(request.query_params.get('page_size','100'))))
+    except ValueError:page_size=100
+    detail=client_detail(client_ip,filters['range'],filters,page,page_size)
+    params={key:value for key,value in filters.items() if value not in (None,'')}
     return request.app.state.templates.TemplateResponse(
-        request=request,name="traffic/client_detail.html",
-        context={"request":request,"page_title":f"Client {client_ip}","detail":detail,"range_key":range_key}
-    )
+        request=request,name='traffic/client_detail.html',
+        context={'request':request,'page_title':'PC activity','detail':detail,'range_key':filters['range'],'filters':filters,
+                 'export_query':urlencode(params),'nav_query':urlencode({**params,'page_size':page_size}),
+                 'ranges':[('1h','Last hour'),('24h','Last 24 hours'),('7d','Last 7 days'),('30d','Last 30 days'),('all','All retained')]})
+
+
+@router.post('/clients/{client_ip}/label')
+def name_client(client_ip:str,request:Request,name:str=Form(''),csrf_token:str=Form(...)):
+    if not request.state.user or request.state.user['role']!='admin':return HTMLResponse('Forbidden',403)
+    if not auth.check_csrf(request.state.user,csrf_token):return HTMLResponse('Invalid request',403)
+    from app.services.client_identity import save_label
+    try:
+        save_label(client_ip,name,request.state.user['username'])
+        return RedirectResponse('/traffic/clients/'+quote_plus(client_ip)+'?msg=PC+name+saved',303)
+    except ValueError:return HTMLResponse('Invalid IP or PC name',400)
 
 
 @router.get("/export.csv")

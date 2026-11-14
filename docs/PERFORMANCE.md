@@ -63,3 +63,8 @@ Targets are operational objectives, not hard guarantees:
 - persistent swap use: investigate; normal workload should not depend on swap
 
 Use the actual site baseline to set alerts.
+
+
+## 3.12.4 client-name lookup
+
+Client pages never perform reverse DNS. The performance worker refreshes a persistent cache for up to eight client IPs selected from the newest 2,000 telemetry events per run. Each getent lookup has a 0.5-second cap; successful names cache for one hour and negative results for ten minutes. Older/inactive clients may show only their IP. Health API responses use sampler data and expose staleness rather than probing DNS on each page poll.

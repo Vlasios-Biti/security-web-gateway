@@ -1,4 +1,6 @@
 import json
+from datetime import datetime, timezone
+from app.services.notifications import conditions, settings as notification_settings
 from fastapi import APIRouter,Request,Form
 from fastapi.responses import HTMLResponse,RedirectResponse
 from app import auth
@@ -19,6 +21,8 @@ def page(request:Request):
         last_apply=c.execute("SELECT id,version,status,created_by,deployed_at,description FROM deployments ORDER BY id DESC LIMIT 1").fetchone()
         backup_count=c.execute("SELECT COUNT(*) c FROM audit_events WHERE action='SYSTEM_BACKUP' AND result='SUCCESS'").fetchone()["c"]
         last_backup=c.execute("SELECT timestamp,actor,result FROM audit_events WHERE action='SYSTEM_BACKUP' ORDER BY id DESC LIMIT 1").fetchone()
+        last_success=c.execute("SELECT MAX(timestamp) FROM audit_events WHERE action='SYSTEM_BACKUP' AND result='SUCCESS'").fetchone()[0]
+        expiry_incident=c.execute("SELECT severity,title,detail FROM health_incidents WHERE code='expiry' AND active=1").fetchone()
         apply_count=c.execute("SELECT COUNT(*) c FROM deployments WHERE status='deployed'").fetchone()["c"]
     finally:c.close()
     recovery={
@@ -27,22 +31,14 @@ def page(request:Request):
       "last_backup":dict(last_backup) if last_backup else None,
       "rollback_available":bool(apply_count),
     }
-    alerts=[]
-    if h["squid_status"]!="active":alerts.append({"severity":"critical","title":"Squid data plane is not active","detail":"Proxy enforcement requires immediate attention."})
-    if h["nginx_status"]!="active" or h["app_status"]!="active":alerts.append({"severity":"critical","title":"Management plane service unavailable","detail":"Nginx or SWG Manager is not active."})
-    if not h["port_ok"]:alerts.append({"severity":"critical","title":"Proxy listener TCP/3128 is down","detail":"Clients cannot use the explicit proxy endpoint."})
-    if h["disk"].get("percent",0)>=85:alerts.append({"severity":"warning","title":"Disk utilization is high","detail":f"{h['disk']['percent']}% used; {h['disk']['free_gb']} GB free."})
-    if h["memory"].get("percent",0)>=85:alerts.append({"severity":"warning","title":"Memory pressure is high","detail":f"{h['memory']['percent']}% memory used."})
-    cert=h.get("certificate") or {}
-    if cert.get("days_remaining") is not None and cert["days_remaining"]<=30:alerts.append({"severity":"warning" if cert["days_remaining"]>14 else "critical","title":"Management TLS certificate expires soon","detail":f"{cert['days_remaining']} days remaining."})
-    if not (h.get("ntp") or {}).get("ok"):alerts.append({"severity":"warning","title":"NTP synchronization needs attention","detail":(h.get("ntp") or {}).get("state","unknown")})
-    for d in h.get("dns",[]):
-        if not d.get("ok"):alerts.append({"severity":"warning","title":"DNS resolver unavailable","detail":str(d.get("server","unknown"))})
-    for worker,state in (h.get("workers") or {}).items():
-        if state!="active":alerts.append({"severity":"warning","title":"Background service needs attention","detail":f"{worker.replace('_',' ').title()}: {state}"})
-    if perf and perf.get("telemetry_lag_seconds") is not None and perf["telemetry_lag_seconds"]>60:
-        alerts.append({"severity":"warning","title":"Telemetry ingestion is delayed","detail":f"{round(perf['telemetry_lag_seconds'],1)} seconds behind."})
-    if drift.get("state")=="drift":alerts.append({"severity":"critical","title":"Managed Squid configuration drift detected","detail":drift.get("message","Expected and live policy differ.")})
+    backup_age=None
+    if last_success:
+        moment=datetime.fromisoformat(last_success.replace('Z','+00:00'))
+        if moment.tzinfo is None:moment=moment.replace(tzinfo=timezone.utc)
+        backup_age=(datetime.now(timezone.utc)-moment).total_seconds()/3600
+    found=conditions(h,perf,drift,notification_settings(),h.get('cache_stale',True),backup_age)
+    alerts=sorted(found.values(),key=lambda row:(row['severity']!='critical',row['title']))
+    if expiry_incident:alerts.append(dict(expiry_incident))
     return request.app.state.templates.TemplateResponse(
       request=request,name="system/health.html",
       context={"request":request,"page_title":"System","health":h,"squid":h["squid_status"],"nginx":h["nginx_status"],"app":h["app_status"],

@@ -997,7 +997,7 @@ def export_xlsx(filters):
             if isinstance(val,(int,float)) and val is not None:
                 cells.append(f'<c r="{ref}" t="n"><v>{val}</v></c>')
             else:
-                text=escape("" if val is None else str(val))
+                text=escape("" if val is None else "".join(ch for ch in str(val) if ch in "\t\n\r" or 0x20<=ord(ch)<=0xD7FF or 0xE000<=ord(ch)<=0xFFFD or 0x10000<=ord(ch)<=0x10FFFF))
                 cells.append(f'<c r="{ref}" t="inlineStr"><is><t>{text}</t></is></c>')
         sheet.append(f'<row r="{ri}">'+"".join(cells)+"</row>")
     sheet_xml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetData>'+"".join(sheet)+'</sheetData><autoFilter ref="A1:S%d"/></worksheet>'%len(all_rows)

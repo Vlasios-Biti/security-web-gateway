@@ -107,7 +107,7 @@ REL="/opt/security-web-gateway/releases/$SWG_VERSION"
 rm -rf "$REL"; install -d -o root -g proxy-mgmt -m 0750 "$REL"
 rsync -a --delete \
   --exclude '__pycache__' --exclude '*.pyc' \
-  "$ROOT/app" "$ROOT/bin" "$ROOT/migrations" "$ROOT/static" "$ROOT/templates" "$ROOT/tools" "$ROOT/requirements.txt" "$ROOT/VERSION" "$REL/"
+  "$ROOT/app" "$ROOT/bin" "$ROOT/migrations" "$ROOT/static" "$ROOT/templates" "$ROOT/tools" "$ROOT/privileged" "$ROOT/requirements.txt" "$ROOT/VERSION" "$REL/"
 chown -R root:proxy-mgmt "$REL"
 find "$REL" -type d -exec chmod 0750 {} +
 find "$REL" -type f -exec chmod 0640 {} +

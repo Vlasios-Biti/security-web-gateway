@@ -1,6 +1,6 @@
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, Response, RedirectResponse
 
 from app import auth
@@ -15,6 +15,23 @@ router = APIRouter(prefix="/traffic")
 
 def _filters(request, forced_decision=None, default_range="1h"):
     q = request.query_params
+    import ipaddress
+    from datetime import datetime
+    for key in ('network_id','application_id','port'):
+        value=q.get(key,'').strip()
+        if value:
+            try:number=int(value)
+            except ValueError:raise HTTPException(400,'Invalid '+key+'. Use a positive whole number.') from None
+            if number<1 or number>9223372036854775807 or (key=='port' and number>65535):raise HTTPException(400,'Invalid '+key+'.')
+    if q.get('client_ip','').strip():
+        try:ipaddress.ip_address(q['client_ip'].strip())
+        except ValueError:raise HTTPException(400,'Invalid client IP.') from None
+    dates={}
+    for key in ('date_from','date_to'):
+        if q.get(key):
+            try:dates[key]=datetime.fromisoformat(q[key]).timestamp()
+            except (ValueError,OverflowError):raise HTTPException(400,'Invalid '+key+'.') from None
+    if dates.get('date_from',0)>dates.get('date_to',float('inf')):raise HTTPException(400,'Start date must be before end date.')
     data = {
         "range": q.get("range", default_range),
         "date_from": q.get("date_from", ""),

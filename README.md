@@ -5,7 +5,7 @@ Create the Access Profile, select/create its VLAN and choose allowed access on *
 Version 3.12 consolidates websites/domains/IPs under **Access**, separates **Proxy bypass**, groups traffic/health under **Monitoring**, exposes **Alerts & SNMP** directly, and uses one profile-or-VLAN selector. Install/upgrade provides an unassigned Google Search starter and no customer-specific application data. Optional read-only SNMPv2c polling/traps are configured with email/Slack; SNMPv3 is not included. See [the access/deployment guide](docs/CONNECTION_AND_LEARNING.md) and [notification/SNMP setup](docs/HEALTH_NOTIFICATIONS.md).
 
 
-**Version:** 3.12.5
+**Version:** 3.12.6
 
 **Target:** single-VM, on-prem enterprise appliance  
 **Target OS:** Ubuntu Server 24.04 LTS / 26.04 LTS  
@@ -59,6 +59,10 @@ Sizing should ultimately follow concurrent CONNECT sessions, requests/sec, WAN t
 - Operator changes remain pending for Admin approval. Advanced manual/HAR discovery remains available for authenticated or unusual workflows.
 - Browser discovery rejects private/reserved targets and DNS-rebinding/SSRF-style pivots.
 - PAC supports explicit DIRECT bypasses plus fail-open `PROXY ...; DIRECT` behavior.
+
+## v3.12.6 — detailed functional review
+
+Includes role/CSRF route checks, authentication and concurrent-admin regressions, bounded HAR import, reliable traffic-filter errors, valid XLSX exports and a fresh-install TLS module fix. Activity distinguishes failed attempts from successful baselines. See the [detailed functional review](docs/DETAILED_FUNCTION_AUDIT.md) and [complete application function inventory](docs/FUNCTION_CATALOG.md) for measured coverage and remaining deployment checks. The Cloudflare security-audit skill is a project instruction; this functional review is not a completed independent security audit.
 
 ## v3.12.5 — PC activity
 

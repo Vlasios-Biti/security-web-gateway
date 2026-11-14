@@ -139,7 +139,7 @@ jobs:
       - name: v3.8 save and apply smoke tests
         run: python tests/smoke_v380.py
       - name: Connection, health notifications and publication safety
-        run: python tests/smoke_v3125.py
+        run: python tests/smoke_v3126.py
       - name: App import
         env:
           SWG_DB_PATH: /tmp/swg-ci.db
@@ -189,4 +189,4 @@ jobs:
           python tests/smoke_v340.py
           python tests/smoke_v370.py
           python tests/smoke_v380.py
-          python tests/smoke_v3125.py
+          python tests/smoke_v3126.py

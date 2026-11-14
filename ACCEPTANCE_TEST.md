@@ -118,3 +118,10 @@
 - Verify first/last matching timestamps and the latest network/VLAN agree with the selected filters. Compare requests to actual Squid logs for two different PCs.
 - Keep client source IPs visible to the proxy; document NAT/VPN aggregation. Validate DHCP history or reservations for historical device ownership and PTR records for current readable names.
 - Confirm HTTPS shows domain/port rather than encrypted contents. DIRECT bypass/fallback does not appear in proxy telemetry. AD/GPO deployment is distinct from unimplemented user authentication/group policies.
+
+## 3.12.6 detailed review acceptance
+
+- Activity must display pending state without clearing it. Viewer/auditor can read it; only an administrator can approve production changes. A failed attempt must not become the successful baseline.
+- Invalid traffic IDs, dates, IPs and ports must return HTTP 400. Oversized HAR must fail before creating an application. Archived profile status cannot be reactivated.
+- Verify fresh installation contains `current/privileged/tls_install.py` before testing certificate renewal on a pilot VM.
+- See `docs/DETAILED_FUNCTION_AUDIT.md` for automated results, function coverage and the outstanding real VM/PC/NMS checks. Do not equate that report with a completed independent security audit.

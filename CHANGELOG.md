@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.12.6
+
+- Adds a detailed functional review and catalog of 405 application functions, with measured execution coverage and explicit deployment-validation limits.
+- Adds a 116-endpoint role/CSRF/anonymous matrix plus login/logout, malformed-hash, lockout, session-revocation and concurrent-last-admin regressions.
+- Makes Activity GET read-only and accessible to viewers/auditors; separates failed apply attempts from successful deployment baselines.
+- Serializes administrator changes before the last-enabled-admin check; rejects malformed stored hashes without a server error and prevents reactivation of archived profiles.
+- Rejects malformed/out-of-range traffic filters with HTTP 400, removes blocking DNS from domain saves and sanitizes XML-invalid XLSX text characters.
+- Bounds new HAR uploads before creating application state and includes the privileged TLS module in fresh-install release payloads.
+- Records the user's security-audit skill preference in AGENTS.md. A reconnaissance-only security run remains explicitly incomplete; functional tests are not a clean-audit claim.
+
 ## 3.12.5
 
 - Makes Monitoring → PC activity the entry point for identifying recorded source IPs, current DNS names, observed networks/VLANs, request/decision/byte totals and distinct destinations.

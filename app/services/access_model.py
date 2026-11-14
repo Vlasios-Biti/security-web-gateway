@@ -253,7 +253,7 @@ def set_policy_group_status(group_id,status,actor):
     c=connect()
     try:
         row=c.execute("SELECT status FROM policy_groups WHERE id=?",(group_id,)).fetchone()
-        if not row:raise ValueError("Policy group not found.")
+        if not row or row['status']=='deleted':raise ValueError("Policy group not found or deleted.")
         changed=row['status']!=status
         c.execute("UPDATE policy_groups SET status=?,pending=CASE WHEN ? THEN 1 ELSE pending END,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",(status,1 if changed else 0,actor,group_id));c.commit()
     finally:c.close()

@@ -1,7 +1,7 @@
 import hashlib
 import ipaddress
 from app.db import connect
-from app.security import normalize_domain, normalize_ip, resolve_domain, normalize_expiration
+from app.security import normalize_domain, normalize_ip, normalize_expiration
 
 
 def list_networks(enabled_only=True):
@@ -172,7 +172,7 @@ def _fingerprint(kind,destination,protocol,management,category_id):return hashli
 
 def create_rule(kind,destination,protocol,network_ids,actor,reason,change_reference="",expires_at="",management_type="custom",category_slug=None,scope_mode="selected",policy_group_ids=None):
     expires_at=normalize_expiration(expires_at)
-    destination=normalize_domain(destination) if kind=="domain" else normalize_ip(destination);resolved=resolve_domain(destination) if kind=="domain" else []
+    destination=normalize_domain(destination) if kind=="domain" else normalize_ip(destination);resolved=[]
     protocol=protocol.upper()
     if protocol not in("HTTP","HTTPS","BOTH"):raise ValueError("Invalid protocol.")
     if scope_mode not in("selected","all_proxy"):raise ValueError("Invalid scope mode.")
@@ -199,7 +199,7 @@ def update_rule(rule_id,destination,protocol,network_ids,actor,reason,change_ref
         r=c.execute("SELECT * FROM rules WHERE id=?",(rule_id,)).fetchone()
         if not r or r["status"]=="deleted":raise ValueError("Rule cannot be edited.")
         if r["management_type"]=="system" and not allow_system:raise ValueError("System rule requires administrator privileges.")
-        destination=normalize_domain(destination) if r["rule_type"]=="domain" else normalize_ip(destination);resolved=resolve_domain(destination) if r["rule_type"]=="domain" else []
+        destination=normalize_domain(destination) if r["rule_type"]=="domain" else normalize_ip(destination);resolved=[]
         if c.execute("SELECT 1 FROM rules WHERE rule_type=? AND destination=? AND id!=? AND status!='deleted'",(r["rule_type"],destination,rule_id)).fetchone():raise ValueError("Another rule for this destination already exists.")
         protocol=protocol.upper()
         if protocol not in("HTTP","HTTPS","BOTH"):raise ValueError("Invalid protocol.")

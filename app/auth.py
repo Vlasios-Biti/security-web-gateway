@@ -4,7 +4,7 @@ import time
 from datetime import datetime, timezone, timedelta
 
 from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError, VerificationError
+from argon2.exceptions import VerifyMismatchError, VerificationError, InvalidHashError
 
 from app.config import (
     SESSION_COOKIE,
@@ -105,7 +105,7 @@ def authenticate(username, password, request):
 
         try:
             PH.verify(r["password_hash"], password)
-        except (VerifyMismatchError, VerificationError):
+        except (VerifyMismatchError, VerificationError, InvalidHashError):
             attempts = int(r["failed_attempts"] or 0) + 1
             lock = (
                 (utcnow() + timedelta(minutes=LOGIN_LOCK_MINUTES)).isoformat()

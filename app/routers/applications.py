@@ -157,7 +157,8 @@ async def discover_har_upload(request:Request,name:str=Form(...),seed_domain:str
     if not auth.check_csrf(u,csrf_token):return HTMLResponse("Invalid request",403)
     try:
         baseline_dirty=save_apply_state()["dirty"]
-        raw=await har_file.read()
+        raw=await har_file.read(DISCOVERY_MAX_HAR_BYTES+1)
+        if len(raw)>DISCOVERY_MAX_HAR_BYTES:raise ValueError('HAR file is too large')
         c=connect();existing=c.execute("SELECT id FROM applications WHERE name=? AND status!='deleted'",(name.strip(),)).fetchone();c.close()
         aid=existing["id"] if existing else create_application(name,"Custom",f"Discovered application: {name}",seed_domain,"observed","HAR workflow",False,u["username"])
         save_discovery_access(aid,access_mode,network_ids,policy_group_ids)

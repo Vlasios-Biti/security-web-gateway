@@ -48,7 +48,13 @@ def dependency_candidates(request:Request):
     source=' FROM application_dependency_candidates adc JOIN applications a ON a.id=adc.application_id'
     c=connect()
     try:
-        applications=[dict(r) for r in c.execute('SELECT DISTINCT a.id,a.name FROM applications a JOIN application_dependency_candidates adc ON adc.application_id=a.id ORDER BY a.name COLLATE NOCASE,a.id')]
+        applications=[dict(r) for r in c.execute("SELECT a.id,a.name,a.status FROM applications a WHERE a.status!='deleted' OR EXISTS(SELECT 1 FROM application_dependency_candidates adc WHERE adc.application_id=a.id) ORDER BY a.name COLLATE NOCASE,a.id")]
+        selected_application=next((a for a in applications if a['id']==filters['application_id']),None)
+        latest_discovery=None
+        if selected_application:
+            run=c.execute('SELECT id,status,method FROM discovery_runs WHERE application_id=? ORDER BY id DESC LIMIT 1',(selected_application['id'],)).fetchone()
+            latest_discovery=dict(run) if run else None
+            selected_application['dependency_count']=c.execute("SELECT COUNT(*) FROM application_rules ar JOIN rules r ON r.id=ar.rule_id WHERE ar.application_id=? AND ar.enabled=1 AND r.status='active'",(selected_application['id'],)).fetchone()[0]
         total=c.execute('SELECT COUNT(*)'+source+where,args).fetchone()[0]
         pages=max(1,(total+49)//50);filters['page']=min(filters['page'],pages)
         rows=[dict(r) for r in c.execute('SELECT adc.*,a.name application_name'+source+where+
@@ -57,7 +63,7 @@ def dependency_candidates(request:Request):
         for row in rows:row['suggestions']=suggestions(row['destination'],row['application_id'],apps)
     finally:c.close()
     query=urlencode({k:v for k,v in filters.items() if k!='page'})
-    return request.app.state.templates.TemplateResponse(request=request,name='intelligence/dependency_candidates.html',context={'request':request,'page_title':'Dependency Candidates','rows':rows,'applications':applications,'filters':filters,'total':total,'pages':pages,'nav_query':query,'return_filters':urlencode(filters)})
+    return request.app.state.templates.TemplateResponse(request=request,name='intelligence/dependency_candidates.html',context={'request':request,'page_title':'Dependency Candidates','rows':rows,'applications':applications,'selected_application':selected_application,'latest_discovery':latest_discovery,'filters':filters,'total':total,'pages':pages,'nav_query':query,'return_filters':urlencode(filters)})
 
 
 def _candidate_filters(values):

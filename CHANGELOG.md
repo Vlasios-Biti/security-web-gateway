@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.12.12
+
+- Identifies the expiring certificate as the admin-panel/HTTPS-PAC certificate in Health, Connection and notifications. Health badge color now follows its warning/critical state instead of showing a near-expiry certificate as green. HTTPS traffic inspection remains separate and is not enabled.
+- Shows new/unassigned applications immediately in the Dependency Candidates application filter, even when no traffic-derived candidates exist. Archived applications remain available only when they have review history and are labeled accordingly.
+- Adds selected-application discovery status, configured dependency count and a link to the application/scan results. Clarifies that this page contains traffic-correlated suggestions, not the separate website/capture discovery results; zero traffic suggestions does not imply a failed scan.
+- Adds regression coverage for visibility before any scan/candidate exists and running/completed discovery with zero traffic candidates. Schema remains 019; access policies are unchanged.
+
 ## 3.12.11
 
 - Adds explicit domain membership moves between applications, pending-candidate reassignment/merge, and suggestions based on configured primary domains or known memberships. Corrections guide future timing correlation; suggestions do not publish access. Timing-only scores are capped Low/review and migration 019 downgrades existing pending scores without changing approved access.

@@ -1,11 +1,11 @@
-# Security Web Gateway v3.12.11 Acceptance Test
+# Security Web Gateway v3.12.12 Acceptance Test
 
 Integration/correction checks: upgrade an existing schema 018 database to 019 and confirm VLAN/profile/approved rules stay intact. Timing-only pending scores become Low/review. Move a pending candidate without adding access; move an enabled application domain and verify the source/target membership and publication result. Other memberships must stay intact, and protected targets require Admin. Test per-PC label save/clear/search with DNS fallback. Create an expiring read-only token in System → Integrations API; verify correct scope, rejected cookie/query-token/HTTP access, revoked/expired/disabled-owner refusal and 120/minute limit. Portable restore must revoke imported tokens and retain target-local PC labels. No real Slack/email/SNMP delivery is required for these tests.
 
 Dependency review: choose an application and optionally a domain substring, status or confidence, then press Filter. Counts/pagination must cover all matching stored candidates, including rows beyond the old 500-result cutoff. Approve/Ignore must return to the same filter selection; completed rows show their status without review buttons. Reset returns to all applications with pending status. Filtering/history views must not change access policy. Verify the filter controls remain readable on mobile and desktop.
 
-1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.12.11`.
-2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.12.11`, mode `production`.
+1. `readlink -f /opt/security-web-gateway/current` returns `/opt/security-web-gateway/releases/3.12.12`.
+2. `/healthz` on `127.0.0.1:8200` and management HTTPS returns version `3.12.12`, mode `production`.
 3. `SELECT MAX(version) FROM schema_migrations` returns `019`; `PRAGMA integrity_check` returns `ok`; `PRAGMA foreign_key_check` returns no rows.
 4. `squid -k parse` and `nginx -t` succeed.
 5. `security-web-gateway.service`, `squid.service`, `nginx.service`, and `security-web-gateway-deploy-helper.socket` are active.

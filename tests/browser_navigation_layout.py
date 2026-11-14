@@ -25,7 +25,7 @@ def render_pages(folder):
     with TestClient(app,base_url='https://localhost') as client:
         client.cookies.set(SESSION_COOKIE,token)
         c=connect();candidate_id=c.execute('SELECT id FROM application_dependency_candidates LIMIT 1').fetchone()[0];c.close()
-        for name,url in [('integrations','/system/integrations'),('candidate-move',f'/intelligence/dependency-candidates/{candidate_id}/move'),('access-add','/applications/allow'),('application-add','/applications/discover'),('application-edit',f'/applications/{aid}/edit'),('dependency-review','/intelligence/dependency-candidates'),('profiles','/policies/groups'),('notifications','/system/notifications'),('connection','/connection'),('simulator','/intelligence/simulator'),('traffic-clients','/traffic/clients'),('pc-detail','/traffic/clients/10.20.0.10')]:
+        for name,url in [('integrations','/system/integrations'),('candidate-move',f'/intelligence/dependency-candidates/{candidate_id}/move'),('access-add','/applications/allow'),('application-add','/applications/discover'),('application-edit',f'/applications/{aid}/edit'),('dependency-selected',f'/intelligence/dependency-candidates?application_id={aid}'),('dependency-review','/intelligence/dependency-candidates'),('profiles','/policies/groups'),('notifications','/system/notifications'),('connection','/connection'),('simulator','/intelligence/simulator'),('traffic-clients','/traffic/clients'),('pc-detail','/traffic/clients/10.20.0.10')]:
             response=client.get(url);assert response.status_code==200,(url,response.status_code)
             html=response.text.replace('/static/',(ROOT/'static').as_uri()+'/')
             (folder/(name+'.html')).write_text(html,encoding='utf-8')
@@ -58,7 +58,7 @@ def check(folder,executable=None):
         page.get_by_role('link',name='SNMP',exact=True).click()
         position=page.locator('#snmp h3').bounding_box()
         assert position and 0<=position['y']<900,'SNMP jump link must bring configuration into view'
-        for name in ('integrations','candidate-move','access-add','application-add','application-edit','dependency-review','connection','notifications','simulator','simulator-result','traffic-clients','pc-detail'):
+        for name in ('dependency-selected','integrations','candidate-move','access-add','application-add','application-edit','dependency-review','connection','notifications','simulator','simulator-result','traffic-clients','pc-detail'):
             for width in (1440,920,390):
                 page.set_viewport_size({'width':width,'height':1000})
                 page.goto((folder/(name+'.html')).resolve().as_uri())
@@ -68,7 +68,7 @@ def check(folder,executable=None):
                     assert page.locator('[data-access-method]').count()==0,'Applications must have one profile-based access path'
                     assert page.locator('input[name=network_ids]').count()==0,'No duplicate direct VLAN assignment'
                     assert page.locator('.application-profile-picker').count()>=1
-                if name=='dependency-review':
+                if name in ('dependency-review','dependency-selected'):
                     controls=page.locator('.candidate-filters input,.candidate-filters select').evaluate_all('nodes=>nodes.map(e=>({width:e.getBoundingClientRect().width,left:e.getBoundingClientRect().left,right:e.getBoundingClientRect().right}))')
                     assert len(controls)==4
                     assert all(e['width']>=100 and e['left']>=0 and e['right']<=width for e in controls),('Candidate filter fit',width,controls)

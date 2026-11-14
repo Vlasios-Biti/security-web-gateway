@@ -50,7 +50,7 @@ def conditions(health,perf,drift,cfg,cache_stale=False,backup_age_hours=None):
     if cfg['backup_age_hours'] and (backup_age_hours is None or backup_age_hours>cfg['backup_age_hours']):add('backup','warning','Configuration backup needs attention','No recent successful backup is recorded.')
     cert=health.get('certificate') or {};days=cert.get('days_remaining')
     if cert.get('state')=='unknown':add('certificate_check','warning','Certificate monitoring is unavailable','Review the management certificate configuration.')
-    if days is not None and days<=cfg['certificate_days']:add('certificate','critical' if days<=7 else 'warning','Management certificate expires soon',f'{days} days remaining')
+    if days is not None and days<=cfg['certificate_days']:add('certificate','critical' if days<=7 else 'warning','Admin panel HTTPS certificate expires soon',f'{days} days remaining')
     for row in health.get('dns',[]):
         if not row.get('ok'):add('dns','warning','A DNS resolver is unavailable','Check configured enterprise DNS resolvers.')
     for key,value in (health.get('workers') or {}).items():

@@ -1,4 +1,16 @@
-# Access and connection guide — 3.12.4
+# Access and connection guide — 3.12.8
+
+## Company block page and allowed-only access
+
+Open **Connection → Blocked page**. Enter the company name, title, message and optional IT contact. Upload a PNG logo up to 128 KB and 2048 × 2048; saving without an upload keeps the current logo. **Preview saved page** opens the saved result. Only administrators can view or save these settings.
+
+Install/upgrade publishes the fixed public HTTP page at `http://<gateway-IP>:8081/blocked`. Denied HTTP requests redirect there. Denied HTTPS CONNECT requests retain status 403; browsers normally show their own proxy/connection error rather than the response HTML. A branded page inside HTTPS requires managed TLS inspection and client CA trust; this release does not enable that. See [Squid deny_info](https://www.squid-cache.org/Doc/config/deny_info/) and [Squid custom error limitations](https://wiki.squid-cache.org/Features/CustomErrors).
+
+Branding is stored in `/etc/security-web-gateway/block-page.json`, with rendered public HTML in `blocked.html`. The JSON stays private, while the public page contains the company text/logo only. Existing branding survives an upgrade. Portable policy exports/imports do not move this VM-local setting; provision it separately on a replacement appliance. The public page uses the appliance's configured IPv4, independently of the optional HTTPS PAC address.
+
+The proxy base policy is default deny: allowed profile/application/domain/IP rules take priority and everything else is denied. If a forbidden platform partly opens, inspect its actual host and source IP in **Monitoring → Traffic**, the matching access profile, direct bypasses and the active deployed policy. An IP/subnet allow rule can permit multiple sites on shared infrastructure. Deleting a membership from one profile does not revoke an allow inherited from another matching scope. Do not treat missing styles/images as proof the main site is blocked.
+
+PAC affects clients that honor its proxy settings. Direct bypasses, local-traffic exceptions and outage fallback deliberately permit traffic outside Squid; direct traffic is not covered by its allow list or telemetry. Enforce managed browser/endpoint settings where required. A network firewall policy is needed to prevent arbitrary direct connections; configure its outage behavior to match the intended fail-open requirement. The GUI does not change router rules automatically.
 
 ## Profile and VLAN in one save
 

@@ -21,7 +21,7 @@
   <a href="/traffic/explorer"><b>Investigate traffic</b><small>Search clients, domains and decisions</small><span>→</span></a>
   {% if request.state.user.role in ('admin','operator') %}<a href="/applications/discover"><b>Add application</b><small>Automatic dependency discovery</small><span>＋</span></a>{% endif %}
   <a href="/intelligence/simulator"><b>Simulate policy</b><small>Explain a decision before Save</small><span>⌕</span></a>
-  <a href="/changes/review"><b>Activity</b><small>Audit, approvals and rollback</small><span>→</span></a>
+  {% if request.state.user.role=='admin' %}<a href="/connection#device-setup"><b>Connect a PC</b><small>Find and copy the PAC URL</small><span>→</span></a>{% else %}<a href="/changes/review"><b>Activity</b><small>Audit, approvals and rollback</small><span>→</span></a>{% endif %}
 </section>
 
 <section class="ops-grid primary">

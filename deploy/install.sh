@@ -228,12 +228,14 @@ chown root:proxy /etc/squid/squid.conf; chmod 0640 /etc/squid/squid.conf
 
 sed -e "s|__PROXY_IP__|$BIND_IP|g" -e "s|__PROXY_PORT__|$PROXY_PORT|g" -e "s|__INTERNAL_DOMAIN_SUFFIX__|$INTERNAL_DOMAIN_SUFFIX|g" "$ROOT/pac/proxy.pac.tpl" > /etc/security-web-gateway/proxy.pac
 chown root:proxy-mgmt /etc/security-web-gateway/proxy.pac; chmod 0644 /etc/security-web-gateway/proxy.pac
+python3 "$ROOT/tools/ensure_pac_access.py"
 
 sed -e "s|__FQDN__|$FQDN|g" -e "s|__BIND_IP__|$BIND_IP|g" \
     -e "s|__TLS_CERT__|/etc/security-web-gateway/tls/management.crt|g" -e "s|__TLS_KEY__|/etc/security-web-gateway/tls/management.key|g" \
   "$ROOT/deploy/templates/nginx.conf.tpl" > /etc/nginx/sites-available/security-web-gateway
 ln -sfn /etc/nginx/sites-available/security-web-gateway /etc/nginx/sites-enabled/security-web-gateway
 rm -f /etc/nginx/sites-enabled/default
+python3 "$ROOT/tools/configure_block_page.py"
 
 /usr/sbin/squid -k parse
 /usr/sbin/nginx -t

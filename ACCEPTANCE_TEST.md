@@ -134,3 +134,13 @@
 - Inspect a custom exported archive as 0600 from creation through publication. Cross-host restore must keep the target PAC URL in Connection, Windows package and Edge JSON.
 - Pilot the Windows controller separately; legacy untrusted owners/write ACLs or reparse paths must be inspected by an administrator. Pure backup validation tests do not prove real machine ACL behavior.
 - See `docs/SECURITY_CORRECTIONS.md` for verified corrections, source-only concerns and remaining deployment checks. The Cloudflare skill was disabled at the user's request.
+
+## 3.12.8 PAC setup acceptance
+
+- As Admin, Overview → Connect a PC must open Connection at the visible PAC URL field. Copy address and Open PAC use the configured endpoint; address/certificate controls remain collapsed.
+- From a client without an administrator session, the configured /proxy.pac must return the PAC script instead of nginx 403. Install/upgrade grants only parent-directory search permission; production.env, notifications.json and TLS keys retain their private modes.
+- `sudo python3 tests/pac_permissions_contract.py` verifies a disposable public PAC is readable by an unprivileged UID while dummy private files remain unreadable. It never changes installed configuration.
+
+- As Admin, expand Connection → Blocked page. Save company name/message/contact and a PNG logo (at most 128 KB, 2048 × 2048). Preview must show escaped text; saving without a new file retains the logo, and Remove clears it. Invalid uploads must preserve the previous settings. Other roles cannot preview or change branding.
+- `sudo python3 tests/squid_block_page_contract.py` starts a disposable native Squid with loopback origins: allowed HTTP/CONNECT must return 200; denied HTTP redirects to the fixed branding page; denied CONNECT must return 403 without a redirect. Requires installed Squid and unused local port 8081; use a test runner, not the production appliance.
+- On a pilot PC test a fresh denied HTTP URL and denied HTTPS host, an allowed host, a direct bypass and proxy outage separately. Verify the source IP in Squid logs belongs to the intended VLAN/profile. PAC alone does not enforce applications that ignore system proxy settings or prevent users changing their routing.

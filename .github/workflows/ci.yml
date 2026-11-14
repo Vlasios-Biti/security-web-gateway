@@ -139,9 +139,16 @@ jobs:
       - name: v3.8 save and apply smoke tests
         run: python tests/smoke_v380.py
       - name: Connection, health notifications and publication safety
-        run: python tests/smoke_v3127.py
+        run: python tests/smoke_v3128.py
       - name: Windows backup validation without machine changes
         run: pwsh -NoProfile -NonInteractive -File tests/windows_backup_contract.ps1
+      - name: Public PAC access without exposing private configuration
+        run: sudo python3 tests/pac_permissions_contract.py
+      - name: Native Squid allow and branded-deny contract
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y squid
+          sudo python3 tests/squid_block_page_contract.py
       - name: App import
         env:
           SWG_DB_PATH: /tmp/swg-ci.db
@@ -191,4 +198,4 @@ jobs:
           python tests/smoke_v340.py
           python tests/smoke_v370.py
           python tests/smoke_v380.py
-          python tests/smoke_v3127.py
+          python tests/smoke_v3128.py

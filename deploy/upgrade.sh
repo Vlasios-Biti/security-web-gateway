@@ -57,6 +57,10 @@ PY
     cp -a "$BACKUP/nginx-site.conf" /etc/nginx/sites-available/security-web-gateway
     /usr/sbin/nginx -t && systemctl reload nginx || true
   fi
+  if [[ -f "$BACKUP/squid-base.conf" ]]; then
+    cp -a "$BACKUP/squid-base.conf" /etc/squid/squid.conf
+    /usr/sbin/squid -k parse && systemctl restart squid || true
+  fi
   systemctl daemon-reload
   systemctl restart security-web-gateway-deploy-helper.socket 2>/dev/null || true
   systemctl start security-web-gateway.service 2>/dev/null || true
@@ -89,6 +93,7 @@ s=sqlite3.connect(sys.argv[1]);d=sqlite3.connect(sys.argv[2]);s.backup(d);d.clos
 PY
 cp -a /etc/security-web-gateway/production.env "$BACKUP/production.env"
 cp -a /etc/nginx/sites-available/security-web-gateway "$BACKUP/nginx-site.conf"
+cp -a /etc/squid/squid.conf "$BACKUP/squid-base.conf"
 cp -a /etc/squid/managed/security-web-gateway.conf "$BACKUP/security-web-gateway.conf" 2>/dev/null || true
 for f in /etc/systemd/system/security-web-gateway*.service /etc/systemd/system/security-web-gateway*.timer /etc/systemd/system/security-web-gateway-deploy-helper.socket; do [[ -f "$f" ]] && cp -a "$f" "$BACKUP/"; done
 [[ -f /usr/local/sbin/security-web-gateway-deploy-helper ]] && cp -a /usr/local/sbin/security-web-gateway-deploy-helper "$BACKUP/security-web-gateway-deploy-helper"
@@ -156,6 +161,9 @@ install -o root -g root -m 0644 "$ROOT/systemd/squid-priority.conf" /etc/systemd
 systemctl daemon-reload
 systemctl restart security-web-gateway-deploy-helper.socket
 python3 "$REL/tools/enable_https_pac.py"
+python3 "$REL/tools/ensure_pac_access.py"
+python3 "$REL/tools/configure_block_page.py"
+/usr/sbin/squid -k parse
 /usr/sbin/nginx -t
 systemctl reload nginx
 systemctl restart squid

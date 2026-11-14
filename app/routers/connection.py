@@ -13,6 +13,7 @@ from app.config import MANAGEMENT_FQDN
 from app.services.system import certificate_health
 from app.services.pc_services import service_profiles, save_service
 from app.services.access_model import list_policy_groups
+from app.services import block_page, block_page_settings
 
 router=APIRouter(dependencies=[Depends(policy_guard)],prefix="/connection")
 
@@ -28,7 +29,39 @@ def page(request: Request):
     return request.app.state.templates.TemplateResponse(request=request, name="connection.html", context={
         "page_title": "Connection", "request": request, "policy": connection_policy(),
         "pac_url": pac_address(), "endpoint": endpoint_settings(), "management_fqdn": MANAGEMENT_FQDN, "certificate": certificate_health(), "proxy_endpoint": f"{PROXY_IP}:{PROXY_PORT}", "mode": MODE,
+        "branding": block_page_settings.settings(),
         "pc_services":service_profiles(), "groups":list_policy_groups()})
+
+
+@router.get('/blocked-page/preview', response_class=HTMLResponse)
+def blocked_page_preview(request: Request):
+    if not _admin(request): return HTMLResponse('Forbidden', 403)
+    return HTMLResponse(block_page.render(block_page_settings.settings(), preview=True))
+
+
+@router.post('/blocked-page')
+async def save_blocked_page(request: Request, csrf_token: str = Form(...), company: str = Form(...),
+                            title: str = Form(...), message: str = Form(...), contact: str = Form(''),
+                            remove_logo: bool = Form(False), logo: UploadFile | None = File(None)):
+    if not _admin(request): return HTMLResponse('Forbidden', 403)
+    if not auth.check_csrf(request.state.user, csrf_token): return HTMLResponse('Invalid request', 403)
+    import base64
+    from starlette.concurrency import run_in_threadpool
+    try:
+        value = {'company': company, 'title': title, 'message': message, 'contact': contact,
+                 'logo': '' if remove_logo else block_page_settings.settings()['logo']}
+        if logo and logo.filename:
+            raw = await logo.read(block_page.MAX_LOGO_BYTES + 1)
+            if not raw or len(raw) > block_page.MAX_LOGO_BYTES: raise ValueError('Use a PNG logo of at most 128 KB.')
+            value['logo'] = base64.b64encode(raw).decode('ascii')
+        block_page.validate(value)
+        await run_in_threadpool(block_page_settings.save, value, request.state.user['username'], auth.client_ip(request))
+        text = 'Company block page published.' if MODE == 'production' else 'Preview saved. Production block page is unchanged.'
+        return RedirectResponse('/connection?msg=' + quote_plus(text) + '#blocked-page', 303)
+    except (ValueError, OSError, RuntimeError) as exc:
+        return RedirectResponse('/connection?error=' + quote_plus(str(exc)) + '#blocked-page', 303)
+    finally:
+        if logo: await logo.close()
 
 
 @router.get('/bypass',response_class=HTMLResponse)

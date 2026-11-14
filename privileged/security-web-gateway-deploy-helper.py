@@ -183,8 +183,8 @@ def deploy(cid):
 
 def main():
     try:
-        raw=sys.stdin.readline(65537)
-        if len(raw)>65536:raise ValueError('Request too large.')
+        raw=sys.stdin.readline(262145)
+        if len(raw)>262144:raise ValueError('Request too large.')
         req=json.loads(raw)
         act=req.get('action')
         if act=='deploy':
@@ -212,6 +212,14 @@ def main():
                 r=module.install(req.get('certificate_data',{}))
         elif act=='save_notifications':
             r=save_notifications(req.get('settings'))
+        elif act=='save_block_page':
+            module_path=Path('/opt/security-web-gateway/current/privileged/block_page_install.py')
+            spec=importlib.util.spec_from_file_location('swg_block_page_install',module_path)
+            module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+            LOCK.parent.mkdir(parents=True,exist_ok=True)
+            with LOCK.open('a+') as lockf:
+                fcntl.flock(lockf.fileno(),fcntl.LOCK_EX)
+                r=module.install(req.get('settings'))
         else:
             raise ValueError('Unsupported action.')
         out(r.pop('ok',False),r.pop('message','Completed.'),**r)

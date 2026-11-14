@@ -5,7 +5,7 @@ Create the Access Profile, select/create its VLAN and choose allowed access on *
 Version 3.12 consolidates websites/domains/IPs under **Access**, separates **Proxy bypass**, groups traffic/health under **Monitoring**, exposes **Alerts & SNMP** directly, and uses one profile-or-VLAN selector. Install/upgrade provides an unassigned Google Search starter and no customer-specific application data. Optional read-only SNMPv2c polling/traps are configured with email/Slack; SNMPv3 is not included. See [the access/deployment guide](docs/CONNECTION_AND_LEARNING.md) and [notification/SNMP setup](docs/HEALTH_NOTIFICATIONS.md).
 
 
-**Version:** 3.12.7
+**Version:** 3.12.8
 
 **Target:** single-VM, on-prem enterprise appliance  
 **Target OS:** Ubuntu Server 24.04 LTS / 26.04 LTS  
@@ -59,6 +59,12 @@ Sizing should ultimately follow concurrent CONNECT sessions, requests/sec, WAN t
 - Operator changes remain pending for Admin approval. Advanced manual/HAR discovery remains available for authenticated or unusual workflows.
 - Browser discovery rejects private/reserved targets and DNS-rebinding/SSRF-style pivots.
 - PAC supports explicit DIRECT bypasses plus fail-open `PROXY ...; DIRECT` behavior.
+
+## v3.12.8 — visible PC setup and readable PAC delivery
+
+Overview → **Connect a PC** opens Connection directly at **PAC URL for your PC**. Copy the configured **Script address** into Windows; the same URL remains shared by endpoint downloads. Install/upgrade repairs directory traversal for anonymous nginx PAC delivery without granting access to private configuration files.
+
+**Connection → Blocked page** configures the company name, PNG logo, message and IT contact in one form with a preview. Denied HTTP requests display this page; HTTPS tunnels remain blocked with 403 and the browser displays its own connection error. This feature does not enable TLS interception. See [the block-page and whitelist guide](docs/CONNECTION_AND_LEARNING.md#company-block-page-and-allowed-only-access).
 
 ## v3.12.7 — security and recovery corrections
 

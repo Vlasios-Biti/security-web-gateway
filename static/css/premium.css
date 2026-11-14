@@ -74,7 +74,7 @@ input::placeholder,textarea::placeholder{color:#647084!important;opacity:1}label
 
 .profile-head{align-items:flex-start!important;gap:16px}.profile-head>div{flex:1;min-width:0}.profile-head>.badge{flex:0 0 auto;align-self:flex-start;white-space:nowrap;line-height:1.4}
 
-.pac-setup{margin-bottom:24px}.pac-copy-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.pac-copy-row input{flex:1 1 300px;min-width:0}.tls-summary{margin:20px 0;overflow-wrap:anywhere}.pac-setup form+form{margin-top:20px}.slack-topics{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.pac-setup{margin-bottom:24px;border:2px solid #bac9ff;scroll-margin-top:24px}.pac-setup>h3{font-size:22px;margin:8px 0}.pac-copy-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.pac-copy-row input{flex:1 1 300px;min-width:0;color:#172554!important;background:#f4f7ff!important;border:1px solid #a5b4fc;font:600 15px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;padding:14px}.pac-windows-guide{color:#334155;background:#f1f5f9;border-radius:10px;padding:12px 14px;line-height:1.7}.tls-summary{margin:20px 0;overflow-wrap:anywhere}.pac-setup form+form{margin-top:20px}.slack-topics{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
 
 .channel-settings>label:not(.check){display:grid;gap:6px;margin:14px 0}.channel-settings>label:not(.check)>input{width:100%;min-width:0}
 
@@ -85,3 +85,4 @@ input::placeholder,textarea::placeholder{color:#647084!important;opacity:1}label
 .pc-inventory-search{display:flex;gap:10px;flex-wrap:wrap;flex:1}.pc-inventory-search .search{flex:1 1 230px;min-width:0}.pc-inventory-search select{width:auto;min-width:130px}
 
 #clients-table{min-width:980px}#clients-table td:first-child{min-width:180px}#clients-table code,.pc-requests-table code{white-space:nowrap;overflow-wrap:normal;word-break:normal}.pc-requests-table{min-width:1050px}
+.branding-logo-preview{display:block;max-width:240px;max-height:100px;object-fit:contain;margin:16px 0}

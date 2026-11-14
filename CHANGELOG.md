@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.12.8
+
+- Adds Connection → Blocked page with company name, bounded PNG logo, title, message, IT contact and authenticated preview. Only administrators can save; production publication accepts validated settings, never arbitrary HTML or paths. Branding stays local to the VM across policy imports/upgrades.
+- Denied HTTP requests redirect to a fixed public local branded page; denied HTTPS CONNECT remains 403 and allowed policy rules keep priority. HTTPS browser errors cannot display this HTML without managed TLS inspection. Install/upgrade configures nginx/Squid and validates both; upgrade rollback restores the previous Squid base configuration.
+- Repairs nginx PAC 403 responses during install/upgrade by permitting traversal to the public PAC file while retaining private env/notification/TLS permissions. A disposable-file test verifies reads as an unprivileged UID and checks that private files remain inaccessible.
+- Adds an administrator Overview shortcut, Connect a PC, linking directly to the existing PAC setup card.
+- Makes Connection's configured PAC URL prominent with a Script address label, high-contrast selectable field, primary Copy action and inline Windows setup instructions. Address/certificate changes remain collapsed below it; the existing shared PAC configuration and endpoint downloads remain authoritative.
+
 ## 3.12.7
 
 - Prevents an in-flight login from overwriting a newer password reset; session insertion checks the verified credential under a write transaction. Failed-login counters update atomically without overwriting a changed credential.

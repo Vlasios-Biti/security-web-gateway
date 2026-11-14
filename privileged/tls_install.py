@@ -46,12 +46,15 @@ def install(value):
         data=ssl._ssl._test_decode_cert(str(paths[0]))
         if ssl.cert_time_to_seconds(data['notBefore']) > datetime.now(timezone.utc).timestamp():
             raise ValueError('Certificate is not valid yet.')
+        # Trust the supplied leaf only for this local identity/date check. This does
+        # not assert public/enterprise CA trust; clients must trust their own CA.
+        # x509 -checkhost exit codes differ across OpenSSL releases; verify fails closed.
         for host in set(hosts):
             if not isinstance(host, str) or len(host)>253 or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.-]*', host):
                 raise ValueError('Invalid gateway hostname.')
-            try: ipaddress.ip_address(host); flag='-checkip'
-            except ValueError: flag='-checkhost'
-            if command(['/usr/bin/openssl', 'x509', '-in', str(paths[0]), flag, host, '-noout']).returncode:
+            try: ipaddress.ip_address(host); flag='-verify_ip'
+            except ValueError: flag='-verify_hostname'
+            if command(['/usr/bin/openssl', 'verify', '-no-CAfile', '-no-CApath', '-partial_chain', '-trusted', str(paths[0]), flag, host, str(paths[0])]).returncode:
                 raise ValueError('Certificate does not cover the management / HTTPS PAC hostname.')
         # Retain old files in root-only temporary storage until validation and reload succeed.
         old=[]

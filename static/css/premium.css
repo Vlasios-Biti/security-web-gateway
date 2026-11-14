@@ -86,3 +86,5 @@ input::placeholder,textarea::placeholder{color:#647084!important;opacity:1}label
 
 #clients-table{min-width:980px}#clients-table td:first-child{min-width:180px}#clients-table code,.pc-requests-table code{white-space:nowrap;overflow-wrap:normal;word-break:normal}.pc-requests-table{min-width:1050px}
 .branding-logo-preview{display:block;max-width:240px;max-height:100px;object-fit:contain;margin:16px 0}
+#blocked-page form>label:not(.check){display:flex;flex-direction:column;gap:8px;margin:16px 0;font-weight:600}
+#blocked-page form>label>input,#blocked-page form>label>textarea{display:block;width:100%;min-width:0;font-weight:400}

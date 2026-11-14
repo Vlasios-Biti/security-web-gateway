@@ -58,6 +58,11 @@ def check(folder,executable=None):
                 page.goto((folder/(name+'.html')).resolve().as_uri())
                 page.locator('main details').evaluate_all('nodes=>nodes.forEach(e=>e.open=true)')
                 assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),('Form overflow',name,width)
+                if name=='connection':
+                    form_width=page.locator('#blocked-page form').bounding_box()['width']
+                    for field in ('message','contact','logo'):
+                        control=page.locator('#blocked-page [name="'+field+'"]').bounding_box()
+                        assert control['width']>=form_width*.9,('Branding field must fill its own row',field,width,control)
                 if name=='traffic-clients':
                     assert page.locator('#clients-table tbody code').count()>0
                     assert page.locator('#clients-table tbody code').evaluate_all('nodes=>nodes.every(e=>e.getBoundingClientRect().height<30)'), 'PC IPs must stay on one line, including on phones'

@@ -128,7 +128,7 @@ b01b6397565fba9b45602c443855554b5ae9a9281a11c1c7475ae6f768437bc1  ./scripts/pack
 0760e07ce528c30319736207d410bf1acd2ea8ab87c3e57f74ed9cbbeae950f5  ./scripts/patch_squid.py
 d1d23898943d68fe24cce12b3cd477c85bcd52739bddbbfb5d490f3e075c1651  ./static/css/app.css
 9d20fffd699cbdf1df93523236f4e308a7f38a6fe6acd0dc89b75107bde556c4  ./static/css/block-page.css
-d3c861a77527006de46c49a1f2954d08b9b64804cdde0f9327411a7f202ad016  ./static/css/premium.css
+65de2ecd9d0ee02a2f203074905e469b62f6effe33b520e106ac57b64f423066  ./static/css/premium.css
 14b5f4d1699f27e4b83e15b28baa4cd26d5a49cc7d49cc99d04d3c289c21be3c  ./static/css/ui-v35.css
 9d64c54f307b15ef40cb5ffd4fafe543064d6e4f305db8fa46140900a31d380f  ./static/css/ui-v36.css
 7d61b42a5d5b9ea19bd167c1abffb929dce531b26d68d64ebfd23e6cd127eeab  ./static/css/ui-v37.css
@@ -195,7 +195,7 @@ d25a2d52a471b3dff66e724ca2c1298fb0d9b77912586c4bfb428db48ae1cb2a  ./templates/tr
 5ec98d78a0aa839c005d84bc1a37efe3b0bfa71d266c7f77a32433410903a2a2  ./templates/users/edit.html
 19adb37f8034f34834622c880e472796110a4291e7c52712bae17d78b9e2f79e  ./templates/users/list.html
 d97334d01b644b1723ec080aaced3359808d385f4e5df0f28038fabb2f81810b  ./tests/browser_capture_e2e.py
-9a87a5bf88b75da83c8942619658c0d2918c3956b177a86826cab2cd67074034  ./tests/browser_navigation_layout.py
+eb34793df9dc2e3f7311f1f50e7c2eafbb8461d097f984388f75b6711ca1d892  ./tests/browser_navigation_layout.py
 ab06bef6b0f3968193993ec92e83117f5a336a086b695fef2b0a61eab4fd0202  ./tests/pac_contract.cjs
 4982b22d155642cb428bc01fa45297168e4dec117ef6bab8b90c11e20d3f1b72  ./tests/pac_permissions_contract.py
 a7d1d3c2bbc11e893d4deda0a175def5de269efc14283d8f35da0bc240e8dd1e  ./tests/routing_preview_contract.cjs

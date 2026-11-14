@@ -103,6 +103,9 @@ def update_application(application_id,name,provider,description,seed_domain,sour
         old_groups={x['group_id'] for x in c.execute("SELECT group_id FROM policy_group_applications WHERE application_id=?",(application_id,))}
         new_networks={int(x) for x in (network_ids or [])}
         new_groups=old_groups if policy_group_ids is None else {int(x) for x in (policy_group_ids or [])}
+        from app.services.resource_permissions import require_application_write,check_profile_membership_changes
+        require_application_write(c,application_id,actor)
+        check_profile_membership_changes(c,old_groups,new_groups,actor)
         policy_changed=(old_networks!=new_networks or old_groups!=new_groups)
         c.execute("""UPDATE applications SET name=?,provider=?,description=?,seed_domain=?,source_kind=?,source_ref=?,auto_monitor=?,
                   pending=CASE WHEN ? THEN 1 ELSE pending END,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?""",
@@ -304,9 +307,9 @@ def create_application_dependency(application_id,kind,destination,protocol,actor
     destination=normalize_domain(destination) if kind=='domain' else normalize_ip(destination)
     c=connect()
     try:
-        app=c.execute("SELECT * FROM applications WHERE id=? AND status!='deleted'",(application_id,)).fetchone()
-        if not app:raise ValueError('Application not found.')
         c.execute('BEGIN IMMEDIATE')
+        from app.services.resource_permissions import require_application_write
+        app=require_application_write(c,application_id,actor)
         existing=c.execute("SELECT * FROM rules WHERE rule_type=? AND destination=? AND status!='deleted'",(kind,destination)).fetchone()
         if existing:
             rid=existing['id']

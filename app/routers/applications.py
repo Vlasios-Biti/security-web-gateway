@@ -85,7 +85,7 @@ def allow_submit(request:Request,destination:str=Form(...),name:str=Form(''),acc
                     name=existing['name']
                     if access_mode=='none':access_mode='keep'
             finally:c.close()
-        return discover_custom(request,name=name.strip() or parsed.hostname,method='browser_auto',source_ref=url,seed_domain=parsed.hostname,auto_approve=1,access_mode=access_mode,network_ids=networks,policy_group_ids=groups,csrf_token=csrf_token)
+        return discover_custom(request,name=name.strip() or parsed.hostname,method='browser_auto',source_ref=url,seed_domain=parsed.hostname,client_ip='',window_minutes=10,auto_approve=1,access_mode=access_mode,network_ids=networks,policy_group_ids=groups,csrf_token=csrf_token)
     except ValueError as exc:
         return request.app.state.templates.TemplateResponse(request=request,name='applications/allow.html',context={'request':request,'page_title':'Add access','networks':list_networks(),'groups':list_policy_groups(),'error':str(exc),'draft_destination':destination,'draft_name':name,'access_groups':policy_group_ids if access_mode=='profiles' else [],'access_networks':network_ids if access_mode=='networks' else []},status_code=400)
 
@@ -125,9 +125,10 @@ def discover_catalog(request:Request,catalog_key:str=Form(...),policy_group_ids:
         baseline_dirty=save_apply_state()["dirty"]
         c=connect();existing=c.execute("SELECT id FROM applications WHERE name=? AND status!='deleted'",(item["name"],)).fetchone();c.close()
         aid=existing["id"] if existing else create_application(item["name"],item["provider"],item["description"],item["seed_domain"],item.get("source_kind",item["method"]),item.get("source_ref",catalog_key),bool(item.get("auto_monitor")),u["username"],system_managed=False)
-        save_discovery_access(aid,access_mode,network_ids,policy_group_ids)
+        if not can_modify_application(request,get_application(aid)):return HTMLResponse('Forbidden',403)
+        save_discovery_access(aid,access_mode,network_ids,policy_group_ids,u['username'])
         method=item["method"]
-        rid=create_run(aid,item.get("seed_domain") or item["name"],method,u["username"],source_ref=item.get("source_ref"),catalog_key=catalog_key,auto_apply=bool(u["role"]=="admin"),baseline_dirty=baseline_dirty);audit(u["username"],"DISCOVERY_START","SUCCESS","discovery_run",rid,auth.client_ip(request),json.dumps({"catalog":catalog_key,"method":method}));return RedirectResponse(f"/applications/discovery/{rid}",303)
+        rid=create_run(aid,item.get("seed_domain") or item["name"],method,u["username"],source_ref=item.get("source_ref"),catalog_key=catalog_key,auto_apply=bool(u["role"]=="admin"),baseline_dirty=baseline_dirty,defer=True);audit(u["username"],"DISCOVERY_START","SUCCESS","discovery_run",rid,auth.client_ip(request),json.dumps({"catalog":catalog_key,"method":method}));return RedirectResponse(f"/applications/discovery/{rid}",303)
     except Exception as exc:return RedirectResponse("/applications/discover?error="+str(exc).replace(" ","+"),303)
 
 @router.post("/discover/custom")
@@ -142,9 +143,10 @@ def discover_custom(request:Request,name:str=Form(...),seed_domain:str=Form(""),
             seed_domain=(p.hostname or "").strip().lower()
         c=connect();existing=c.execute("SELECT id FROM applications WHERE name=? AND status!='deleted'",(name.strip(),)).fetchone();c.close()
         aid=existing["id"] if existing else create_application(name,"Custom",f"Managed web application: {name}",seed_domain,"official_url" if method=="official_url" else "observed",source_ref,False,u["username"])
-        save_discovery_access(aid,access_mode,network_ids,policy_group_ids)
+        if not can_modify_application(request,get_application(aid)):return HTMLResponse('Forbidden',403)
+        save_discovery_access(aid,access_mode,network_ids,policy_group_ids,u['username'])
         query=seed_domain if method=="seed_probe" else (source_ref if method=="browser_auto" else name)
-        rid=create_run(aid,query,method,u["username"],source_ref=source_ref,client_ip=client_ip,window_minutes=window_minutes,auto_approve=bool(auto_approve),auto_apply=bool(auto_approve and u["role"]=="admin"),baseline_dirty=baseline_dirty);audit(u["username"],"DISCOVERY_START","SUCCESS","discovery_run",rid,auth.client_ip(request),json.dumps({"method":method,"automatic":bool(auto_approve)}))
+        rid=create_run(aid,query,method,u["username"],source_ref=source_ref,client_ip=client_ip,window_minutes=window_minutes,auto_approve=bool(auto_approve),auto_apply=bool(auto_approve and u["role"]=="admin"),baseline_dirty=baseline_dirty,defer=True);audit(u["username"],"DISCOVERY_START","SUCCESS","discovery_run",rid,auth.client_ip(request),json.dumps({"method":method,"automatic":bool(auto_approve)}))
         if auto_approve:
             return RedirectResponse(f"/applications/{aid}?msg=Application+created.+Dependencies+are+being+discovered+automatically",303)
         return RedirectResponse(f"/applications/discovery/{rid}",303)
@@ -161,7 +163,8 @@ async def discover_har_upload(request:Request,name:str=Form(...),seed_domain:str
         if len(raw)>DISCOVERY_MAX_HAR_BYTES:raise ValueError('HAR file is too large')
         c=connect();existing=c.execute("SELECT id FROM applications WHERE name=? AND status!='deleted'",(name.strip(),)).fetchone();c.close()
         aid=existing["id"] if existing else create_application(name,"Custom",f"Discovered application: {name}",seed_domain,"observed","HAR workflow",False,u["username"])
-        save_discovery_access(aid,access_mode,network_ids,policy_group_ids)
+        if not can_modify_application(request,get_application(aid)):return HTMLResponse('Forbidden',403)
+        save_discovery_access(aid,access_mode,network_ids,policy_group_ids,u['username'])
         rid=create_har_run(aid,seed_domain,raw,u["username"],auto_apply=bool(u["role"]=="admin"),baseline_dirty=baseline_dirty)
         audit(u["username"],"DISCOVERY_HAR","SUCCESS","discovery_run",rid,auth.client_ip(request),json.dumps({"filename":har_file.filename,"bytes":len(raw)}))
         return RedirectResponse(f"/applications/discovery/{rid}",303)

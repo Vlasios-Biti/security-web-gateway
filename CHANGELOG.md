@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.12.7
+
+- Prevents an in-flight login from overwriting a newer password reset; session insertion checks the verified credential under a write transaction. Failed-login counters update atomically without overwriting a changed credential.
+- Enforces protected application/profile membership permissions across name-based discovery, dependency review, service helpers and deferred approval; queued work rechecks current enabled actor authority. Candidate review joins the policy edit lock.
+- Fixes Add access passing FastAPI Form objects into real SQLite discovery creation. GUI source discovery is explicitly queued outside the request/edit lock, with migration 018 preserving old queued browser runs and separating synchronous source-sync ownership.
+- Normalizes HAR/discovery destinations before storage and again at approval. Generic hostname tokenization avoids repeated suffix matching; HTTP response work has a shared redirect deadline and closes timed-out connections.
+- Creates portable exports privately from the first write and atomically replaces their destination. Restore retains target pac_endpoint alongside connection_policy, including absence/default semantics.
+- Upgrade rollback uses a new snapshot after writers stop, preserves late credential changes and clears sessions. Fresh install gives the appliance data parent root ownership.
+- Windows controller validates backup identity and fixed registry targets, rejects untrusted/reparse storage and replaces directory ACLs explicitly. No live Windows registry/ACL or VM changes were made during review.
+- Disables the Cloudflare security-audit skill at the user's request and records ordinary review results and remaining operational checks separately.
+
 ## 3.12.6
 
 - Adds a detailed functional review and catalog of 405 application functions, with measured execution coverage and explicit deployment-validation limits.

@@ -98,6 +98,7 @@ if ! id proxy-mgmt >/dev/null 2>&1; then
   }
 fi
 usermod -a -G proxy proxy-mgmt
+install -d -o root -g proxy-mgmt -m 0750 /var/lib/security-web-gateway
 install -d -o root -g proxy-mgmt -m 0750 /opt/security-web-gateway/releases /etc/security-web-gateway /etc/security-web-gateway/tls
 install -d -o proxy-mgmt -g proxy-mgmt -m 0750 /var/lib/security-web-gateway/prod /var/lib/security-web-gateway/staging /var/lib/security-web-gateway/playwright /var/log/security-web-gateway
 install -d -o root -g proxy -m 0750 /var/lib/security-web-gateway/backups /etc/squid/managed

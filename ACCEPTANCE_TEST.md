@@ -125,3 +125,12 @@
 - Invalid traffic IDs, dates, IPs and ports must return HTTP 400. Oversized HAR must fail before creating an application. Archived profile status cannot be reactivated.
 - Verify fresh installation contains `current/privileged/tls_install.py` before testing certificate renewal on a pilot VM.
 - See `docs/DETAILED_FUNCTION_AUDIT.md` for automated results, function coverage and the outstanding real VM/PC/NMS checks. Do not equate that report with a completed independent security audit.
+
+## 3.12.7 security and recovery acceptance
+
+- Upgrade to schema 018 with the shipped upgrade script; confirm saved profiles/VLANs/users and PAC endpoint remain intact. Existing queued browser jobs continue and source-sync work is not claimed by the GUI queue.
+- Confirm protected applications/profile membership require Admin through discovery, dependency review and ordinary editors. Operator proposals remain pending for publication; disabled/downgraded actors cannot auto-approve queued work.
+- Use only a dummy pilot account to check login/reset behavior. A password reset must retain the new credential and cancel an older in-flight login.
+- Inspect a custom exported archive as 0600 from creation through publication. Cross-host restore must keep the target PAC URL in Connection, Windows package and Edge JSON.
+- Pilot the Windows controller separately; legacy untrusted owners/write ACLs or reparse paths must be inspected by an administrator. Pure backup validation tests do not prove real machine ACL behavior.
+- See `docs/SECURITY_CORRECTIONS.md` for verified corrections, source-only concerns and remaining deployment checks. The Cloudflare skill was disabled at the user's request.

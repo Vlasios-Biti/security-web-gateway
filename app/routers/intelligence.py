@@ -1,6 +1,7 @@
 import json
 from urllib.parse import quote_plus
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Request, Form, Depends
+from app.services.policy_lock import policy_guard
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app import auth
@@ -9,7 +10,7 @@ from app.services.policy_explain import explain_policy, explain_event
 from app.services.access_model import create_application_dependency, get_application
 from app.services.apply import save_apply_state,apply_saved_change,apply_message
 
-router=APIRouter(prefix='/intelligence')
+router=APIRouter(prefix='/intelligence',dependencies=[Depends(policy_guard)])
 
 def _manage(request):
     return request.state.user and request.state.user['role'] in ('admin','operator')
@@ -54,6 +55,9 @@ def review_candidate(candidate_id:int,request:Request,action:str=Form(...),csrf_
         if not row:return HTMLResponse('Candidate not found',404)
         row=dict(row)
     finally:c.close()
+    application=get_application(row['application_id'])
+    if not application:return HTMLResponse('Application not found',404)
+    if application['system_managed'] and u['role']!='admin':return HTMLResponse('Forbidden',403)
     try:
         baseline_dirty=save_apply_state()["dirty"]
         if action=='approve':

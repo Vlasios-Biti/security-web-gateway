@@ -182,6 +182,8 @@ def create_rule(kind,destination,protocol,network_ids,actor,reason,change_refere
     c=connect()
     try:
         if c.execute("SELECT 1 FROM rules WHERE rule_type=? AND destination=? AND status!='deleted'",(kind,destination)).fetchone():raise ValueError("A rule for this destination already exists.")
+        from app.services.resource_permissions import check_profile_membership_changes
+        check_profile_membership_changes(c,[],policy_group_ids or [],actor)
         cid=_system_category(c,category_slug) if management_type=="system" else _category(c,kind);fp=_fingerprint(kind,destination,protocol,management_type,cid)
         cur=c.execute("""INSERT INTO rules(rule_type,destination,protocol,category_id,management_type,status,pending,reason,change_reference,expires_at,fingerprint,created_by,updated_by,scope_mode)
           VALUES(?,?,?,?,?,'active',1,?,?,?,?,?,?,?)""",(kind,destination,protocol,cid,management_type,reason.strip(),change_reference or None,expires_at or None,fp,actor,actor,scope_mode));rid=cur.lastrowid
@@ -199,6 +201,9 @@ def update_rule(rule_id,destination,protocol,network_ids,actor,reason,change_ref
         r=c.execute("SELECT * FROM rules WHERE id=?",(rule_id,)).fetchone()
         if not r or r["status"]=="deleted":raise ValueError("Rule cannot be edited.")
         if r["management_type"]=="system" and not allow_system:raise ValueError("System rule requires administrator privileges.")
+        from app.services.resource_permissions import check_profile_membership_changes
+        old_groups={x['group_id'] for x in c.execute('SELECT group_id FROM policy_group_rules WHERE rule_id=?',(rule_id,))}
+        check_profile_membership_changes(c,old_groups,policy_group_ids or [],actor)
         destination=normalize_domain(destination) if r["rule_type"]=="domain" else normalize_ip(destination);resolved=[]
         if c.execute("SELECT 1 FROM rules WHERE rule_type=? AND destination=? AND id!=? AND status!='deleted'",(r["rule_type"],destination,rule_id)).fetchone():raise ValueError("Another rule for this destination already exists.")
         protocol=protocol.upper()

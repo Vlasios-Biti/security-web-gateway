@@ -34,19 +34,7 @@ for unit in security-web-gateway.service security-web-gateway-snmp.service "${TI
 systemctl stop "${TIMERS[@]}" "${WORKERS[@]}" security-web-gateway.service
 for unit in "${WORKERS[@]}" security-web-gateway.service; do if systemctl is-active --quiet "$unit"; then echo "Writer still active: $unit"; exit 1; fi; done
 install -d -o root -g root -m 0700 "$BACKUP"
-python3 - "$PDB" "$BACKUP/pre-restore.db" "$TMP/swg.db" <<'PY'
-import sqlite3,sys
-source=sqlite3.connect(sys.argv[1]);backup=sqlite3.connect(sys.argv[2]);source.backup(backup);backup.close()
-row=source.execute("SELECT value FROM settings WHERE key='connection_policy'").fetchone();source.close()
-c=sqlite3.connect(sys.argv[3])
-c.execute('DELETE FROM sessions')
-c.execute("UPDATE application_learning_sessions SET status='stopped' WHERE status='active'")
-c.execute("UPDATE discovery_runs SET status='discarded',error_text='Cancelled by state restore' WHERE status='running'")
-for table in ('health_test_queue','health_delivery_state','health_incidents'):c.execute('DELETE FROM '+table)
-c.execute("DELETE FROM settings WHERE key='connection_policy'")
-if row:c.execute("INSERT INTO settings(key,value) VALUES('connection_policy',?)",row)
-c.commit();c.execute('PRAGMA wal_checkpoint(TRUNCATE)');c.close()
-PY
+python3 "$ROOT/tools/prepare_restored_policy.py" "$PDB" "$BACKUP/pre-restore.db" "$TMP/swg.db"
 CUTOVER=1
 rm -f "$PDB-wal" "$PDB-shm"
 python3 - "$TMP/swg.db" "$PDB" <<'PY'

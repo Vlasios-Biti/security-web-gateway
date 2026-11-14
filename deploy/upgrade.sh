@@ -10,6 +10,7 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 BACKUP="/var/lib/security-web-gateway/backups/release-upgrade-$STAMP"
 OLD_REL=""
 CUTOVER=0
+DB_MUTATED=0
 SUCCESS=0
 SKIP_BROWSER=0
 
@@ -24,8 +25,12 @@ rollback(){
   echo "ERROR: upgrade failed; rolling back..." >&2
   systemctl stop security-web-gateway-snmp.service security-web-gateway.service security-web-gateway-health-monitor.service security-web-gateway-discovery.service security-web-gateway-telemetry.service security-web-gateway-performance.service security-web-gateway-source-sync.service security-web-gateway-storage-maintenance.service 2>/dev/null || true
   systemctl stop security-web-gateway-telemetry.timer security-web-gateway-source-sync.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer security-web-gateway-performance.timer security-web-gateway-health-monitor.timer 2>/dev/null || true
-  if [[ -f "$BACKUP/swg.db" ]]; then
-    rm -f "$PDB" "$PDB-wal" "$PDB-shm"; cp -a "$BACKUP/swg.db" "$PDB"; chown proxy-mgmt:proxy-mgmt "$PDB"; chmod 0640 "$PDB"
+  if [[ $DB_MUTATED -eq 1 && -f "$BACKUP/cutover.db" ]]; then
+    rm -f "$PDB" "$PDB-wal" "$PDB-shm"; cp -a "$BACKUP/cutover.db" "$PDB"; chown proxy-mgmt:proxy-mgmt "$PDB"; chmod 0640 "$PDB"
+    python3 - "$PDB" <<'PY'
+import sqlite3,sys
+with sqlite3.connect(sys.argv[1]) as c:c.execute('DELETE FROM sessions')
+PY
   fi
   if [[ -n "$OLD_REL" && -d "$OLD_REL" ]]; then ln -sfn "$OLD_REL" /opt/security-web-gateway/current; fi
   for f in "$BACKUP"/*.service "$BACKUP"/*.timer "$BACKUP"/security-web-gateway-deploy-helper.socket; do [[ -f "$f" ]] && cp -a "$f" /etc/systemd/system/; done
@@ -124,6 +129,17 @@ CUTOVER=1
 systemctl stop security-web-gateway-telemetry.timer security-web-gateway-source-sync.timer security-web-gateway-storage-maintenance.timer security-web-gateway-discovery.timer security-web-gateway-performance.timer security-web-gateway-health-monitor.timer 2>/dev/null || true
 systemctl stop security-web-gateway-snmp.service security-web-gateway-health-monitor.service 2>/dev/null || true
 systemctl stop security-web-gateway.service security-web-gateway-discovery.service security-web-gateway-telemetry.service security-web-gateway-performance.service security-web-gateway-source-sync.service security-web-gateway-storage-maintenance.service
+for unit in security-web-gateway.service security-web-gateway-snmp.service security-web-gateway-health-monitor.service security-web-gateway-discovery.service security-web-gateway-telemetry.service security-web-gateway-performance.service security-web-gateway-source-sync.service security-web-gateway-storage-maintenance.service; do
+  if systemctl is-active --quiet "$unit"; then echo "Writer still active: $unit" >&2; exit 1; fi
+done
+# The early backup is historical only. Rollback must retain all credential/session
+# changes made while dependencies and shadow validation were still running.
+python3 - "$PDB" "$BACKUP/cutover.db" <<'PY'
+import sqlite3,sys
+s=sqlite3.connect(sys.argv[1]);d=sqlite3.connect(sys.argv[2]);s.backup(d);d.close();s.close()
+PY
+chmod 0600 "$BACKUP/cutover.db"
+DB_MUTATED=1
 runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH="$REL" \
   "$VENV/bin/python" "$REL/tools/migrate.py" --db "$PDB" --root "$REL"
 runuser -u proxy-mgmt -- env $(grep -v '^#' /etc/security-web-gateway/production.env | xargs) PYTHONPATH="$REL" \

@@ -46,6 +46,7 @@ $MachineInternetSettings = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Inte
 $ProxyControlPolicy = "HKLM:\SOFTWARE\Policies\Microsoft\Internet Explorer\Control Panel"
 $WinHttpKey = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings\WinHttp"
 $ProductKey = "HKLM:\SOFTWARE\SecurityWebGateway\ProxyControl"
+$script:TrustedStateReady = $false
 
 function Test-IsAdministrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -89,7 +90,7 @@ function Ensure-Key {
 function Write-Log {
     param([Parameter(Mandatory)][string]$Message)
 
-    if (-not (Test-IsAdministrator)) { return }
+    if (-not (Test-IsAdministrator) -or -not $script:TrustedStateReady) { return }
 
     Ensure-Key -Path "HKLM:\SOFTWARE\SecurityWebGateway"
 
@@ -225,6 +226,7 @@ function Restore-InitialBackup {
     }
 
     $backup = Get-Content -Path $BackupFile -Raw | ConvertFrom-Json
+    Assert-BackupScope -Backup $backup
 
     foreach ($entry in $backup.Values) {
         if ($entry.Exists) {
@@ -390,14 +392,79 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$InstalledScript" -Mode
     Set-Content -Path $path -Value $content -Encoding ASCII
 }
 
-function Set-SecureFilePermissions {
-    # Program Files folder: SYSTEM/Admin full; Users read/execute.
-    & icacls.exe $InstallDir /inheritance:r | Out-Null
-    & icacls.exe $InstallDir /grant:r "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:(OI)(CI)F" "*S-1-5-32-545:(OI)(CI)RX" | Out-Null
+function Assert-BackupScope {
+    param([Parameter(Mandatory)]$Backup)
+    $allowed = @(
+        "$PolicyInternetSettings|ProxySettingsPerUser", "$PolicyInternetSettings|AutoDetect",
+        "$MachineInternetSettings|AutoConfigURL", "$MachineInternetSettings|ProxyEnable",
+        "$MachineInternetSettings|AutoDetect", "$MachineInternetSettings|ProxyServer",
+        "$MachineInternetSettings|ProxyOverride", "$ProxyControlPolicy|Proxy",
+        "$ProxyControlPolicy|Autoconfig", "$WinHttpKey|DisableWpad"
+    )
+    if ($Backup.Product -ne $ProductName -or $Backup.Computer -ne $env:COMPUTERNAME -or @($Backup.Values).Count -ne $allowed.Count) {
+        throw "The proxy backup does not match this computer or expected format. No registry values were restored."
+    }
+    $seen = @{}
+    foreach ($entry in $Backup.Values) {
+        $key = "{0}|{1}" -f $entry.Path, $entry.Name
+        if ($key -notin $allowed -or $seen.ContainsKey($key) -or $entry.Exists -isnot [bool]) { throw "Unexpected or duplicate registry target in proxy backup." }
+        if ($entry.Exists -and $entry.Kind -notin @('DWord','QWord','String','ExpandString','MultiString','Binary')) { throw "Unsupported registry type in proxy backup." }
+        $seen[$key] = $true
+    }
+}
 
-    # State/backup/log folder: SYSTEM/Admin only.
-    & icacls.exe $StateDir /inheritance:r | Out-Null
-    & icacls.exe $StateDir /grant:r "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:(OI)(CI)F" | Out-Null
+function Assert-TrustedLocalPath {
+    param([Parameter(Mandatory)][string]$Path)
+    $item = Get-Item -LiteralPath $Path -Force
+    $ancestor = $item
+    while ($null -ne $ancestor) {
+        if (($ancestor.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "Refusing redirected local path: $Path" }
+        if ($ancestor -is [IO.FileInfo]) { $ancestor = $ancestor.Directory } else { $ancestor = $ancestor.Parent }
+    }
+    $acl = Get-Acl -LiteralPath $Path
+    $trusted = @('S-1-5-18','S-1-5-32-544',[Security.Principal.WindowsIdentity]::GetCurrent().User.Value,
+        'S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464')
+    if ($acl.GetOwner([Security.Principal.SecurityIdentifier]).Value -notin $trusted) { throw "Untrusted owner of $Path. Administrator inspection is required." }
+    $writes = [Security.AccessControl.FileSystemRights]'Write,Delete,ChangePermissions,TakeOwnership,DeleteSubdirectoriesAndFiles'
+    foreach ($rule in $acl.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier])) {
+        if ($rule.AccessControlType -eq 'Allow' -and ($rule.PropagationFlags -band [Security.AccessControl.PropagationFlags]::InheritOnly) -eq 0 -and ($rule.FileSystemRights -band $writes) -ne 0 -and $rule.IdentityReference.Value -notin $trusted) {
+            throw "Untrusted write permission on $Path. Administrator inspection is required."
+        }
+    }
+}
+
+function Set-ManagedDirectoryAcl {
+    param([Parameter(Mandatory)][string]$Path,[bool]$UserRead = $false)
+    $acl = [Security.AccessControl.DirectorySecurity]::new()
+    $acl.SetAccessRuleProtection($true,$false)
+    $admins = [Security.Principal.SecurityIdentifier]::new('S-1-5-32-544')
+    $acl.SetOwner($admins)
+    foreach ($sid in @('S-1-5-18','S-1-5-32-544')) {
+        $identity = [Security.Principal.SecurityIdentifier]::new($sid)
+        $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($identity,'FullControl','ContainerInherit,ObjectInherit','None','Allow'))
+    }
+    if ($UserRead) {
+        $identity = [Security.Principal.SecurityIdentifier]::new('S-1-5-32-545')
+        $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($identity,'ReadAndExecute','ContainerInherit,ObjectInherit','None','Allow'))
+    }
+    Set-Acl -LiteralPath $Path -AclObject $acl
+}
+
+function Initialize-TrustedStorage {
+    foreach ($path in @((Split-Path $StateDir),$StateDir,$LogDir,(Split-Path $InstallDir),$InstallDir)) {
+        if (Test-Path -LiteralPath $path) { Assert-TrustedLocalPath $path }
+        else { New-Item -ItemType Directory -Path $path | Out-Null }
+        Set-ManagedDirectoryAcl -Path $path -UserRead ($path -eq $InstallDir -or $path -eq (Split-Path $InstallDir))
+    }
+    foreach ($path in @($BackupFile,$LogFile,$InstalledScript,(Join-Path $InstallDir 'Proxy-Control.exe'))) {
+        if (Test-Path -LiteralPath $path) { Assert-TrustedLocalPath $path }
+    }
+    $script:TrustedStateReady = $true
+}
+
+function Set-SecureFilePermissions {
+    Set-ManagedDirectoryAcl -Path $InstallDir -UserRead $true
+    Set-ManagedDirectoryAcl -Path $StateDir
 }
 
 function Install-SecurityWebGateway {
@@ -509,6 +576,7 @@ function Uninstall-SecurityWebGateway {
 Request-Elevation
 
 try {
+    if ($Mode -ne 'Status') { Initialize-TrustedStorage }
     switch ($Mode) {
         "Install"   { Install-SecurityWebGateway }
         "Enable"    { Enable-SecurityWebGateway }
